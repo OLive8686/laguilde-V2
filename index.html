@@ -358,7 +358,7 @@
 // 📌 CONFIGURATION
 // =============================================================================
 const SHEET_ID = '1x_XBv6Y6nih-SevBIE6KRGmg9eDoSGyNpi9VwFHcHjM';
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzaVnJL9YBVta4eKYhoZn3t-7MDsthaSiV6odX3-FsNH_mARaYRDVuNS5XzAmVDR8uoNQ/exec';       // ← URL du Google Apps Script déployé
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx7mMdcZQ-z_jwMmZ1QLX4c0oOM8aplBKjTS6voY7i1rKSlsR0Zb-XCwV1VmRLs7oyTEQ/exec';       // ← URL du Google Apps Script déployé
 const GOOGLE_CLIENT_ID = '274189183408-qgjihd7cg6k6tbb4gomeq44gbarih723.apps.googleusercontent.com'; // ← Client ID Google (SSO)
 const DISCORD_CLIENT_ID = '1477424032532922530'; // ← Client ID Discord (SSO, optionnel)
 // =============================================================================
@@ -492,7 +492,7 @@ function loginGoogle() {
 
 function loginDiscord() {
     if (!DISCORD_CLIENT_ID || !SCRIPT_URL) { toast('SSO Discord non configuré — utilisez pseudo/email', 'info'); showEmailForm(); return; }
-    const redirectUri = encodeURIComponent(SCRIPT_URL + '?action=discord_callback');
+    const redirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
     window.location.href = 'https://discord.com/api/oauth2/authorize?client_id=' + DISCORD_CLIENT_ID + '&redirect_uri=' + redirectUri + '&response_type=code&scope=identify%20email';
 }
 
@@ -507,10 +507,26 @@ function loginEmail() {
 
 function checkAuthCallback() {
     const p = new URLSearchParams(location.search);
+
+    // Discord : le site reçoit le code, l'envoie à Apps Script pour l'échange token
+    if (p.get('code') && !p.get('auth')) {
+        const code = p.get('code');
+        const redirectUri = window.location.origin + window.location.pathname;
+        history.replaceState({}, '', location.pathname + location.hash);
+        toast('Connexion Discord en cours...', 'info');
+        callAPI({ action: 'discord_exchange', code: code, redirect_uri: redirectUri })
+            .then(data => {
+                document.getElementById('authModal').classList.add('active');
+                showPseudoForm({ nom: data.nom || '', email: data.email || '', auth_type: 'discord', auth_id: data.auth_id || '' });
+            })
+            .catch(err => toast('Erreur Discord : ' + err.message, 'error'));
+        return;
+    }
+
+    // Ancien format (compatibilité)
     if (p.get('auth') === 'discord') {
         const ssoUser = { nom: p.get('nom')||'', email: p.get('email')||'', auth_type:'discord', auth_id: p.get('auth_id')||'' };
         history.replaceState({}, '', location.pathname + location.hash);
-        // Ouvre le modal avec le formulaire pseudo pré-rempli
         document.getElementById('authModal').classList.add('active');
         showPseudoForm(ssoUser);
     }
