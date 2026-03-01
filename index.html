@@ -390,7 +390,7 @@
 // 📌 CONFIGURATION
 // =============================================================================
 const SHEET_ID = '1x_XBv6Y6nih-SevBIE6KRGmg9eDoSGyNpi9VwFHcHjM';
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyIL-uimbnD66PAzet9GkmzHLSy3LmB8F2zUbO137-RDGfuqcVOfkQUwv5UFZsImRa2Ug/exec';       // ← URL du Google Apps Script déployé
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwBzYRBOAZOhwAaqGL-2PNP9OhCWrrrbhDXj--FK91L3XtzYUoZVENwoMDgCSK2TTl7/exec';       // ← URL du Google Apps Script déployé
 const GOOGLE_CLIENT_ID = '274189183408-qgjihd7cg6k6tbb4gomeq44gbarih723.apps.googleusercontent.com'; // ← Client ID Google (SSO)
 const DISCORD_CLIENT_ID = '1477424032532922530'; // ← Client ID Discord (SSO, optionnel)
 // =============================================================================
@@ -402,36 +402,39 @@ let pendingSSOUser = null; // Stocke les infos SSO en attendant le choix du pseu
 
 // ── Google Sheets CSV ───────────────────────────────────────────────────────
 function getSheetCSV(tab) {
-    // cache:'no-store' dans fetch() = empêche le cache navigateur
-    // &_t=timestamp = empêche le cache serveur Google (URL unique à chaque appel)
     return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}&_t=${Date.now()}`;
 }
 
 /**
- * Récupère un onglet Google Sheet en CSV, sans cache.
- * On utilise fetch() avec cache:'no-store' pour forcer Google
- * à renvoyer les données fraîches à chaque chargement.
+ * Récupère les données d'un onglet Google Sheet.
+ * Stratégie : essaie d'abord via le backend Apps Script (données toujours
+ * fraîches, pas de cache Google), puis fallback sur le CSV gviz si le
+ * backend n'est pas configuré ou échoue.
  */
-async function fetchCSV(tab) {
+async function fetchSheetData(tab) {
+    // 1. Essai via le backend Apps Script (lecture directe, sans cache)
+    if (SCRIPT_URL) {
+        try {
+            var result = await callAPI({ action: 'get_sheet', tab: tab });
+            if (result.ok && result.data) return result.data;
+        } catch(e) { /* fallback sur CSV */ }
+    }
+    // 2. Fallback : CSV via l'endpoint gviz/tq de Google (peut être en cache)
     if (!SHEET_ID) return null;
     try {
         var resp = await fetch(getSheetCSV(tab), { cache: 'no-store' });
         var text = await resp.text();
-        var result = Papa.parse(text, { header: true, skipEmptyLines: true });
-        return result.data;
+        var parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+        return parsed.data;
     } catch(e) { return null; }
 }
 
 async function fetchConfig() {
-    if (!SHEET_ID) return null;
-    try {
-        var resp = await fetch(getSheetCSV('config'), { cache: 'no-store' });
-        var text = await resp.text();
-        var result = Papa.parse(text, { header: true, skipEmptyLines: true });
-        var c = {};
-        result.data.forEach(row => { if (row.cle) c[row.cle.trim()] = (row.valeur || '').trim(); });
-        return c;
-    } catch(e) { return null; }
+    var data = await fetchSheetData('config');
+    if (!data) return null;
+    var c = {};
+    data.forEach(row => { if (row.cle) c[row.cle.trim()] = (row.valeur || '').trim(); });
+    return c;
 }
 
 // ── Apps Script API ─────────────────────────────────────────────────────────
@@ -825,8 +828,8 @@ async function loadMesInscriptions() {
 async function refreshProgramme() {
     let items;
     if (SCRIPT_URL) {
-        try { items = (await callAPI({ action:'get_programme' })).programme; } catch(e) { items = await fetchCSV('programme'); }
-    } else { items = await fetchCSV('programme'); }
+        try { items = (await callAPI({ action:'get_programme' })).programme; } catch(e) { items = await fetchSheetData('programme'); }
+    } else { items = await fetchSheetData('programme'); }
     if (items) renderProgramme(items);
 }
 
@@ -894,6 +897,17 @@ function renderConfig(c) {
     if (c.image_hero) document.getElementById('heroBgImage').style.backgroundImage = `url(${c.image_hero})`;
 }
 
+/**
+ * Formate un prix pour l'affichage : nombre → "X,XXe", texte → tel quel.
+ * Gère les cas : "4" → "4,00€", "0.5" → "0,50€", "Gratuit" → "Gratuit", "" → ""
+ */
+function formatPrix(prix) {
+    if (!prix) return '';
+    var n = parseFloat(prix);
+    if (isNaN(n)) return prix; // texte libre (ex: "Gratuit")
+    return n.toFixed(2).replace('.', ',') + '€';
+}
+
 function renderRestauration(items) {
     if (!items) return;
     // Grouper les items par catégorie pour aérer l'affichage
@@ -907,7 +921,7 @@ function renderRestauration(items) {
         }
         html += `
         <div class="menu-item animate-on-scroll visible">
-            <div class="menu-item-header"><div class="menu-item-name">${i.item||''}</div><div class="menu-item-price">${i.prix||''}</div></div>
+            <div class="menu-item-header"><div class="menu-item-name">${i.item||''}</div><div class="menu-item-price">${formatPrix(i.prix)}</div></div>
             <div class="menu-item-desc">${i.description||''}</div>
         </div>`;
     });
@@ -1002,7 +1016,7 @@ function initScrollAnimations() {
 async function init() {
     checkAuthCallback();
     updateNavUser();
-    const [config, restauration, animations] = await Promise.all([fetchConfig(), fetchCSV('restauration'), fetchCSV('animations'), refreshProgramme()]);
+    const [config, restauration, animations] = await Promise.all([fetchConfig(), fetchSheetData('restauration'), fetchSheetData('animations'), refreshProgramme()]);
     renderConfig(config);
     renderRestauration(restauration);
     renderAnimations(animations);
