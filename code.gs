@@ -412,6 +412,9 @@ function doGet(e) {
       case 'get_programme':
         return jsonResponse(getProgrammeAvecPlaces(), callback);
 
+      case 'get_sheet':
+        return jsonResponse(getSheetData(e.parameter), callback);
+
       case 'get_inscriptions':
         return jsonResponse(getInscriptionsPubliques(e.parameter), callback);
 
@@ -489,6 +492,32 @@ function doPost(e) {
   } catch (err) {
     return jsonResponse({ error: err.message });
   }
+}
+
+
+// ─── Lecture générique d'un onglet ──────────────────────────────────────────
+
+/**
+ * Lit n'importe quel onglet du Google Sheet et renvoie ses données en JSON.
+ * Utilisé pour servir les données fraîches (restauration, animations, config)
+ * sans passer par le cache de l'endpoint gviz/tq de Google.
+ * Seuls certains onglets sont autorisés (liste blanche) pour éviter
+ * d'exposer des données sensibles (inscriptions, accompagnants).
+ * @param {Object} params - { tab: string } - nom de l'onglet à lire
+ * @returns {Object} { ok, data: [...] }
+ */
+function getSheetData(params) {
+  var tab = (params.tab || '').toString().trim();
+
+  // Liste blanche des onglets publics — sécurité : on n'expose pas
+  // les onglets contenant des données personnelles (inscriptions, accompagnants)
+  var allowed = ['config', 'restauration', 'animations'];
+  if (allowed.indexOf(tab) === -1) {
+    return { error: 'Onglet non autorisé : ' + tab };
+  }
+
+  var data = readSheet(tab);
+  return { ok: true, data: data };
 }
 
 
