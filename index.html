@@ -245,6 +245,19 @@
     </div>
 </div>
 
+<!-- MODAL CHOIX ACCOMPAGNANT — affiché quand un joueur avec accompagnants clique "S'inscrire" -->
+<div class="modal-overlay" id="choixModal">
+    <div class="modal">
+        <button class="modal-close" onclick="closeChoixModal()">✕</button>
+        <h3>Pour qui ?</h3>
+        <p class="modal-game" id="choixModalGame"></p>
+        <p id="choixModalCreneau" style="font-size:13px;color:var(--text-muted);text-align:center;margin-bottom:20px"></p>
+        <div id="choixOptions" class="auth-options">
+            <!-- Rempli dynamiquement par showChoixModal() -->
+        </div>
+    </div>
+</div>
+
 <!-- NAV -->
 <nav class="nav" id="nav">
     <div class="nav-inner">
@@ -306,6 +319,21 @@
     </div>
 </section>
 
+<!-- MES ACCOMPAGNANTS (visible si connecté) -->
+<section class="section section-dark" id="mesAccompagnants" style="display:none">
+    <div class="section-inner">
+        <div class="section-header"><p class="section-label">Mon espace</p><h2 class="section-title">Mes accompagnants</h2><div class="section-sep"></div></div>
+        <p style="color:var(--text-light);text-align:center;margin-bottom:24px;font-size:14px">Ajoutez jusqu'à 3 accompagnants (enfants, conjoint…) pour les inscrire à des tables.</p>
+        <div id="accompagnantsGrid"></div>
+        <div id="addAccompagnantForm" style="text-align:center;margin-top:20px">
+            <div style="display:inline-flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center">
+                <input type="text" id="inputNomAccompagnant" placeholder="Prénom / pseudo de l'accompagnant" style="padding:10px 16px;border-radius:8px;border:1px solid rgba(46,139,139,0.2);background:rgba(255,255,255,0.05);color:var(--cream);font-family:var(--font-body);font-size:14px;width:280px" onkeydown="if(event.key==='Enter')ajouterAccompagnant()">
+                <button class="btn btn-small btn-green" onclick="ajouterAccompagnant()">+ Ajouter</button>
+            </div>
+        </div>
+    </div>
+</section>
+
 <!-- PROGRAMME -->
 <section class="section section-dark" id="programme">
     <div class="section-inner">
@@ -358,12 +386,13 @@
 // 📌 CONFIGURATION
 // =============================================================================
 const SHEET_ID = '1x_XBv6Y6nih-SevBIE6KRGmg9eDoSGyNpi9VwFHcHjM';
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx7mMdcZQ-z_jwMmZ1QLX4c0oOM8aplBKjTS6voY7i1rKSlsR0Zb-XCwV1VmRLs7oyTEQ/exec';       // ← URL du Google Apps Script déployé
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyIL-uimbnD66PAzet9GkmzHLSy3LmB8F2zUbO137-RDGfuqcVOfkQUwv5UFZsImRa2Ug/exec';       // ← URL du Google Apps Script déployé
 const GOOGLE_CLIENT_ID = '274189183408-qgjihd7cg6k6tbb4gomeq44gbarih723.apps.googleusercontent.com'; // ← Client ID Google (SSO)
 const DISCORD_CLIENT_ID = '1477424032532922530'; // ← Client ID Discord (SSO, optionnel)
 // =============================================================================
 
 let currentUser = JSON.parse(localStorage.getItem('melusine_user') || 'null');
+let accompagnants = JSON.parse(localStorage.getItem('melusine_accompagnants') || '[]'); // Liste des accompagnants du joueur
 let pendingInscription = null;
 let pendingSSOUser = null; // Stocke les infos SSO en attendant le choix du pseudo
 
@@ -421,15 +450,30 @@ function setUser(user) {
     localStorage.setItem('melusine_user', JSON.stringify(user));
     updateNavUser();
     loadMesInscriptions();
-    if (pendingInscription) { doInscrire(pendingInscription.creneau, pendingInscription.jeu); pendingInscription = null; }
+    // Charger les accompagnants, puis gérer l'inscription en attente
+    loadAccompagnants().then(function() {
+        renderAccompagnants();
+        if (pendingInscription) {
+            // Si le joueur a des accompagnants, on demande "Pour qui ?"
+            if (accompagnants.length > 0) {
+                showChoixModal(pendingInscription.creneau, pendingInscription.jeu);
+            } else {
+                doInscrire(pendingInscription.creneau, pendingInscription.jeu);
+            }
+            pendingInscription = null;
+        }
+    });
     closeAuthModal();
 }
 
 function logout() {
     currentUser = null;
+    accompagnants = [];
     localStorage.removeItem('melusine_user');
+    localStorage.removeItem('melusine_accompagnants');
     updateNavUser();
     document.getElementById('mesInscriptions').style.display = 'none';
+    document.getElementById('mesAccompagnants').style.display = 'none';
     refreshProgramme();
 }
 
@@ -533,12 +577,168 @@ function checkAuthCallback() {
     if (p.get('error')) { toast('Erreur : ' + p.get('error'), 'error'); history.replaceState({}, '', location.pathname + location.hash); }
 }
 
+// ── Accompagnants ────────────────────────────────────────────────────────────
+// Gestion des accompagnants (enfants, conjoints) liés au compte du joueur.
+// Stockés côté serveur (onglet accompagnants) ET en localStorage pour le confort.
+
+/**
+ * Charge la liste des accompagnants depuis le backend.
+ * Met à jour la variable globale et le localStorage.
+ * @returns {Promise} résolue quand le chargement est terminé
+ */
+async function loadAccompagnants() {
+    if (!currentUser || !SCRIPT_URL) return;
+    try {
+        const r = await callAPI({ action: 'get_accompagnants', email: currentUser.email });
+        accompagnants = r.accompagnants || [];
+        localStorage.setItem('melusine_accompagnants', JSON.stringify(accompagnants));
+    } catch(e) { console.warn('Erreur chargement accompagnants:', e); }
+}
+
+/**
+ * Affiche la liste des accompagnants et le formulaire d'ajout.
+ * Masque le formulaire si le joueur a déjà 3 accompagnants.
+ */
+function renderAccompagnants() {
+    const section = document.getElementById('mesAccompagnants');
+    const grid = document.getElementById('accompagnantsGrid');
+    const addForm = document.getElementById('addAccompagnantForm');
+
+    if (!currentUser) { section.style.display = 'none'; return; }
+    section.style.display = 'block';
+
+    if (accompagnants.length === 0) {
+        grid.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:14px">Aucun accompagnant pour le moment.</p>';
+    } else {
+        grid.innerHTML = accompagnants.map(a => `
+            <div class="mes-inscriptions" style="border-color:rgba(212,168,67,0.15)">
+                <div class="mi-info">
+                    <h4 style="color:var(--gold)">${a.nom_accompagnant}</h4>
+                    <p style="font-size:13px;color:var(--text-muted)">Accompagnant</p>
+                </div>
+                <button class="btn btn-small btn-red" onclick="supprimerAccompagnant('${esc(a.nom_accompagnant)}')">Supprimer</button>
+            </div>`).join('');
+    }
+
+    // Masquer le formulaire d'ajout si déjà 3 accompagnants (le maximum)
+    addForm.style.display = accompagnants.length >= 3 ? 'none' : 'block';
+}
+
+/**
+ * Ajoute un accompagnant via l'API backend.
+ * Vérifie côté client que le champ n'est pas vide, puis appelle le backend
+ * qui fait les vraies validations (max 3, doublon, longueur).
+ */
+async function ajouterAccompagnant() {
+    const input = document.getElementById('inputNomAccompagnant');
+    const nom = input.value.trim();
+    if (!nom) { toast('Entrez le nom de l\'accompagnant', 'error'); return; }
+    if (!currentUser) { toast('Connectez-vous d\'abord', 'error'); return; }
+
+    try {
+        const r = await callAPI({
+            action: 'add_accompagnant',
+            email: currentUser.email,
+            nom_accompagnant: nom
+        });
+        toast(r.message, 'success');
+        input.value = '';
+        await loadAccompagnants();
+        renderAccompagnants();
+    } catch(e) { toast(e.message, 'error'); }
+}
+
+/**
+ * Supprime un accompagnant ET toutes ses inscriptions.
+ * Demande confirmation avant de procéder (action irréversible).
+ */
+async function supprimerAccompagnant(nomAccompagnant) {
+    if (!confirm('Supprimer ' + nomAccompagnant + ' ? Toutes ses inscriptions seront annulées.')) return;
+
+    try {
+        const r = await callAPI({
+            action: 'remove_accompagnant',
+            email: currentUser.email,
+            nom_accompagnant: nomAccompagnant
+        });
+        toast(r.message, 'success');
+        await loadAccompagnants();
+        renderAccompagnants();
+        loadMesInscriptions(); // Rafraîchir car des inscriptions ont pu être annulées
+        refreshProgramme();    // Les places ont pu changer
+    } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── Modal "Pour qui ?" ──────────────────────────────────────────────────────
+// Affiché quand un joueur qui a des accompagnants clique "S'inscrire".
+// Permet de choisir : inscription pour soi ou pour un accompagnant.
+
+/**
+ * Affiche le modal de choix "Pour qui s'inscrire ?"
+ * avec un bouton par personne (le joueur + ses accompagnants).
+ */
+function showChoixModal(creneau, jeu) {
+    document.getElementById('choixModalGame').textContent = jeu;
+    document.getElementById('choixModalCreneau').textContent = 'Créneau : ' + creneau;
+
+    // Construire la liste : moi + mes accompagnants
+    let options = `
+        <button class="auth-btn" onclick="doInscrire('${esc(creneau)}','${esc(jeu)}'); closeChoixModal()">
+            <span class="auth-btn-icon">🧑</span>
+            <div><div class="auth-btn-text">${currentUser.nom} (moi)</div><div class="auth-btn-sub">Inscription personnelle</div></div>
+        </button>`;
+
+    accompagnants.forEach(function(a) {
+        options += `
+            <button class="auth-btn" onclick="doInscrireAccompagnant('${esc(creneau)}','${esc(jeu)}','${esc(a.nom_accompagnant)}'); closeChoixModal()">
+                <span class="auth-btn-icon">👤</span>
+                <div><div class="auth-btn-text">${a.nom_accompagnant}</div><div class="auth-btn-sub">Accompagnant</div></div>
+            </button>`;
+    });
+
+    document.getElementById('choixOptions').innerHTML = options;
+    document.getElementById('choixModal').classList.add('active');
+}
+
+function closeChoixModal() {
+    document.getElementById('choixModal').classList.remove('active');
+}
+
+/**
+ * Inscription d'un accompagnant à une table.
+ * Envoie type_inscrit et nom_accompagnant au backend.
+ */
+async function doInscrireAccompagnant(creneau, jeu, nomAccompagnant) {
+    if (!SCRIPT_URL) { toast('Backend non configuré', 'info'); return; }
+    try {
+        const r = await callAPI({
+            action: 'inscrire',
+            nom: currentUser.nom,
+            email: currentUser.email,
+            auth_type: currentUser.auth_type,
+            auth_id: currentUser.auth_id || '',
+            creneau: creneau,
+            jeu: jeu,
+            type_inscrit: 'accompagnant',
+            nom_accompagnant: nomAccompagnant
+        });
+        toast(r.message, r.statut === 'inscrit' ? 'success' : 'info');
+        refreshProgramme();
+        loadMesInscriptions();
+    } catch(e) { toast(e.message, 'error'); }
+}
+
 // ── Inscriptions ────────────────────────────────────────────────────────────
 function esc(s) { return (s||'').replace(/'/g, "\\'"); }
 
 function handleInscrire(creneau, jeu) {
     if (!currentUser) { openAuthModal(creneau, jeu); return; }
-    doInscrire(creneau, jeu);
+    // Si le joueur a des accompagnants, on demande "Pour qui ?"
+    if (accompagnants.length > 0) {
+        showChoixModal(creneau, jeu);
+    } else {
+        doInscrire(creneau, jeu);
+    }
 }
 
 async function doInscrire(creneau, jeu) {
@@ -551,10 +751,14 @@ async function doInscrire(creneau, jeu) {
     } catch(e) { toast(e.message, 'error'); }
 }
 
-async function annulerInscription(creneau, jeu) {
+async function annulerInscription(creneau, jeu, nomAccompagnant) {
     if (!currentUser || !SCRIPT_URL) return;
     try {
-        const r = await callAPI({ action:'annuler', email:currentUser.email, creneau, jeu });
+        // Paramètres de base
+        const params = { action:'annuler', email:currentUser.email, creneau, jeu };
+        // Si c'est l'annulation d'un accompagnant, on ajoute son nom
+        if (nomAccompagnant) params.nom_accompagnant = nomAccompagnant;
+        const r = await callAPI(params);
         toast(r.message, 'success');
         refreshProgramme();
         loadMesInscriptions();
@@ -569,11 +773,43 @@ async function loadMesInscriptions() {
         const section = document.getElementById('mesInscriptions');
         if (r.inscriptions && r.inscriptions.length) {
             section.style.display = 'block';
-            container.innerHTML = r.inscriptions.map(i => `
+
+            // Séparer inscriptions personnelles et accompagnants
+            const perso = r.inscriptions.filter(i => !i.nom_accompagnant || i.type_inscrit !== 'accompagnant');
+            const accs = r.inscriptions.filter(i => i.nom_accompagnant && i.type_inscrit === 'accompagnant');
+
+            let html = '';
+
+            // Inscriptions personnelles
+            html += perso.map(i => `
                 <div class="mes-inscriptions">
                     <div class="mi-info"><h4>${i.jeu}</h4><p>${i.creneau} · <span class="badge badge-${i.statut}">${i.statut==='inscrit'?'✅ Inscrit·e':'⏳ En attente'}</span></p></div>
                     <button class="btn btn-small btn-red" onclick="annulerInscription('${esc(i.creneau)}','${esc(i.jeu)}')">Annuler</button>
                 </div>`).join('');
+
+            // Inscriptions des accompagnants, groupées par nom
+            if (accs.length) {
+                const parAcc = {};
+                accs.forEach(i => {
+                    if (!parAcc[i.nom_accompagnant]) parAcc[i.nom_accompagnant] = [];
+                    parAcc[i.nom_accompagnant].push(i);
+                });
+
+                Object.keys(parAcc).forEach(nomAcc => {
+                    html += `<div style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(212,168,67,0.15)">
+                        <p style="font-family:var(--font-heading);font-size:13px;color:var(--gold);letter-spacing:1px;margin-bottom:8px">👤 ${nomAcc} (accompagnant)</p>`;
+
+                    html += parAcc[nomAcc].map(i => `
+                        <div class="mes-inscriptions" style="border-color:rgba(212,168,67,0.15)">
+                            <div class="mi-info"><h4>${i.jeu}</h4><p>${i.creneau} · <span class="badge badge-${i.statut}">${i.statut==='inscrit'?'✅ Inscrit·e':'⏳ En attente'}</span></p></div>
+                            <button class="btn btn-small btn-red" onclick="annulerInscription('${esc(i.creneau)}','${esc(i.jeu)}','${esc(i.nom_accompagnant)}')">Annuler</button>
+                        </div>`).join('');
+
+                    html += '</div>';
+                });
+            }
+
+            container.innerHTML = html;
         } else { section.style.display = 'none'; }
     } catch(e) { console.warn('Erreur inscriptions:', e); }
 }
@@ -697,12 +933,13 @@ function renderAdminPanel(data, pw) {
         </div>
         <h3 style="font-family:var(--font-heading);color:var(--cream);margin-bottom:16px">Inscriptions</h3>
         <div style="overflow-x:auto"><table class="admin-table">
-            <thead><tr><th>Date</th><th>Nom</th><th>Email</th><th>Auth</th><th>Créneau</th><th>Jeu</th><th>Statut</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Date</th><th>Nom</th><th>Email</th><th>Auth</th><th>Type</th><th>Créneau</th><th>Jeu</th><th>Statut</th><th>Actions</th></tr></thead>
             <tbody>${(data.inscriptions||[]).filter(i=>i.statut!=='supprimé'&&i.statut!=='annulé').map((i,idx)=>`
                 <tr>
                     <td>${i.timestamp?new Date(i.timestamp).toLocaleDateString('fr'):'—'}</td>
                     <td style="color:var(--cream)">${i.nom}</td><td>${i.email}</td>
                     <td><span class="badge" style="font-size:10px">${i.auth_type}</span></td>
+                    <td>${(i.type_inscrit||'principal')==='accompagnant'?`<span style="color:var(--gold);font-size:11px">👤 ${i.nom_accompagnant||''}</span>`:'<span style="font-size:11px;color:var(--text-muted)">principal</span>'}</td>
                     <td>${i.creneau}</td><td style="color:var(--cream)">${i.jeu}</td>
                     <td><span class="badge badge-${i.statut}">${i.statut}</span></td>
                     <td>
@@ -735,6 +972,7 @@ document.getElementById('navToggle').addEventListener('click', function() { this
 document.querySelectorAll('.nav-links a').forEach(l => l.addEventListener('click', () => { document.getElementById('navToggle').classList.remove('open'); document.getElementById('navLinks').classList.remove('open'); }));
 document.getElementById('scrollTop').addEventListener('click', () => window.scrollTo({ top:0, behavior:'smooth' }));
 document.getElementById('authModal').addEventListener('click', e => { if (e.target===e.currentTarget) closeAuthModal(); });
+document.getElementById('choixModal').addEventListener('click', e => { if (e.target===e.currentTarget) closeChoixModal(); });
 if (location.hash==='#admin') document.getElementById('admin').style.display='block';
 window.addEventListener('hashchange', () => { document.getElementById('admin').style.display = location.hash==='#admin'?'block':'none'; });
 
@@ -751,7 +989,10 @@ async function init() {
     renderConfig(config);
     renderRestauration(restauration);
     renderAnimations(animations);
-    if (currentUser) loadMesInscriptions();
+    if (currentUser) {
+        loadMesInscriptions();
+        loadAccompagnants().then(renderAccompagnants);
+    }
     initScrollAnimations();
 }
 
@@ -781,6 +1022,12 @@ window.loginEmail = loginEmail;
 window.handleInscrire = handleInscrire;
 window.annulerInscription = annulerInscription;
 window.logout = logout;
+// Accompagnants
+window.ajouterAccompagnant = ajouterAccompagnant;
+window.supprimerAccompagnant = supprimerAccompagnant;
+window.showChoixModal = showChoixModal;
+window.closeChoixModal = closeChoixModal;
+window.doInscrireAccompagnant = doInscrireAccompagnant;
 
 document.addEventListener('DOMContentLoaded', init);
 })();
