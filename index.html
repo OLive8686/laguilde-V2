@@ -140,6 +140,8 @@
 
         /* RESTAURATION */
         .menu-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+        .menu-category-title{grid-column:1/-1;font-family:var(--font-heading);font-size:18px;color:var(--orange);letter-spacing:2px;text-transform:uppercase;margin-top:24px;padding-bottom:8px;border-bottom:1px solid rgba(224,122,48,0.2)}
+        .menu-category-title:first-child{margin-top:0}
         .menu-item{background:var(--dark-card);border-radius:12px;padding:24px;border:1px solid rgba(224,122,48,0.08);transition:all var(--transition)} .menu-item:hover{border-color:rgba(224,122,48,0.2)}
         .menu-item-category{font-family:var(--font-heading);font-size:13px;letter-spacing:1px;text-transform:uppercase;color:var(--orange);background:rgba(224,122,48,0.1);padding:4px 10px;border-radius:4px;display:inline-block;margin-bottom:12px}
         .menu-item-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
@@ -891,12 +893,22 @@ function renderConfig(c) {
 
 function renderRestauration(items) {
     if (!items) return;
-    document.getElementById('menuGrid').innerHTML = items.map(i => `
+    // Grouper les items par catégorie pour aérer l'affichage
+    var html = '';
+    var currentCat = null;
+    items.forEach(function(i) {
+        // Si la catégorie change, on insère un titre de section pleine largeur
+        if (i.categorie && i.categorie !== currentCat) {
+            currentCat = i.categorie;
+            html += `<div class="menu-category-title">${currentCat}</div>`;
+        }
+        html += `
         <div class="menu-item animate-on-scroll visible">
-            ${i.categorie?`<div class="menu-item-category">${i.categorie}</div>`:''}
             <div class="menu-item-header"><div class="menu-item-name">${i.item||''}</div><div class="menu-item-price">${i.prix||''}</div></div>
             <div class="menu-item-desc">${i.description||''}</div>
-        </div>`).join('');
+        </div>`;
+    });
+    document.getElementById('menuGrid').innerHTML = html;
 }
 
 function renderAnimations(items) {
