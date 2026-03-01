@@ -402,7 +402,9 @@ let pendingSSOUser = null; // Stocke les infos SSO en attendant le choix du pseu
 
 // ── Google Sheets CSV ───────────────────────────────────────────────────────
 function getSheetCSV(tab) {
-    return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}`;
+    // Le paramètre _t (timestamp) empêche le cache navigateur/Google
+    // de servir une version périmée après modification du Google Sheet
+    return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}&_t=${Date.now()}`;
 }
 
 function fetchCSV(tab) {
