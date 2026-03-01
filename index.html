@@ -402,35 +402,34 @@ let pendingSSOUser = null; // Stocke les infos SSO en attendant le choix du pseu
 
 // ── Google Sheets CSV ───────────────────────────────────────────────────────
 function getSheetCSV(tab) {
-    // Le paramètre _t (timestamp) empêche le cache navigateur/Google
-    // de servir une version périmée après modification du Google Sheet
-    return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}&_t=${Date.now()}`;
+    return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}`;
 }
 
-function fetchCSV(tab) {
-    return new Promise(resolve => {
-        if (!SHEET_ID) { resolve(null); return; }
-        Papa.parse(getSheetCSV(tab), {
-            download: true, header: true, skipEmptyLines: true,
-            complete: r => resolve(r.data),
-            error: () => resolve(null)
-        });
-    });
+/**
+ * Récupère un onglet Google Sheet en CSV, sans cache.
+ * On utilise fetch() avec cache:'no-store' pour forcer Google
+ * à renvoyer les données fraîches à chaque chargement.
+ */
+async function fetchCSV(tab) {
+    if (!SHEET_ID) return null;
+    try {
+        var resp = await fetch(getSheetCSV(tab), { cache: 'no-store' });
+        var text = await resp.text();
+        var result = Papa.parse(text, { header: true, skipEmptyLines: true });
+        return result.data;
+    } catch(e) { return null; }
 }
 
-function fetchConfig() {
-    return new Promise(resolve => {
-        if (!SHEET_ID) { resolve(null); return; }
-        Papa.parse(getSheetCSV('config'), {
-            download: true, header: true, skipEmptyLines: true,
-            complete: r => {
-                const c = {};
-                r.data.forEach(row => { if (row.cle) c[row.cle.trim()] = (row.valeur || '').trim(); });
-                resolve(c);
-            },
-            error: () => resolve(null)
-        });
-    });
+async function fetchConfig() {
+    if (!SHEET_ID) return null;
+    try {
+        var resp = await fetch(getSheetCSV('config'), { cache: 'no-store' });
+        var text = await resp.text();
+        var result = Papa.parse(text, { header: true, skipEmptyLines: true });
+        var c = {};
+        result.data.forEach(row => { if (row.cle) c[row.cle.trim()] = (row.valeur || '').trim(); });
+        return c;
+    } catch(e) { return null; }
 }
 
 // ── Apps Script API ─────────────────────────────────────────────────────────
