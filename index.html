@@ -892,7 +892,12 @@ function renderConfig(c) {
     if (c.lieu_complet) document.getElementById('heroInfo').textContent = c.lieu_complet;
     if (c.bienvenue_titre) document.getElementById('welcomeTitle').textContent = c.bienvenue_titre;
     if (c.bienvenue_texte) document.getElementById('welcomeText').innerHTML = c.bienvenue_texte;
-    if (c.lieu_nom) document.getElementById('infoLieu').innerHTML = `${c.lieu_nom}<br>${c.lieu_adresse||''}`;
+    if (c.lieu_nom) {
+        // Lien Google Maps : utilise la clé "lieu_maps" de la config si présente,
+        // sinon génère un lien de recherche à partir du nom + adresse
+        var mapsUrl = c.lieu_maps || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((c.lieu_nom||'') + ' ' + (c.lieu_adresse||''))}`;
+        document.getElementById('infoLieu').innerHTML = `${c.lieu_nom}<br>${c.lieu_adresse||''}<br><a href="${mapsUrl}" target="_blank" rel="noopener" style="color:var(--teal);font-size:14px;text-decoration:underline">📍 Voir sur Google Maps</a>`;
+    }
     if (c.dates_detail) document.getElementById('infoDates').innerHTML = c.dates_detail.replace(/\n/g,'<br>');
     if (c.tarif) document.getElementById('infoTarif').innerHTML = c.tarif.replace(/\n/g,'<br>');
     if (c.restauration_intro) document.getElementById('restaurationIntro').innerHTML = c.restauration_intro.replace(/\n/g,'<br>');
