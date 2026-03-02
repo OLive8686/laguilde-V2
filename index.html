@@ -136,6 +136,7 @@
         .badge-dispo,.badge-inscrit{background:rgba(74,139,94,0.15);color:var(--green);border:1px solid rgba(74,139,94,0.3)}
         .badge-complet{background:rgba(184,41,58,0.15);color:var(--red);border:1px solid rgba(184,41,58,0.3)}
         .badge-attente{background:rgba(212,168,67,0.15);color:var(--gold);border:1px solid rgba(212,168,67,0.3)}
+        .content-warning{font-size:14px;color:var(--orange);background:rgba(224,122,48,0.08);border:1px solid rgba(224,122,48,0.2);border-radius:6px;padding:6px 12px;margin-bottom:8px;display:inline-block}
         @media(max-width:768px){.creneau{grid-template-columns:1fr;text-align:center}.creneau-actions{align-items:center}.creneau-time{min-width:auto}}
 
         /* RESTAURATION */
@@ -865,6 +866,7 @@ function renderProgramme(items) {
                     <h4>${item.jeu||''}</h4>
                     <div class="mj">MJ : ${item.mj||'—'}${item.systeme?` · ${item.systeme}`:''}</div>
                     <div class="desc">${item.description||''}</div>
+                    ${item.content ? `<div class="content-warning">⚠️ ${item.content}</div>` : ''}
                     <span class="badge ${badgeCls}">${statusTxt}</span>
                 </div>
                 <div class="creneau-actions">${btn}</div>
