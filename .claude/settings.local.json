@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:script.google.com)",
+      "WebFetch(domain:script.googleusercontent.com)",
+      "WebFetch(domain:sousloeildemelusine.fr)"
+    ]
+  }
+}
