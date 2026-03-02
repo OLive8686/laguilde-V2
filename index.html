@@ -895,7 +895,7 @@ function renderConfig(c) {
     if (c.lieu_nom) document.getElementById('infoLieu').innerHTML = `${c.lieu_nom}<br>${c.lieu_adresse||''}`;
     if (c.dates_detail) document.getElementById('infoDates').innerHTML = c.dates_detail.replace(/\n/g,'<br>');
     if (c.tarif) document.getElementById('infoTarif').innerHTML = c.tarif.replace(/\n/g,'<br>');
-    if (c.restauration_intro) document.getElementById('restaurationIntro').textContent = c.restauration_intro;
+    if (c.restauration_intro) document.getElementById('restaurationIntro').innerHTML = c.restauration_intro.replace(/\n/g,'<br>');
     if (c.image_hero) document.getElementById('heroBgImage').style.backgroundImage = `url(${c.image_hero})`;
 }
 
