@@ -63,7 +63,16 @@
 <!-- CONTENU PRINCIPAL -->
 <div style="padding-top:90px">
 
-    <!-- Accès refusé si pas admin -->
+    <!-- Non connecté -->
+    <section class="section admin-section" id="adminLoginPrompt" style="display:none">
+        <div class="section-inner" style="text-align:center">
+            <div class="section-header"><p class="section-label">Administration</p><h2 class="section-title">Connexion requise</h2><div class="section-sep"></div></div>
+            <p style="color:var(--text-light);font-size:17px;margin-bottom:24px">Connectez-vous avec un compte administrateur.</p>
+            <button class="btn btn-primary" onclick="openAuthModal()">Se connecter</button>
+        </div>
+    </section>
+
+    <!-- Accès refusé si connecté mais pas admin -->
     <section class="section admin-section" id="adminAccessDenied" style="display:none">
         <div class="section-inner" style="text-align:center">
             <div class="section-header"><p class="section-label">Administration</p><h2 class="section-title">Accès restreint</h2><div class="section-sep"></div></div>
@@ -114,14 +123,18 @@ function updateAdminView() {
     var role = APP.currentRole;
     var isAdmin = (role === 'admin');
 
-    document.getElementById('adminAccessDenied').style.display = (!user || !isAdmin) ? 'block' : 'none';
+    document.getElementById('adminLoginPrompt').style.display = !user ? 'block' : 'none';
+    document.getElementById('adminAccessDenied').style.display = (user && !isAdmin) ? 'block' : 'none';
     document.getElementById('adminPanel').style.display = isAdmin ? 'block' : 'none';
 }
 
 // ── Admin login ─────────────────────────────────────────────────────────────
 
 window.adminLogin = async function() {
-    _adminPw = document.getElementById('adminPassword').value;
+    // Ne lire le champ que lors du premier login — après, on réutilise le pw stocké
+    var pwField = document.getElementById('adminPassword');
+    if (pwField && pwField.value) _adminPw = pwField.value;
+    if (!_adminPw) { toast('Mot de passe requis', 'error'); return; }
     try {
         var data = await callAPIPost({ action:'admin_data', password:_adminPw });
         document.getElementById('adminLoginForm').style.display = 'none';
@@ -179,7 +192,7 @@ function renderAdminPanel(data) {
 
 async function loadPropositionsAdmin() {
     try {
-        var r = await callAPI({ action: 'get_propositions_en_attente', password: _adminPw });
+        var r = await callAPIPost({ action: 'get_propositions_en_attente', password: _adminPw });
         var container = document.getElementById('adminPropositions');
         if (!r.propositions || r.propositions.length === 0) { container.innerHTML = ''; return; }
         container.innerHTML = `

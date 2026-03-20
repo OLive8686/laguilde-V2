@@ -298,19 +298,14 @@ function readSheet(tabName) {
 }
 
 /**
- * Retourne une réponse JSON. Supporte le JSONP si un paramètre callback
- * est présent (utilisé par certains navigateurs pour contourner le CORS).
+ * Retourne une réponse JSON.
+ * JSONP désactivé pour des raisons de sécurité : le paramètre callback
+ * permettait à n'importe quel site tiers de lire les données via <script>.
  * @param {Object} data - Les données à renvoyer
- * @param {string|null} callback - Le nom de la fonction JSONP (optionnel)
  * @returns {GoogleAppsScript.Content.TextOutput} La réponse HTTP
  */
-function jsonResponse(data, callback) {
-  var json = JSON.stringify(data);
-  if (callback) {
-    return ContentService.createTextOutput(callback + '(' + json + ')')
-      .setMimeType(ContentService.MimeType.JAVASCRIPT);
-  }
-  return ContentService.createTextOutput(json)
+function jsonResponse(data) {
+  return ContentService.createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -566,75 +561,47 @@ function sendEmailAccompagnantSupprime(email, nomAccompagnant, nbAnnulees) {
 
 function doGet(e) {
   var action = (e.parameter.action || '').toString();
-  var callback = e.parameter.callback || null;
 
   try {
     switch (action) {
 
-      // --- Lecture ---
+      // --- Lectures publiques (GET uniquement) ---
       case 'get_programme':
-        return jsonResponse(getProgrammeAvecPlaces(), callback);
+        return jsonResponse(getProgrammeAvecPlaces());
 
       case 'get_sheet':
-        return jsonResponse(getSheetData(e.parameter), callback);
+        return jsonResponse(getSheetData(e.parameter));
 
       case 'get_inscriptions':
-        return jsonResponse(getInscriptionsPubliques(e.parameter), callback);
+        return jsonResponse(getInscriptionsPubliques(e.parameter));
 
       case 'get_mes_inscriptions':
-        return jsonResponse(getMesInscriptions(e.parameter), callback);
+        return jsonResponse(getMesInscriptions(e.parameter));
 
-      // --- Rôles ---
+      case 'get_accompagnants':
+        return jsonResponse(getAccompagnants(e.parameter));
+
+      case 'get_mes_propositions':
+        return jsonResponse(getMesPropositions(e.parameter));
+
+      // --- Rôles (lecture) ---
       case 'get_role':
         var roleEmail = (e.parameter.email || '').toLowerCase().trim();
         var roleNom = (e.parameter.nom || '').trim();
-        return jsonResponse({ ok: true, role: getOrCreateRole(roleEmail, roleNom) }, callback);
+        return jsonResponse({ ok: true, role: getOrCreateRole(roleEmail, roleNom) });
 
-      // --- Inscription / Annulation ---
-      case 'inscrire':
-        return jsonResponse(inscrire(e.parameter), callback);
-
-      case 'annuler':
-        return jsonResponse(annuler(e.parameter), callback);
-
-      // --- Accompagnants ---
-      case 'get_accompagnants':
-        return jsonResponse(getAccompagnants(e.parameter), callback);
-
-      case 'add_accompagnant':
-        return jsonResponse(addAccompagnant(e.parameter), callback);
-
-      case 'remove_accompagnant':
-        return jsonResponse(removeAccompagnant(e.parameter), callback);
-
-      // --- Discord OAuth ---
-      case 'discord_auth':
-        // Legacy — la redirection se fait côté client maintenant
-        return jsonResponse({ error: 'Utilisez le site pour vous connecter via Discord' }, callback);
+      // --- Discord OAuth (lecture + redirect) ---
+      case 'discord_exchange':
+        return jsonResponse(discordExchange(e.parameter));
 
       case 'discord_callback':
         return discordCallback(e);
 
-      case 'discord_exchange':
-        return jsonResponse(discordExchange(e.parameter), callback);
-
-      // --- MJ (propositions de tables — lecture) ---
-      case 'get_mes_propositions':
-        return jsonResponse(getMesPropositions(e.parameter), callback);
-
-      // --- Admin --- (LECTURE seule en GET — les actions sensibles passent par POST)
-      case 'admin_data':
-        return jsonResponse(getAdminData(e.parameter), callback);
-
-      case 'get_propositions_en_attente':
-        return jsonResponse(getPropositionsEnAttente(e.parameter), callback);
-
       default:
-        return jsonResponse({ ok: true, message: 'API Mélusine active' }, callback);
+        return jsonResponse({ ok: true, message: 'API Mélusine active' });
     }
   } catch (err) {
-    // Erreur générique — on ne renvoie pas la stack trace au client
-    return jsonResponse({ error: err.message }, callback);
+    return jsonResponse({ error: 'Une erreur est survenue. Réessayez.' });
   }
 }
 
@@ -654,11 +621,17 @@ function doPost(e) {
 
   try {
     switch (data.action) {
-      // --- Inscription / Annulation ---
+      // --- Inscription / Annulation (POST obligatoire — anti-CSRF) ---
       case 'inscrire':
         return jsonResponse(inscrire(data));
       case 'annuler':
         return jsonResponse(annuler(data));
+
+      // --- Accompagnants (POST obligatoire — écritures) ---
+      case 'add_accompagnant':
+        return jsonResponse(addAccompagnant(data));
+      case 'remove_accompagnant':
+        return jsonResponse(removeAccompagnant(data));
 
       // --- MJ (propositions de tables) ---
       case 'proposer_table':
@@ -675,6 +648,8 @@ function doPost(e) {
         return jsonResponse(adminValiderTable(data));
       case 'admin_refuser_table':
         return jsonResponse(adminRefuserTable(data));
+      case 'get_propositions_en_attente':
+        return jsonResponse(getPropositionsEnAttente(data));
 
       // --- Rôles (admin) ---
       case 'set_role':
@@ -686,7 +661,7 @@ function doPost(e) {
         return jsonResponse({ error: 'Action inconnue' });
     }
   } catch (err) {
-    return jsonResponse({ error: err.message });
+    return jsonResponse({ error: 'Une erreur est survenue. Réessayez.' });
   }
 }
 
@@ -846,6 +821,11 @@ function inscrire(params) {
   if (!isValidEmail(email)) return { error: "Format d'email invalide" };
   if (!creneau || !jeu) return { error: 'Créneau et jeu requis' };
 
+  // Limites de longueur (protection anti-abus)
+  if (nom.length > 100) return { error: 'Nom trop long (100 caractères max)' };
+  if (creneau.length > 50) return { error: 'Créneau invalide' };
+  if (jeu.length > 200) return { error: 'Nom de jeu trop long' };
+
   // Verrou exclusif : toute la logique de vérification + écriture est protégée
   // pour empêcher deux inscriptions simultanées à la dernière place.
   return withLock(function() {
@@ -912,6 +892,11 @@ function inscrire(params) {
     });
 
     if (!creneauInfo) return { error: 'Créneau introuvable' };
+
+    // Vérifier que la table est bien validée (pas en attente ou refusée)
+    if (creneauInfo.statut_table && creneauInfo.statut_table !== 'validé') {
+      return { error: 'Cette table n\'est pas encore ouverte aux inscriptions.' };
+    }
 
     var maxPlaces = parseInt(creneauInfo.places) || 0;
     var inscritsCount = inscriptions.filter(function(i) {
@@ -1137,37 +1122,40 @@ function addAccompagnant(params) {
   var email = (params.email || '').toLowerCase().trim();
   var nomAccompagnant = (params.nom_accompagnant || '').trim();
 
-  // Validation
+  // Validation (hors verrou — lecture seule)
   if (!email) return { error: 'Email requis' };
   if (!nomAccompagnant) return { error: 'Nom de l\'accompagnant requis' };
   if (nomAccompagnant.length > 50) return { error: 'Nom trop long (50 caractères max)' };
 
-  // Lire le maximum depuis la config (défaut: 3)
-  var maxAccompagnants = parseInt(cfg('max_accompagnants', '3')) || 3;
+  // Verrou exclusif : protège contre l'ajout simultané qui dépasserait le max
+  return withLock(function() {
+    // Lire le maximum depuis la config (défaut: 3)
+    var maxAccompagnants = parseInt(cfg('max_accompagnants', '3')) || 3;
 
-  // Vérifier le nombre actuel
-  var all = readSheet('accompagnants');
-  var mine = all.filter(function(a) {
-    return a.email_parent.toLowerCase().trim() === email;
-  });
+    // Vérifier le nombre actuel
+    var all = readSheet('accompagnants');
+    var mine = all.filter(function(a) {
+      return a.email_parent.toLowerCase().trim() === email;
+    });
 
-  if (mine.length >= maxAccompagnants) {
-    return { error: 'Vous avez déjà ' + maxAccompagnants + ' accompagnants (maximum autorisé).' };
-  }
+    if (mine.length >= maxAccompagnants) {
+      return { error: 'Vous avez déjà ' + maxAccompagnants + ' accompagnants (maximum autorisé).' };
+    }
 
-  // Vérifier que ce nom n'existe pas déjà pour ce parent (case-insensitive)
-  var dejaExistant = mine.some(function(a) {
-    return a.nom_accompagnant.toLowerCase().trim() === nomAccompagnant.toLowerCase();
-  });
-  if (dejaExistant) {
-    return { error: 'Un accompagnant avec ce nom existe déjà.' };
-  }
+    // Vérifier que ce nom n'existe pas déjà pour ce parent (case-insensitive)
+    var dejaExistant = mine.some(function(a) {
+      return a.nom_accompagnant.toLowerCase().trim() === nomAccompagnant.toLowerCase();
+    });
+    if (dejaExistant) {
+      return { error: 'Un accompagnant avec ce nom existe déjà.' };
+    }
 
-  // Écrire dans l'onglet accompagnants
-  var sheet = getSheet('accompagnants');
-  sheet.appendRow([email, nomAccompagnant, new Date().toISOString()]);
+    // Écrire dans l'onglet accompagnants
+    var sheet = getSheet('accompagnants');
+    sheet.appendRow([email, nomAccompagnant, new Date().toISOString()]);
 
-  return { ok: true, message: 'Accompagnant ajouté : ' + nomAccompagnant };
+    return { ok: true, message: 'Accompagnant ajouté : ' + nomAccompagnant };
+  }); // fin withLock
 }
 
 /**
@@ -1183,6 +1171,9 @@ function removeAccompagnant(params) {
   var nomAccompagnant = (params.nom_accompagnant || '').trim();
 
   if (!email || !nomAccompagnant) return { error: 'Paramètres manquants' };
+
+  // Verrou exclusif : protège contre suppression + inscription simultanées
+  return withLock(function() {
 
   // 1. Supprimer de l'onglet accompagnants
   var sheetAcc = getSheet('accompagnants');
@@ -1253,6 +1244,8 @@ function removeAccompagnant(params) {
       + (annulees > 0 ? ' ' + annulees + ' inscription(s) annulée(s).' : ''),
     inscriptions_annulees: annulees
   };
+
+  }); // fin withLock
 }
 
 
@@ -1406,22 +1399,48 @@ function adminPromouvoir(params) {
   if (rowIndex < 2) return { error: 'Ligne invalide' };
 
   var sheet = getSheet('inscriptions');
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  var statutCol = headers.indexOf('statut') + 1;
+  var data = sheet.getDataRange().getValues();
+  if (rowIndex > data.length) return { error: 'Ligne hors limites' };
 
-  if (statutCol < 1) return { error: 'Colonne statut introuvable' };
+  var headers = data[0].map(function(h) { return h.toString().trim(); });
+  var statutCol = headers.indexOf('statut');
+  var creneauCol = headers.indexOf('creneau');
+  var jeuCol = headers.indexOf('jeu');
 
-  var currentStatut = sheet.getRange(rowIndex, statutCol).getValue();
+  if (statutCol < 0) return { error: 'Colonne statut introuvable' };
+
+  var currentStatut = data[rowIndex - 1][statutCol];
   if (currentStatut !== 'attente') {
     return { error: 'Cette inscription n\'est pas en attente' };
   }
 
-  sheet.getRange(rowIndex, statutCol).setValue('inscrit');
+  // Vérifier qu'il reste de la place (protection anti-overbooking)
+  var creneau = data[rowIndex - 1][creneauCol].toString().trim();
+  var jeu = data[rowIndex - 1][jeuCol].toString().trim();
+  var programme = readSheet('programme');
+  var creneauInfo = programme.find(function(p) { return p.creneau === creneau && p.jeu === jeu; });
+  if (creneauInfo) {
+    var maxPlaces = parseInt(creneauInfo.places) || 0;
+    var inscritsCount = 0;
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][creneauCol].toString().trim() === creneau
+          && data[i][jeuCol].toString().trim() === jeu
+          && data[i][statutCol] === 'inscrit') {
+        inscritsCount++;
+      }
+    }
+    if (inscritsCount >= maxPlaces) {
+      return { error: 'Table déjà complète (' + inscritsCount + '/' + maxPlaces + '). Promotion impossible.' };
+    }
+  }
+
+  sheet.getRange(rowIndex, statutCol + 1).setValue('inscrit');
   return { ok: true, message: 'Inscription promue !' };
 }
 
 /**
  * Supprime une inscription (admin uniquement). Marque le statut comme "supprimé".
+ * Si l'inscription avait le statut "inscrit", promouvoit le premier en attente.
  * @param {Object} params - { password, row (numéro de ligne dans la Sheet) }
  * @returns {Object} { ok, message } ou { error }
  */
@@ -1435,11 +1454,27 @@ function adminSupprimer(params) {
   if (rowIndex < 2) return { error: 'Ligne invalide' };
 
   var sheet = getSheet('inscriptions');
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  var statutCol = headers.indexOf('statut') + 1;
+  var data = sheet.getDataRange().getValues();
+  if (rowIndex > data.length) return { error: 'Ligne hors limites' };
 
-  sheet.getRange(rowIndex, statutCol).setValue('supprimé');
-  return { ok: true, message: 'Inscription supprimée.' };
+  var headers = data[0].map(function(h) { return h.toString().trim(); });
+  var statutCol = headers.indexOf('statut');
+  var creneauCol = headers.indexOf('creneau');
+  var jeuCol = headers.indexOf('jeu');
+
+  // Vérifier le statut actuel avant suppression
+  var wasInscrit = (data[rowIndex - 1][statutCol] === 'inscrit');
+  var creneau = data[rowIndex - 1][creneauCol].toString().trim();
+  var jeu = data[rowIndex - 1][jeuCol].toString().trim();
+
+  sheet.getRange(rowIndex, statutCol + 1).setValue('supprimé');
+
+  // Si c'était un inscrit, promouvoir le premier en attente
+  if (wasInscrit) {
+    promouvoirPremierEnAttente(creneau, jeu);
+  }
+
+  return { ok: true, message: 'Inscription supprimée.' + (wasInscrit ? ' Premier en attente promu.' : '') };
 }
 
 

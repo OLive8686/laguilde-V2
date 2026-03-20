@@ -116,9 +116,12 @@ function escHtml(str) {
 }
 
 /**
- * Échappe les apostrophes pour les attributs onclick.
+ * Échappe une chaîne pour insertion dans un attribut onclick='...'.
+ * Gère les apostrophes, backslashes, et retours à la ligne.
  */
-function esc(s) { return (s||'').replace(/'/g, "\\'"); }
+function esc(s) {
+    return (s||'').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '');
+}
 
 // ── Toasts ──────────────────────────────────────────────────────────────────
 function toast(msg, type='info') {

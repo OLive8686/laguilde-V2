@@ -248,7 +248,7 @@ async function ajouterAccompagnant() {
     if (!nom) { toast('Entrez le nom de l\'accompagnant', 'error'); return; }
     if (!APP.currentUser) { toast('Connectez-vous d\'abord', 'error'); return; }
     try {
-        var r = await callAPI({ action: 'add_accompagnant', email: APP.currentUser.email, nom_accompagnant: nom });
+        var r = await callAPIPost({ action: 'add_accompagnant', email: APP.currentUser.email, nom_accompagnant: nom });
         toast(r.message, 'success');
         input.value = '';
         await loadAccompagnants();
@@ -259,7 +259,7 @@ async function ajouterAccompagnant() {
 async function supprimerAccompagnant(nomAccompagnant) {
     if (!confirm('Supprimer ' + nomAccompagnant + ' ? Toutes ses inscriptions seront annulées.')) return;
     try {
-        var r = await callAPI({ action: 'remove_accompagnant', email: APP.currentUser.email, nom_accompagnant: nomAccompagnant });
+        var r = await callAPIPost({ action: 'remove_accompagnant', email: APP.currentUser.email, nom_accompagnant: nomAccompagnant });
         toast(r.message, 'success');
         await loadAccompagnants();
         renderAccompagnants();
@@ -307,7 +307,7 @@ async function doInscrire(creneau, jeu) {
     if (!APP.SCRIPT_URL) { toast('Backend non configuré', 'info'); return; }
     try {
         var u = APP.currentUser;
-        var r = await callAPI({ action:'inscrire', nom:u.nom, email:u.email, auth_type:u.auth_type, auth_id:u.auth_id||'', creneau, jeu });
+        var r = await callAPIPost({ action:'inscrire', nom:u.nom, email:u.email, auth_type:u.auth_type, auth_id:u.auth_id||'', creneau, jeu });
         toast(r.message, r.statut==='inscrit' ? 'success' : 'info');
         refreshProgramme();
         loadMesInscriptions();
@@ -318,7 +318,7 @@ async function doInscrireAccompagnant(creneau, jeu, nomAccompagnant) {
     if (!APP.SCRIPT_URL) { toast('Backend non configuré', 'info'); return; }
     try {
         var u = APP.currentUser;
-        var r = await callAPI({
+        var r = await callAPIPost({
             action: 'inscrire', nom: u.nom, email: u.email, auth_type: u.auth_type,
             auth_id: u.auth_id || '', creneau, jeu, type_inscrit: 'accompagnant', nom_accompagnant: nomAccompagnant
         });
@@ -333,7 +333,7 @@ async function annulerInscription(creneau, jeu, nomAccompagnant) {
     try {
         var params = { action:'annuler', email:APP.currentUser.email, creneau, jeu };
         if (nomAccompagnant) params.nom_accompagnant = nomAccompagnant;
-        var r = await callAPI(params);
+        var r = await callAPIPost(params);
         toast(r.message, 'success');
         refreshProgramme();
         loadMesInscriptions();
@@ -385,13 +385,16 @@ async function refreshProgramme() {
 }
 
 function renderProgramme(items) {
-    if (!items || !items.length) return;
+    if (!items || !items.length) {
+        document.getElementById('programmeGrid').innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:16px;padding:40px 0">Le programme sera bientôt disponible.</p>';
+        return;
+    }
     var grid = document.getElementById('programmeGrid');
     var tabsEl = document.getElementById('programmeTabs');
     var creneaux = [...new Set(items.map(i => i.creneau))];
 
     tabsEl.innerHTML = `<button class="tab active" data-filter="all">Tous</button>` +
-        creneaux.map(c => `<button class="tab" data-filter="${escHtml(c)}">${escHtml(c)}</button>`).join('');
+        creneaux.map(c => `<button class="tab" data-filter="${esc(c)}">${escHtml(c)}</button>`).join('');
 
     function render(filter) {
         var list = filter==='all' ? items : items.filter(i => i.creneau===filter);
@@ -432,19 +435,31 @@ function renderProgramme(items) {
 
 function renderConfig(c) {
     if (!c) return;
+    // textContent pour les champs simples (pas de HTML autorisé — sécurité XSS)
     if (c.sous_titre) document.getElementById('heroSubtitle').textContent = c.sous_titre;
     if (c.dates) document.getElementById('heroDate').textContent = c.dates;
     if (c.lieu_complet) document.getElementById('heroInfo').textContent = c.lieu_complet;
     if (c.bienvenue_titre) document.getElementById('welcomeTitle').textContent = c.bienvenue_titre;
-    if (c.bienvenue_texte) document.getElementById('welcomeText').innerHTML = c.bienvenue_texte;
+
+    // Pour les champs qui peuvent contenir des retours à la ligne :
+    // on échappe le HTML puis on remplace \n par <br> (safe car escHtml a neutralisé le HTML)
+    if (c.bienvenue_texte) document.getElementById('welcomeText').innerHTML = escHtml(c.bienvenue_texte).replace(/\n/g,'<br>');
+
     if (c.lieu_nom) {
-        var mapsUrl = c.lieu_maps || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((c.lieu_nom||'') + ' ' + (c.lieu_adresse||''))}`;
-        document.getElementById('infoLieu').innerHTML = `${c.lieu_nom}<br>${c.lieu_adresse||''}<br><a href="${mapsUrl}" target="_blank" rel="noopener" style="color:var(--teal);font-size:14px;text-decoration:underline">📍 Voir sur Google Maps</a>`;
+        // Valider que l'URL Maps commence bien par https:// (protection contre javascript:)
+        var mapsUrl = c.lieu_maps && c.lieu_maps.match(/^https?:\/\//)
+            ? c.lieu_maps
+            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((c.lieu_nom||'') + ' ' + (c.lieu_adresse||''))}`;
+        document.getElementById('infoLieu').innerHTML = `${escHtml(c.lieu_nom)}<br>${escHtml(c.lieu_adresse||'')}<br><a href="${escHtml(mapsUrl)}" target="_blank" rel="noopener" style="color:var(--teal);font-size:14px;text-decoration:underline">📍 Voir sur Google Maps</a>`;
     }
-    if (c.dates_detail) document.getElementById('infoDates').innerHTML = c.dates_detail.replace(/\n/g,'<br>');
-    if (c.tarif) document.getElementById('infoTarif').innerHTML = c.tarif.replace(/\n/g,'<br>');
-    if (c.restauration_intro) document.getElementById('restaurationIntro').innerHTML = c.restauration_intro.replace(/\n/g,'<br>');
-    if (c.image_hero) document.getElementById('heroBgImage').style.backgroundImage = `url(${c.image_hero})`;
+    if (c.dates_detail) document.getElementById('infoDates').innerHTML = escHtml(c.dates_detail).replace(/\n/g,'<br>');
+    if (c.tarif) document.getElementById('infoTarif').innerHTML = escHtml(c.tarif).replace(/\n/g,'<br>');
+    if (c.restauration_intro) document.getElementById('restaurationIntro').innerHTML = escHtml(c.restauration_intro).replace(/\n/g,'<br>');
+
+    // Valider que l'URL de l'image hero est bien une URL http(s) (pas javascript:)
+    if (c.image_hero && c.image_hero.match(/^https?:\/\//)) {
+        document.getElementById('heroBgImage').style.backgroundImage = `url(${c.image_hero})`;
+    }
 }
 
 function formatPrix(prix) {
