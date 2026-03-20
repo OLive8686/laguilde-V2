@@ -57,8 +57,6 @@
             <li><a href="infos.html">Infos</a></li>
             <li><a href="benevoles.html">B&eacute;n&eacute;voles</a></li>
             <li id="navInscriptionsLink" style="display:none"><a href="mes-inscriptions.html" class="active">Mes inscriptions</a></li>
-            <li id="navMjLink" style="display:none"></li>
-            <li id="navAdminLink" style="display:none"></li>
             <li id="navUserArea"><button class="nav-user-btn" onclick="openAuthModal()">Se connecter</button></li>
         </ul>
     </div>
@@ -253,7 +251,7 @@ async function loadMesInscriptionsJdr() {
         var grid = document.getElementById('mesJdrGrid');
 
         if (!r.inscriptions || r.inscriptions.length === 0) {
-            grid.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:16px;padding:20px 0">Vous n\'&ecirc;tes inscrit&middot;e &agrave; aucune table pour le moment. <a href="index.html#programme" style="color:var(--gold)">Voir le programme</a></p>';
+            grid.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:16px;padding:20px 0">Vous n\'&ecirc;tes inscrit&middot;e &agrave; aucune table pour le moment. <a href="programme.html" style="color:var(--gold)">Voir le programme</a></p>';
             return;
         }
 

@@ -63,6 +63,10 @@
 [data-theme="clair"] .section-light .section-title,[data-theme="clair"] .section-light .section-label{color:var(--teal-dark)}
 [data-theme="clair"] .welcome-text strong{color:var(--teal-dark)}
 [data-theme="clair"] select.mj-input option{background:#FFFFFF;color:#1A2A3A}
+[data-theme="clair"] .admin-section{background:#E8DDD0}
+[data-theme="clair"] .admin-stat{background:#FFFFFF;border:1px solid rgba(43,127,181,0.1)}
+[data-theme="clair"] .admin-table td{color:#4A6070}
+[data-theme="clair"] .admin-login input{background:rgba(43,127,181,0.04);color:#1A2A3A;border-color:rgba(43,127,181,0.2)}
 
 /* ── Reset & base ────────────────────────────────────────────────────────── */
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}

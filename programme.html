@@ -71,8 +71,6 @@
             <li><a href="infos.html">Infos</a></li>
             <li><a href="benevoles.html">Bénévoles</a></li>
             <li id="navInscriptionsLink" style="display:none"><a href="mes-inscriptions.html">Mes inscriptions</a></li>
-            <li id="navMjLink" style="display:none"></li>
-            <li id="navAdminLink" style="display:none"></li>
             <li id="navUserArea"><button class="nav-user-btn" onclick="openAuthModal()">Se connecter</button></li>
         </ul>
     </div>
@@ -371,7 +369,7 @@ function renderProgramme(items) {
     // Générer les onglets : "Tous" + un onglet par créneau
     tabsEl.innerHTML = '<button class="tab active" data-filter="all">Tous</button>' +
         creneaux.map(function(c) {
-            return '<button class="tab" data-filter="' + esc(c) + '">' + escHtml(c) + '</button>';
+            return '<button class="tab" data-filter="' + escHtml(c) + '">' + escHtml(c) + '</button>';
         }).join('');
 
     /**

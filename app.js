@@ -172,16 +172,11 @@ async function fetchRole() {
 }
 
 /**
- * Met à jour la navigation selon le rôle de l'utilisateur.
- * Affiche/masque les liens Espace MJ et Admin.
+ * Met à jour la navigation selon l'état de connexion.
+ * "Mes inscriptions" visible si connecté. Admin via le bouton dans le user area.
  */
 function updateNavForRole() {
-    var mjLink = document.getElementById('navMjLink');
-    var adminLink = document.getElementById('navAdminLink');
     var inscriptionsLink = document.getElementById('navInscriptionsLink');
-    if (mjLink) mjLink.style.display = (currentRole === 'mj' || currentRole === 'admin') ? '' : 'none';
-    if (adminLink) adminLink.style.display = currentRole === 'admin' ? '' : 'none';
-    // "Mes inscriptions" est visible des que l'utilisateur est connecte
     if (inscriptionsLink) inscriptionsLink.style.display = currentUser ? '' : 'none';
 }
 

@@ -135,10 +135,16 @@ function parseCreneauDates(creneau) {
   var endH = parseInt(match[3]);
   var endM = match[4] ? parseInt(match[4]) : 0;
 
-  // Si le créneau passe minuit (ex: 21h-01h), la fin est le lendemain
+  // Si le créneau passe minuit (ex: 21h-01h), la fin est le jour suivant
   var endDate = date;
   if (endH < startH) {
-    endDate = dateDimanche; // Le lendemain
+    // Calculer le lendemain à partir de la date de début
+    var d = new Date(date + 'T00:00:00');
+    d.setDate(d.getDate() + 1);
+    var y = d.getFullYear();
+    var mo = ('0' + (d.getMonth() + 1)).slice(-2);
+    var da = ('0' + d.getDate()).slice(-2);
+    endDate = y + '-' + mo + '-' + da;
   }
 
   // Formater en YYYYMMDDTHHMMSS (format Google Calendar)
@@ -177,15 +183,16 @@ function buildCalendarLinks(creneau, jeu, type) {
     + '&text=' + encodeURIComponent(titre)
     + '&dates=' + dates.start + '/' + dates.end
     + '&location=' + encodeURIComponent(lieu)
-    + '&details=' + encodeURIComponent(description);
+    + '&details=' + encodeURIComponent(description)
+    + '&ctz=Europe/Paris';
 
   // Contenu .ics (fichier iCalendar universel — Outlook, Apple Calendar, etc.)
   var ics = 'BEGIN:VCALENDAR\r\n'
     + 'VERSION:2.0\r\n'
     + 'PRODID:-//Melusine//Convention JDR//FR\r\n'
     + 'BEGIN:VEVENT\r\n'
-    + 'DTSTART:' + dates.start + '\r\n'
-    + 'DTEND:' + dates.end + '\r\n'
+    + 'DTSTART;TZID=Europe/Paris:' + dates.start + '\r\n'
+    + 'DTEND;TZID=Europe/Paris:' + dates.end + '\r\n'
     + 'SUMMARY:' + titre.replace(/[,;\\]/g, ' ') + '\r\n'
     + 'LOCATION:' + lieu.replace(/[,;\\]/g, ' ') + '\r\n'
     + 'DESCRIPTION:' + description.replace(/[,;\\]/g, ' ') + '\r\n'
@@ -375,6 +382,11 @@ function getSheet(tabName) {
     if (tabName === 'creneaux_benevoles') {
       sheet.appendRow(['creneau', 'description', 'places']);
       sheet.getRange(1, 1, 1, 3).setFontWeight('bold');
+    }
+
+    if (tabName === 'programme') {
+      sheet.appendRow(['creneau', 'jeu', 'mj', 'systeme', 'description', 'content', 'places', 'statut', 'statut_table', 'email_mj']);
+      sheet.getRange(1, 1, 1, 10).setFontWeight('bold');
     }
   }
 
@@ -844,7 +856,7 @@ function getSheetData(params) {
   // les onglets contenant des données personnelles (inscriptions, accompagnants)
   var allowed = ['config', 'restauration', 'animations'];
   if (allowed.indexOf(tab) === -1) {
-    return { error: 'Onglet non autorisé : ' + tab };
+    return { error: 'Onglet non autorisé' };
   }
 
   var data = readSheet(tab);
@@ -1052,7 +1064,7 @@ function inscrire(params) {
       var estBenevole = benevoles.some(function(b) {
         return b.email.toLowerCase().trim() === email
           && b.creneau.trim() === creneau
-          && b.statut === 'inscrit';
+          && (b.statut === 'inscrit' || b.statut === 'attente');
       });
       if (estBenevole) {
         return { error: 'Vous êtes déjà bénévole sur ce créneau. Annulez votre bénévolat d\'abord.' };
@@ -1704,6 +1716,9 @@ function proposerTable(params) {
   if (jeu.length > 100) return { error: 'Nom du jeu trop long (100 caractères max)' };
   if (description.length > 500) return { error: 'Description trop longue (500 caractères max)' };
 
+  // Verrou exclusif : protège contre proposition + inscription simultanées
+  return withLock(function() {
+
   // Anti-chevauchement joueur : pas inscrit à une table JDR sur le même créneau
   var inscriptions = readSheet('inscriptions');
   var inscritJoueur = inscriptions.some(function(i) {
@@ -1721,7 +1736,7 @@ function proposerTable(params) {
   var estBenevole = benevoles.some(function(b) {
     return b.email.toLowerCase().trim() === emailMj
       && b.creneau.trim() === creneau
-      && b.statut === 'inscrit';
+      && (b.statut === 'inscrit' || b.statut === 'attente');
   });
   if (estBenevole) {
     return { error: 'Vous êtes bénévole sur ce créneau. Annulez votre bénévolat d\'abord.' };
@@ -1770,6 +1785,8 @@ function proposerTable(params) {
   sheet.appendRow(newRow);
 
   return { ok: true, message: 'Table proposée ! Un administrateur va la valider.' };
+
+  }); // fin withLock
 }
 
 /**
@@ -1833,13 +1850,6 @@ function adminRefuserTable(params) {
 }
 
 /**
- * Fonction interne : change le statut_table d'une proposition dans le programme.
- * Cherche la ligne par email_mj + jeu + creneau et met à jour statut_table.
- * @param {Object} params - { email_mj, jeu, creneau }
- * @param {string} newStatut - Le nouveau statut ("validé" ou "refusé")
- * @returns {Object} { ok, message } ou { error }
- */
-/**
  * Envoie un email au MJ quand sa proposition de table est validée.
  * @param {string} email   - Adresse du MJ
  * @param {string} jeu     - Nom du jeu proposé
@@ -1887,6 +1897,14 @@ function sendEmailTableRefusee(email, jeu, creneau) {
   }));
 }
 
+/**
+ * Fonction interne : change le statut_table d'une proposition dans le programme.
+ * Cherche la ligne par email_mj + jeu + creneau et met à jour statut_table.
+ * Envoie un email de notification au MJ (validée ou refusée).
+ * @param {Object} params - { email_mj, jeu, creneau }
+ * @param {string} newStatut - Le nouveau statut ("validé" ou "refusé")
+ * @returns {Object} { ok, message } ou { error }
+ */
 function _changeStatutTable(params, newStatut) {
   var emailMj = (params.email_mj || '').toLowerCase().trim();
   var jeu = (params.jeu || '').trim();
