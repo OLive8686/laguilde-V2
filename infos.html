@@ -191,7 +191,7 @@ function renderConfig(c) {
     // Le texte de bienvenue peut contenir des retours à la ligne :
     // on échappe le HTML d'abord, puis on convertit \n en <br> (sûr car déjà échappé)
     if (c.bienvenue_texte) {
-        document.getElementById('welcomeText').innerHTML = escHtml(c.bienvenue_texte).replace(/\n/g, '<br>');
+        document.getElementById('welcomeText').innerHTML = escHtmlSafe(c.bienvenue_texte).replace(/\n/g, '<br>');
     }
 
     // Carte "Lieu" avec lien Google Maps
@@ -220,7 +220,7 @@ function renderConfig(c) {
 
     // Intro de la section restauration
     if (c.restauration_intro) {
-        document.getElementById('restaurationIntro').innerHTML = escHtml(c.restauration_intro).replace(/\n/g, '<br>');
+        document.getElementById('restaurationIntro').innerHTML = escHtmlSafe(c.restauration_intro).replace(/\n/g, '<br>');
     }
 }
 

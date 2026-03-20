@@ -121,6 +121,24 @@ function escHtml(str) {
 }
 
 /**
+ * Échappe le HTML mais autorise les balises de mise en forme simples.
+ * Utilisé pour les champs de config qui peuvent contenir du formatage
+ * (bienvenue_texte, restauration_intro, etc.).
+ * Balises autorisées : strong, em, b, i, br, a (avec href https uniquement).
+ */
+function escHtmlSafe(str) {
+    if (!str) return '';
+    // D'abord on échappe tout
+    var escaped = escHtml(str);
+    // Puis on ré-autorise les balises sûres
+    escaped = escaped.replace(/&lt;(\/?(strong|em|b|i|br)\s*\/?)&gt;/gi, '<$1>');
+    // Ré-autoriser les liens <a href="https://...">texte</a>
+    escaped = escaped.replace(/&lt;a\s+href=&quot;(https?:\/\/[^&]*)&quot;[^&]*&gt;/gi, '<a href="$1" target="_blank" rel="noopener">');
+    escaped = escaped.replace(/&lt;\/a&gt;/gi, '</a>');
+    return escaped;
+}
+
+/**
  * Échappe une chaîne pour insertion dans un attribut onclick='...'.
  * Gère les apostrophes, backslashes, et retours à la ligne.
  */
@@ -480,6 +498,7 @@ window.loginEmail = loginEmail;
 window.logout = logout;
 window.toast = toast;
 window.escHtml = escHtml;
+window.escHtmlSafe = escHtmlSafe;
 window.esc = esc;
 window.callAPI = callAPI;
 window.callAPIPost = callAPIPost;
