@@ -66,11 +66,16 @@ async function fetchSheetData(tab) {
     } catch(e) { return null; }
 }
 
+// Cache config pour éviter les appels multiples (loadTheme + page init)
+var _configCacheClient = null;
+
 async function fetchConfig() {
+    if (_configCacheClient) return _configCacheClient;
     var data = await fetchSheetData('config');
     if (!data) return null;
     var c = {};
     data.forEach(row => { if (row.cle) c[row.cle.trim()] = (row.valeur || '').trim(); });
+    _configCacheClient = c;
     return c;
 }
 
@@ -419,7 +424,26 @@ function closeChoixModal() {
 
 // ── Init commune ────────────────────────────────────────────────────────────
 
+/**
+ * Charge le thème depuis la config Sheet et l'applique sur <html>.
+ * Valeurs possibles : "dark" (défaut) ou "clair".
+ * Le thème est appliqué via data-theme qui switch les CSS variables.
+ */
+async function loadTheme() {
+    try {
+        var config = await fetchConfig();
+        if (config && config.theme) {
+            var theme = config.theme.trim().toLowerCase();
+            if (theme === 'clair' || theme === 'dark') {
+                document.documentElement.setAttribute('data-theme', theme);
+            }
+        }
+    } catch(e) { /* silencieux — reste en dark par défaut */ }
+}
+
 async function initApp() {
+    // Charger le thème en premier pour éviter le flash de couleurs
+    await loadTheme();
     checkAuthCallback();
     updateNavUser();
     if (currentUser) {

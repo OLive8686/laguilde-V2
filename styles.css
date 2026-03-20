@@ -9,7 +9,11 @@
 
 
 /* ── Variables globales ──────────────────────────────────────────────────── */
-:root {
+/* Les couleurs sont définies par thème (data-theme sur <html>).
+   Le thème est lu depuis la config Sheet (clé "theme": "dark" ou "clair").
+   Par défaut : dark (si pas de config ou JS non chargé). */
+
+:root, [data-theme="dark"] {
     --teal:#2E8B8B; --teal-dark:#1A5C5C; --teal-deep:#0F3D3D; --dark-teal:#0D2B2B;
     --orange:#E07A30; --orange-light:#F2994A; --red:#B8293A; --green:#4A8B5E;
     --gold:#D4A843; --cream:#FDF8F0; --parchment:#F5EDE0;
@@ -18,6 +22,47 @@
     --font-display:'Cinzel Decorative',serif; --font-heading:'Cinzel',serif; --font-body:'Lora',serif;
     --transition:0.3s cubic-bezier(0.25,0.46,0.45,0.94);
 }
+
+/* ── Thème clair (affiche SOM26) ─────────────────────────────────────────── */
+/* Palette tirée de l'affiche : bleu profond, bleu ciel, sable, or chaud.
+   Fond clair avec texte sombre — ambiance aquarelle/illustration. */
+[data-theme="clair"] {
+    --teal:#2B7FB5; --teal-dark:#1A5C8A; --teal-deep:#14496E; --dark-teal:#E8DDD0;
+    --orange:#D4A030; --orange-light:#E0B84A; --red:#C0392B; --green:#3A9B6A;
+    --gold:#D4A030; --cream:#1A2A3A; --parchment:#F0E8DA;
+    --dark:#F5EFE5; --dark-card:#FFFFFF;
+    --text-muted:#6A8899; --text-light:#4A6070; --text-on-light:#1A2A3A;
+}
+
+/* ── Overrides thème clair ───────────────────────────────────────────────── */
+/* Éléments qui utilisent des couleurs en dur (rgba, hex) au lieu de variables */
+[data-theme="clair"] .nav{background:linear-gradient(180deg,rgba(232,221,208,0.97),rgba(240,232,218,0.95));border-bottom:1px solid rgba(43,127,181,0.15)}
+[data-theme="clair"] .nav.scrolled{background:rgba(232,221,208,0.99)}
+[data-theme="clair"] .hero-bg{background:radial-gradient(ellipse at 30% 20%,rgba(43,127,181,0.08) 0%,transparent 60%),radial-gradient(ellipse at 70% 80%,rgba(212,160,48,0.05) 0%,transparent 60%),linear-gradient(135deg,#E8DDD0 0%,#F5EFE5 50%,#E0D5C5 100%)}
+[data-theme="clair"] .hero-bg-overlay{background:linear-gradient(135deg,rgba(232,221,208,0.7) 0%,rgba(245,239,229,0.75) 50%,rgba(232,221,208,0.7) 100%)}
+[data-theme="clair"] .card{border-color:rgba(43,127,181,0.12);box-shadow:0 2px 12px rgba(0,0,0,0.06)}
+[data-theme="clair"] .card:hover{box-shadow:0 8px 30px rgba(0,0,0,0.1)}
+[data-theme="clair"] .creneau{border-color:rgba(43,127,181,0.1)}
+[data-theme="clair"] .creneau:hover{border-color:rgba(43,127,181,0.25)}
+[data-theme="clair"] .creneau-time{background:rgba(43,127,181,0.08)}
+[data-theme="clair"] .modal{background:#FFFFFF;border-color:rgba(43,127,181,0.15)}
+[data-theme="clair"] .modal-overlay{background:rgba(0,0,0,0.4)}
+[data-theme="clair"] .auth-btn{border-color:rgba(43,127,181,0.15);background:rgba(43,127,181,0.03)}
+[data-theme="clair"] .auth-btn:hover{background:rgba(43,127,181,0.08)}
+[data-theme="clair"] .auth-form input, [data-theme="clair"] .mj-input{border-color:rgba(43,127,181,0.2);background:rgba(43,127,181,0.04);color:#1A2A3A}
+[data-theme="clair"] .toast-info{background:#E8DDD0;color:#1A2A3A;border-color:rgba(43,127,181,0.3)}
+[data-theme="clair"] .menu-item{border-color:rgba(212,160,48,0.12);background:#FFFFFF}
+[data-theme="clair"] .animation-card{border-color:rgba(58,155,106,0.12);background:#FFFFFF}
+[data-theme="clair"] .mes-inscriptions{border-color:rgba(43,127,181,0.15);background:#FFFFFF}
+[data-theme="clair"] .mj-form{border-color:rgba(43,127,181,0.12);background:#FFFFFF}
+[data-theme="clair"] .info-card{background:#FFFFFF}
+[data-theme="clair"] .nav-links a{color:#1A2A3A}
+[data-theme="clair"] .nav-links a:hover,[data-theme="clair"] .nav-links a.active{color:var(--teal);background:rgba(43,127,181,0.08)}
+[data-theme="clair"] .footer{background:#E0D5C5;border-top-color:rgba(43,127,181,0.1)}
+[data-theme="clair"] .section-light{background:#FFFFFF}
+[data-theme="clair"] .section-light .section-title,[data-theme="clair"] .section-light .section-label{color:var(--teal-dark)}
+[data-theme="clair"] .welcome-text strong{color:var(--teal-dark)}
+[data-theme="clair"] select.mj-input option{background:#FFFFFF;color:#1A2A3A}
 
 /* ── Reset & base ────────────────────────────────────────────────────────── */
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}

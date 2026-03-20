@@ -257,7 +257,7 @@ function renderRestauration(items) {
             html += '<div class="menu-category-title">' + escHtml(currentCat) + '</div>';
         }
         // Carte d'un item du menu
-        html += '<div class="menu-item animate-on-scroll">' +
+        html += '<div class="menu-item animate-on-scroll visible">' +
             '<div class="menu-item-header">' +
                 '<div class="menu-item-name">' + (escHtml(i.item) || '') + '</div>' +
                 '<div class="menu-item-price">' + escHtml(formatPrix(i.prix)) + '</div>' +
