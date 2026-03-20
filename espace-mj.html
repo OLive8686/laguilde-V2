@@ -119,7 +119,7 @@
                     </div>
                     <div class="mj-form-group">
                         <label class="mj-label">Avertissement contenu</label>
-                        <input type="text" id="mjContent" class="mj-input" placeholder="Ex: Horreur, violence (optionnel)">
+                        <input type="text" id="mjContentWarning" class="mj-input" placeholder="Ex: Horreur, violence (optionnel)">
                     </div>
                 </div>
                 <div class="mj-form-group mj-form-full">
@@ -200,7 +200,7 @@ async function proposerTable() {
     var systeme = document.getElementById('mjSysteme').value.trim();
     var creneau = document.getElementById('mjCreneau').value;
     var places = document.getElementById('mjPlaces').value;
-    var content = document.getElementById('mjContent').value.trim();
+    var content = document.getElementById('mjContentWarning').value.trim();
     var description = document.getElementById('mjDescription').value.trim();
 
     if (!jeu) { toast('Le nom du jeu est requis', 'error'); return; }
@@ -217,7 +217,7 @@ async function proposerTable() {
         document.getElementById('mjJeu').value = '';
         document.getElementById('mjSysteme').value = '';
         document.getElementById('mjDescription').value = '';
-        document.getElementById('mjContent').value = '';
+        document.getElementById('mjContentWarning').value = '';
         document.getElementById('mjDescCount').textContent = '0';
         loadMesPropositions();
     } catch(e) { toast(e.message, 'error'); }
