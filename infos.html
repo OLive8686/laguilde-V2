@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infos pratiques — Sous l'Œil de Mélusine</title>
+    <meta name="description" content="Informations pratiques, restauration et animations — Convention Sous l'Œil de Mélusine, Poitiers.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@400;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <link rel="icon" type="image/png" href="https://sousloeildemelusine.fr/wp-content/uploads/2023/02/cropped-cropped-logo_guilde.png">
+    <link rel="apple-touch-icon" href="https://sousloeildemelusine.fr/wp-content/uploads/2023/02/cropped-cropped-logo_guilde.png">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="toast-container" id="toasts"></div>
+
+<!-- AUTH MODAL -->
+<div class="modal-overlay" id="authModal">
+    <div class="modal">
+        <button class="modal-close" onclick="closeAuthModal()">✕</button>
+        <h3>Se connecter</h3>
+        <p class="modal-game" id="modalGame"></p>
+        <p id="modalSubtext">Connectez-vous pour gérer vos inscriptions</p>
+        <div id="authOptions" class="auth-options">
+            <button class="auth-btn" onclick="loginGoogle()"><span class="auth-btn-icon">🔑</span><div><div class="auth-btn-text">Continuer avec Google</div><div class="auth-btn-sub">Connexion rapide</div></div></button>
+            <button class="auth-btn" onclick="loginDiscord()"><span class="auth-btn-icon">🎮</span><div><div class="auth-btn-text">Continuer avec Discord</div><div class="auth-btn-sub">Compte Discord</div></div></button>
+            <div class="auth-divider">ou</div>
+            <button class="auth-btn" onclick="showEmailForm()"><span class="auth-btn-icon">✉️</span><div><div class="auth-btn-text">Pseudo & email</div><div class="auth-btn-sub">Sans compte</div></div></button>
+        </div>
+        <div id="emailForm" class="auth-form">
+            <label>Pseudo / Nom</label>
+            <input type="text" id="inputNom" placeholder="Votre pseudo ou prénom">
+            <label>Email</label>
+            <input type="email" id="inputEmail" placeholder="votre@email.com">
+            <button class="btn btn-primary" style="width:100%" onclick="loginEmail()">Valider</button>
+            <p style="margin-top:12px;font-size:14px;color:var(--text-muted);cursor:pointer" onclick="showAuthOptions()">← Retour</p>
+        </div>
+        <div id="pseudoForm" class="auth-form">
+            <p id="pseudoHint" style="font-size:15px;color:var(--text-light);text-align:center;margin-bottom:16px">Choisissez votre pseudo :</p>
+            <label>Pseudo affiché</label>
+            <input type="text" id="inputPseudo" placeholder="Votre pseudo" onkeydown="if(event.key==='Enter')confirmPseudo()">
+            <button class="btn btn-primary" style="width:100%" onclick="confirmPseudo()">Confirmer</button>
+        </div>
+    </div>
+</div>
+
+<!-- NAV -->
+<nav class="nav" id="nav">
+    <div class="nav-inner">
+        <a href="index.html" class="nav-brand"><img src="https://sousloeildemelusine.fr/wp-content/uploads/2023/02/cropped-cropped-logo_guilde.png" alt="Logo" onerror="this.style.display='none'"><span>Mélusine</span></a>
+        <button class="nav-toggle" id="navToggle" aria-label="Menu"><span></span><span></span><span></span></button>
+        <ul class="nav-links" id="navLinks">
+            <li><a href="index.html">Accueil</a></li>
+            <li><a href="programme.html">Programme</a></li>
+            <li><a href="infos.html" class="active">Infos</a></li>
+            <li><a href="benevoles.html">Bénévoles</a></li>
+            <li id="navInscriptionsLink" style="display:none"><a href="mes-inscriptions.html">Mes inscriptions</a></li>
+            <li id="navMjLink" style="display:none"></li>
+            <li id="navAdminLink" style="display:none"></li>
+            <li id="navUserArea"><button class="nav-user-btn" onclick="openAuthModal()">Se connecter</button></li>
+        </ul>
+    </div>
+</nav>
+
+<!-- CONTENU (padding-top car la nav est fixe) -->
+<div style="padding-top:90px">
+
+    <!-- BIENVENUE -->
+    <section class="section section-light" id="bienvenue">
+        <div class="section-inner">
+            <div class="section-header animate-on-scroll">
+                <p class="section-label">Bienvenue</p>
+                <h2 class="section-title" id="welcomeTitle">Bienvenue à toutes et tous</h2>
+                <div class="section-sep"></div>
+            </div>
+            <p class="welcome-text animate-on-scroll" id="welcomeText">
+                Sous l'Œil de Mélusine est organisée par <strong>la Guilde</strong>, section jeu de rôle de l'association du Foyer du Porteau. Que vous soyez joueur·euse aguerri·e ou curieux·euse de découvrir le JDR, vous êtes les bienvenu·es !
+            </p>
+            <div class="info-cards">
+                <div class="info-card animate-on-scroll">
+                    <div class="info-card-icon">📍</div>
+                    <div class="info-card-label">Lieu</div>
+                    <div class="info-card-value" id="infoLieu">Salle Gérard Gaschet<br>138 rue de la Grange Saint-Pierre</div>
+                </div>
+                <div class="info-card animate-on-scroll">
+                    <div class="info-card-icon">📅</div>
+                    <div class="info-card-label">Dates</div>
+                    <div class="info-card-value" id="infoDates">Sam. 16 mai 10h →<br>Dim. 17 mai 16h</div>
+                </div>
+                <div class="info-card animate-on-scroll">
+                    <div class="info-card-icon">🎟️</div>
+                    <div class="info-card-label">Tarif</div>
+                    <div class="info-card-value" id="infoTarif">Entrée gratuite<br>Ouverte à tous</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- RESTAURATION -->
+    <section class="section section-dark" id="restauration">
+        <div class="section-inner">
+            <div class="section-header animate-on-scroll">
+                <p class="section-label">Se restaurer</p>
+                <h2 class="section-title">Restauration</h2>
+                <div class="section-sep"></div>
+            </div>
+            <p class="welcome-text animate-on-scroll" style="color:var(--text-light)" id="restaurationIntro">
+                Buvette et buffet sur place. Repas chaud le samedi soir — inscription recommandée.
+            </p>
+            <div class="menu-grid" id="menuGrid">
+                <div class="loading-shimmer" style="height:80px"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ANIMATIONS -->
+    <section class="section section-dark" id="animations">
+        <div class="section-inner">
+            <div class="section-header animate-on-scroll">
+                <p class="section-label">Activités</p>
+                <h2 class="section-title">Animations</h2>
+                <div class="section-sep"></div>
+            </div>
+            <div id="animationsGrid">
+                <div class="loading-shimmer" style="height:80px;margin-bottom:16px"></div>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+<!-- FOOTER -->
+<footer class="footer"><div class="footer-inner"><div><div class="footer-brand">Sous l'Œil de Mélusine</div><div class="footer-sub">Organisé par La Guilde · Foyer du Porteau · Poitiers</div></div><div class="footer-right">16 & 17 mai 2026</div></div></footer>
+<button class="scroll-top" id="scrollTop" aria-label="Retour en haut">↑</button>
+
+<!-- Scripts : app.js (partagé) puis code spécifique à la page Infos -->
+<script src="app.js"></script>
+<script>
+// =============================================================================
+// CODE SPÉCIFIQUE À LA PAGE INFOS (infos.html)
+// =============================================================================
+// Gère : affichage du contenu config (bienvenue, lieu, dates, tarif),
+//        restauration (menu depuis Google Sheet), animations
+// Le code partagé (auth, nav, API, toasts) est dans app.js
+// =============================================================================
+(function() {
+'use strict';
+
+// ── Callbacks appelés par app.js après login/logout ─────────────────────────
+// Cette page n'a pas de fonctionnalités liées à l'utilisateur connecté,
+// mais on définit les callbacks vides pour éviter les erreurs.
+window.onUserLogin = function() {};
+window.onUserLogout = function() {};
+
+// ── Init page ───────────────────────────────────────────────────────────────
+// Charge en parallèle la config, la restauration et les animations,
+// puis affiche chaque section une fois les données récupérées.
+
+window.onPageInit = async function() {
+    var results = await Promise.all([
+        fetchConfig(),
+        fetchSheetData('restauration'),
+        fetchSheetData('animations')
+    ]);
+    renderConfig(results[0]);
+    renderRestauration(results[1]);
+    renderAnimations(results[2]);
+};
+
+// ── Affichage de la configuration (bienvenue, lieu, dates, tarif) ───────────
+
+/**
+ * Met à jour le contenu statique de la page à partir des données
+ * du Google Sheet "config".
+ * Champs utilisés : bienvenue_titre, bienvenue_texte, lieu_nom,
+ *   lieu_adresse, lieu_maps, dates_detail, tarif, restauration_intro
+ * @param {Object} c - Objet clé/valeur issu de l'onglet config
+ */
+function renderConfig(c) {
+    if (!c) return;
+
+    // Titre et texte de bienvenue (textContent = pas de HTML = sûr XSS)
+    if (c.bienvenue_titre) {
+        document.getElementById('welcomeTitle').textContent = c.bienvenue_titre;
+    }
+
+    // Le texte de bienvenue peut contenir des retours à la ligne :
+    // on échappe le HTML d'abord, puis on convertit \n en <br> (sûr car déjà échappé)
+    if (c.bienvenue_texte) {
+        document.getElementById('welcomeText').innerHTML = escHtml(c.bienvenue_texte).replace(/\n/g, '<br>');
+    }
+
+    // Carte "Lieu" avec lien Google Maps
+    if (c.lieu_nom) {
+        // Validation de l'URL Maps : doit commencer par https://
+        // Sinon on génère une URL de recherche Google Maps à partir du nom et de l'adresse
+        var mapsUrl = c.lieu_maps && c.lieu_maps.match(/^https:\/\//)
+            ? c.lieu_maps
+            : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent((c.lieu_nom || '') + ' ' + (c.lieu_adresse || ''));
+
+        document.getElementById('infoLieu').innerHTML =
+            escHtml(c.lieu_nom) + '<br>' +
+            escHtml(c.lieu_adresse || '') + '<br>' +
+            '<a href="' + escHtml(mapsUrl) + '" target="_blank" rel="noopener" style="color:var(--teal);font-size:14px;text-decoration:underline">📍 Voir sur Google Maps</a>';
+    }
+
+    // Carte "Dates"
+    if (c.dates_detail) {
+        document.getElementById('infoDates').innerHTML = escHtml(c.dates_detail).replace(/\n/g, '<br>');
+    }
+
+    // Carte "Tarif"
+    if (c.tarif) {
+        document.getElementById('infoTarif').innerHTML = escHtml(c.tarif).replace(/\n/g, '<br>');
+    }
+
+    // Intro de la section restauration
+    if (c.restauration_intro) {
+        document.getElementById('restaurationIntro').innerHTML = escHtml(c.restauration_intro).replace(/\n/g, '<br>');
+    }
+}
+
+// ── Restauration ────────────────────────────────────────────────────────────
+
+/**
+ * Formate un prix numérique en chaîne lisible (ex : 3.5 → "3,50€").
+ * Si la valeur n'est pas un nombre, on la renvoie telle quelle.
+ * @param {string|number} prix - Le prix brut depuis le Google Sheet
+ * @returns {string} Le prix formaté pour l'affichage
+ */
+function formatPrix(prix) {
+    if (!prix) return '';
+    var n = parseFloat(prix);
+    if (isNaN(n)) return prix;
+    return n.toFixed(2).replace('.', ',') + '€';
+}
+
+/**
+ * Affiche le menu de restauration, groupé par catégorie.
+ * Chaque item du Google Sheet contient : categorie, item, prix, description.
+ * On insère un titre de catégorie à chaque changement de catégorie.
+ * @param {Array} items - Lignes de l'onglet "restauration"
+ */
+function renderRestauration(items) {
+    if (!items) return;
+    var html = '';
+    var currentCat = null;
+
+    items.forEach(function(i) {
+        // Titre de catégorie quand la catégorie change
+        if (i.categorie && i.categorie !== currentCat) {
+            currentCat = i.categorie;
+            html += '<div class="menu-category-title">' + escHtml(currentCat) + '</div>';
+        }
+        // Carte d'un item du menu
+        html += '<div class="menu-item animate-on-scroll">' +
+            '<div class="menu-item-header">' +
+                '<div class="menu-item-name">' + (escHtml(i.item) || '') + '</div>' +
+                '<div class="menu-item-price">' + escHtml(formatPrix(i.prix)) + '</div>' +
+            '</div>' +
+            '<div class="menu-item-desc">' + (escHtml(i.description) || '') + '</div>' +
+        '</div>';
+    });
+
+    document.getElementById('menuGrid').innerHTML = html || '<p style="text-align:center;color:var(--text-muted);font-size:16px;padding:40px 0">Le menu sera bientôt disponible.</p>';
+}
+
+// ── Animations ──────────────────────────────────────────────────────────────
+
+/**
+ * Affiche la liste des animations.
+ * Chaque item du Google Sheet contient : nom, horaire, lieu, description.
+ * @param {Array} items - Lignes de l'onglet "animations"
+ */
+function renderAnimations(items) {
+    if (!items) return;
+
+    if (items.length === 0) {
+        document.getElementById('animationsGrid').innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:16px;padding:40px 0">Les animations seront bientôt annoncées.</p>';
+        return;
+    }
+
+    document.getElementById('animationsGrid').innerHTML = items.map(function(i) {
+        return '<div class="animation-card animate-on-scroll">' +
+            '<h4>' + (escHtml(i.nom) || '') + '</h4>' +
+            '<div class="anim-time">📅 ' + (escHtml(i.horaire) || '') +
+                (i.lieu ? ' · 📍 ' + escHtml(i.lieu) : '') +
+            '</div>' +
+            '<div class="anim-desc">' + (escHtml(i.description) || '') + '</div>' +
+        '</div>';
+    }).join('');
+}
+
+})();
+</script>
+</body>
+</html>

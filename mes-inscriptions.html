@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mes inscriptions — Sous l'Œil de Mélusine</title>
+    <meta name="description" content="Récapitulatif de vos inscriptions pour la convention Sous l'Œil de Mélusine.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@400;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <link rel="icon" type="image/png" href="https://sousloeildemelusine.fr/wp-content/uploads/2023/02/cropped-cropped-logo_guilde.png">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="toast-container" id="toasts"></div>
+
+<!-- AUTH MODAL (identique sur toutes les pages) -->
+<div class="modal-overlay" id="authModal">
+    <div class="modal">
+        <button class="modal-close" onclick="closeAuthModal()">&#10005;</button>
+        <h3>Se connecter</h3>
+        <p class="modal-game" id="modalGame"></p>
+        <p id="modalSubtext">Connectez-vous pour voir vos inscriptions</p>
+        <div id="authOptions" class="auth-options">
+            <button class="auth-btn" onclick="loginGoogle()"><span class="auth-btn-icon">&#128273;</span><div><div class="auth-btn-text">Continuer avec Google</div><div class="auth-btn-sub">Connexion rapide</div></div></button>
+            <button class="auth-btn" onclick="loginDiscord()"><span class="auth-btn-icon">&#127918;</span><div><div class="auth-btn-text">Continuer avec Discord</div><div class="auth-btn-sub">Compte Discord</div></div></button>
+            <div class="auth-divider">ou</div>
+            <button class="auth-btn" onclick="showEmailForm()"><span class="auth-btn-icon">&#9993;&#65039;</span><div><div class="auth-btn-text">Pseudo & email</div><div class="auth-btn-sub">Sans compte</div></div></button>
+        </div>
+        <div id="emailForm" class="auth-form">
+            <label>Pseudo / Nom</label>
+            <input type="text" id="inputNom" placeholder="Votre pseudo ou prénom">
+            <label>Email</label>
+            <input type="email" id="inputEmail" placeholder="votre@email.com">
+            <button class="btn btn-primary" style="width:100%" onclick="loginEmail()">Valider</button>
+            <p style="margin-top:12px;font-size:14px;color:var(--text-muted);cursor:pointer" onclick="showAuthOptions()">&larr; Retour</p>
+        </div>
+        <div id="pseudoForm" class="auth-form">
+            <p id="pseudoHint" style="font-size:15px;color:var(--text-light);text-align:center;margin-bottom:16px">Choisissez votre pseudo :</p>
+            <label>Pseudo affich&eacute;</label>
+            <input type="text" id="inputPseudo" placeholder="Votre pseudo" onkeydown="if(event.key==='Enter')confirmPseudo()">
+            <button class="btn btn-primary" style="width:100%" onclick="confirmPseudo()">Confirmer</button>
+        </div>
+    </div>
+</div>
+
+<!-- NAV -->
+<nav class="nav" id="nav">
+    <div class="nav-inner">
+        <a href="index.html" class="nav-brand"><img src="https://sousloeildemelusine.fr/wp-content/uploads/2023/02/cropped-cropped-logo_guilde.png" alt="Logo" onerror="this.style.display='none'"><span>M&eacute;lusine</span></a>
+        <button class="nav-toggle" id="navToggle" aria-label="Menu"><span></span><span></span><span></span></button>
+        <ul class="nav-links" id="navLinks">
+            <li><a href="index.html">Accueil</a></li>
+            <li><a href="programme.html">Programme</a></li>
+            <li><a href="infos.html">Infos</a></li>
+            <li><a href="benevoles.html">B&eacute;n&eacute;voles</a></li>
+            <li id="navInscriptionsLink" style="display:none"><a href="mes-inscriptions.html" class="active">Mes inscriptions</a></li>
+            <li id="navMjLink" style="display:none"></li>
+            <li id="navAdminLink" style="display:none"></li>
+            <li id="navUserArea"><button class="nav-user-btn" onclick="openAuthModal()">Se connecter</button></li>
+        </ul>
+    </div>
+</nav>
+
+<!-- CONTENU PRINCIPAL -->
+<div style="padding-top:90px">
+
+    <!-- ============================================================= -->
+    <!-- NON CONNECTE : invitation a se connecter                      -->
+    <!-- ============================================================= -->
+    <section class="section section-dark" id="inscriptionsLoginPrompt" style="display:none">
+        <div class="section-inner" style="text-align:center">
+            <div class="section-header">
+                <p class="section-label">Mon espace</p>
+                <h2 class="section-title">Mes inscriptions</h2>
+                <div class="section-sep"></div>
+            </div>
+            <p class="mj-intro">Connectez-vous pour retrouver toutes vos inscriptions : tables de JDR, accompagnants, b&eacute;n&eacute;volat et propositions MJ.</p>
+            <button class="btn btn-primary" onclick="openAuthModal()">Se connecter</button>
+        </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- SECTION 1 : Mes inscriptions JDR (tables en tant que joueur)  -->
+    <!-- ============================================================= -->
+    <section class="section section-dark" id="sectionMesJdr" style="display:none">
+        <div class="section-inner">
+            <div class="section-header">
+                <p class="section-label">Tables de JDR</p>
+                <h2 class="section-title">Mes inscriptions</h2>
+                <div class="section-sep"></div>
+            </div>
+            <div id="mesJdrGrid">
+                <div class="loading-shimmer" style="height:80px"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- SECTION 2 : Mes accompagnants + leurs inscriptions            -->
+    <!-- ============================================================= -->
+    <section class="section section-dark" id="sectionAccompagnants" style="display:none">
+        <div class="section-inner">
+            <div class="section-header">
+                <p class="section-label">Famille &amp; amis</p>
+                <h2 class="section-title">Mes accompagnants</h2>
+                <div class="section-sep"></div>
+            </div>
+            <p class="mj-intro">Ajoutez jusqu'&agrave; 3 accompagnants (enfants, conjoint&hellip;) pour les inscrire &agrave; des tables.</p>
+            <div id="accompagnantsGrid"></div>
+            <!-- Formulaire d'ajout d'accompagnant -->
+            <div id="addAccompagnantForm" style="text-align:center;margin-top:20px">
+                <div style="display:inline-flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center">
+                    <input type="text" id="inputNomAccompagnant" class="mj-input" placeholder="Pr&eacute;nom / pseudo de l'accompagnant" style="width:280px" onkeydown="if(event.key==='Enter')ajouterAccompagnant()">
+                    <button class="btn btn-small btn-green" onclick="ajouterAccompagnant()">+ Ajouter</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- SECTION 3 : Mes creneaux benevole                             -->
+    <!-- ============================================================= -->
+    <section class="section section-dark" id="sectionBenevoles" style="display:none">
+        <div class="section-inner">
+            <div class="section-header">
+                <p class="section-label">B&eacute;n&eacute;volat</p>
+                <h2 class="section-title">Mes cr&eacute;neaux b&eacute;n&eacute;vole</h2>
+                <div class="section-sep"></div>
+            </div>
+            <div id="mesBenevolesGrid">
+                <div class="loading-shimmer" style="height:80px"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- SECTION 4 : Mes propositions MJ (mj/admin uniquement)         -->
+    <!-- ============================================================= -->
+    <section class="section section-dark" id="sectionPropositionsMj" style="display:none">
+        <div class="section-inner">
+            <div class="section-header">
+                <p class="section-label">Espace MJ</p>
+                <h2 class="section-title">Mes propositions de tables</h2>
+                <div class="section-sep"></div>
+            </div>
+            <div id="mesPropositionsGrid">
+                <div class="loading-shimmer" style="height:80px"></div>
+            </div>
+            <div style="text-align:center;margin-top:24px">
+                <a href="espace-mj.html" class="btn btn-gold">Proposer une nouvelle table</a>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+<!-- FOOTER -->
+<footer class="footer"><div class="footer-inner"><div><div class="footer-brand">Sous l'&#338;il de M&eacute;lusine</div><div class="footer-sub">Organis&eacute; par La Guilde &middot; Foyer du Porteau &middot; Poitiers</div></div><div class="footer-right">16 &amp; 17 mai 2026</div></div></footer>
+<button class="scroll-top" id="scrollTop" aria-label="Retour en haut">&uarr;</button>
+
+<!-- Scripts : app.js (partage) puis code specifique a cette page -->
+<script src="app.js"></script>
+<script>
+// =============================================================================
+// CODE SPECIFIQUE A LA PAGE "MES INSCRIPTIONS" (mes-inscriptions.html)
+// =============================================================================
+// Cette page affiche un recapitulatif complet de tout ce a quoi l'utilisateur
+// connecte est inscrit : tables JDR, accompagnants, benevolat, propositions MJ.
+// Le code partage (auth, nav, API, toasts) est dans app.js.
+// =============================================================================
+(function() {
+'use strict';
+
+// ── Callbacks appeles par app.js apres login/logout ─────────────────────────
+
+/**
+ * Appele automatiquement par app.js quand l'utilisateur se connecte.
+ * Rafraichit l'affichage de toutes les sections.
+ */
+window.onUserLogin = function() {
+    updateDashboardView();
+};
+
+/**
+ * Appele automatiquement par app.js quand l'utilisateur se deconnecte.
+ * Cache toutes les sections et affiche l'invitation a se connecter.
+ */
+window.onUserLogout = function() {
+    updateDashboardView();
+};
+
+/**
+ * Init de la page — appele par app.js au chargement (DOMContentLoaded).
+ */
+window.onPageInit = async function() {
+    updateDashboardView();
+};
+
+// ── Affichage conditionnel selon l'etat de connexion ────────────────────────
+
+/**
+ * Gere la visibilite des sections selon que l'utilisateur est connecte ou non.
+ * Si connecte, lance le chargement de toutes les donnees.
+ */
+function updateDashboardView() {
+    var user = APP.currentUser;
+    var role = APP.currentRole;
+
+    // Lien "Mes inscriptions" dans la nav — visible si connecte
+    var navInsLink = document.getElementById('navInscriptionsLink');
+    if (navInsLink) navInsLink.style.display = user ? '' : 'none';
+
+    // Section "non connecte"
+    document.getElementById('inscriptionsLoginPrompt').style.display = !user ? 'block' : 'none';
+
+    // Sections connectees
+    document.getElementById('sectionMesJdr').style.display = user ? 'block' : 'none';
+    document.getElementById('sectionAccompagnants').style.display = user ? 'block' : 'none';
+    document.getElementById('sectionBenevoles').style.display = user ? 'block' : 'none';
+
+    // Section MJ — visible uniquement si role mj ou admin
+    document.getElementById('sectionPropositionsMj').style.display =
+        (user && (role === 'mj' || role === 'admin')) ? 'block' : 'none';
+
+    // Charger les donnees si connecte
+    if (user) {
+        loadMesInscriptionsJdr();
+        loadAccompagnants();
+        loadMesBenevoles();
+        if (role === 'mj' || role === 'admin') {
+            loadMesPropositionsMj();
+        }
+    }
+}
+
+// =========================================================================
+// SECTION 1 : Mes inscriptions JDR
+// =========================================================================
+
+/**
+ * Charge les inscriptions JDR de l'utilisateur (personnelles + accompagnants)
+ * et les affiche dans la grille #mesJdrGrid.
+ * Separe les inscriptions personnelles de celles des accompagnants.
+ */
+async function loadMesInscriptionsJdr() {
+    var user = APP.currentUser;
+    if (!user) return;
+    try {
+        var r = await callAPI({ action: 'get_mes_inscriptions', email: user.email });
+        var grid = document.getElementById('mesJdrGrid');
+
+        if (!r.inscriptions || r.inscriptions.length === 0) {
+            grid.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:16px;padding:20px 0">Vous n\'&ecirc;tes inscrit&middot;e &agrave; aucune table pour le moment. <a href="index.html#programme" style="color:var(--gold)">Voir le programme</a></p>';
+            return;
+        }
+
+        // Separer les inscriptions personnelles des accompagnants
+        var perso = r.inscriptions.filter(function(i) {
+            return !i.nom_accompagnant || i.type_inscrit !== 'accompagnant';
+        });
+        var accs = r.inscriptions.filter(function(i) {
+            return i.nom_accompagnant && i.type_inscrit === 'accompagnant';
+        });
+
+        var html = '';
+
+        // --- Inscriptions personnelles ---
+        if (perso.length > 0) {
+            html += perso.map(function(i) {
+                var badgeCls = i.statut === 'inscrit' ? 'inscrit' : 'attente';
+                var badgeTxt = i.statut === 'inscrit' ? 'Inscrit&middot;e' : 'En attente';
+                return '<div class="mes-inscriptions">'
+                    + '<div class="mi-info">'
+                    + '<h4>' + escHtml(i.jeu) + '</h4>'
+                    + '<p>' + escHtml(i.creneau) + ' &middot; <span class="badge badge-' + badgeCls + '">' + badgeTxt + '</span></p>'
+                    + '</div>'
+                    + '<button class="btn btn-small btn-red" onclick="annulerJdr(\'' + esc(i.creneau) + '\',\'' + esc(i.jeu) + '\')">Annuler</button>'
+                    + '</div>';
+            }).join('');
+        } else {
+            html += '<p style="color:var(--text-muted);font-size:15px;margin-bottom:12px">Aucune inscription personnelle.</p>';
+        }
+
+        // --- Inscriptions des accompagnants (groupees par nom) ---
+        if (accs.length > 0) {
+            var parAcc = {};
+            accs.forEach(function(i) {
+                if (!parAcc[i.nom_accompagnant]) parAcc[i.nom_accompagnant] = [];
+                parAcc[i.nom_accompagnant].push(i);
+            });
+            Object.keys(parAcc).forEach(function(nomAcc) {
+                html += '<div class="accompagnant-group">';
+                html += '<p class="accompagnant-group-title">' + escHtml(nomAcc) + ' (accompagnant)</p>';
+                html += parAcc[nomAcc].map(function(i) {
+                    var badgeCls = i.statut === 'inscrit' ? 'inscrit' : 'attente';
+                    var badgeTxt = i.statut === 'inscrit' ? 'Inscrit&middot;e' : 'En attente';
+                    return '<div class="mes-inscriptions accompagnant-card">'
+                        + '<div class="mi-info">'
+                        + '<h4>' + escHtml(i.jeu) + '</h4>'
+                        + '<p>' + escHtml(i.creneau) + ' &middot; <span class="badge badge-' + badgeCls + '">' + badgeTxt + '</span></p>'
+                        + '</div>'
+                        + '<button class="btn btn-small btn-red" onclick="annulerJdr(\'' + esc(i.creneau) + '\',\'' + esc(i.jeu) + '\',\'' + esc(i.nom_accompagnant) + '\')">Annuler</button>'
+                        + '</div>';
+                }).join('');
+                html += '</div>';
+            });
+        }
+
+        grid.innerHTML = html;
+    } catch(e) {
+        console.warn('Erreur chargement inscriptions JDR:', e);
+        document.getElementById('mesJdrGrid').innerHTML = '<p style="text-align:center;color:var(--text-muted)">Erreur lors du chargement.</p>';
+    }
+}
+
+/**
+ * Annule une inscription JDR (personnelle ou accompagnant).
+ * @param {string} creneau - Le creneau concerne
+ * @param {string} jeu - Le nom du jeu
+ * @param {string} [nomAccompagnant] - Nom de l'accompagnant (optionnel, si c'est son inscription)
+ */
+async function annulerJdr(creneau, jeu, nomAccompagnant) {
+    var user = APP.currentUser;
+    if (!user) return;
+    try {
+        var params = { action: 'annuler', email: user.email, creneau: creneau, jeu: jeu };
+        if (nomAccompagnant) params.nom_accompagnant = nomAccompagnant;
+        var r = await callAPIPost(params);
+        toast(r.message, 'success');
+        loadMesInscriptionsJdr();
+    } catch(e) { toast(e.message, 'error'); }
+}
+
+// =========================================================================
+// SECTION 2 : Mes accompagnants
+// =========================================================================
+
+/**
+ * Charge la liste des accompagnants depuis le backend et les affiche.
+ * Montre/cache le formulaire d'ajout selon le nombre (max 3).
+ */
+async function loadAccompagnants() {
+    var user = APP.currentUser;
+    if (!user) return;
+    try {
+        var r = await callAPI({ action: 'get_accompagnants', email: user.email });
+        var accompagnantsList = r.accompagnants || [];
+        // Mettre a jour l'etat global
+        APP.accompagnants = accompagnantsList;
+        localStorage.setItem('melusine_accompagnants', JSON.stringify(accompagnantsList));
+
+        var grid = document.getElementById('accompagnantsGrid');
+        var addForm = document.getElementById('addAccompagnantForm');
+
+        if (accompagnantsList.length === 0) {
+            grid.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:16px">Aucun accompagnant pour le moment.</p>';
+        } else {
+            grid.innerHTML = accompagnantsList.map(function(a) {
+                return '<div class="mes-inscriptions accompagnant-card">'
+                    + '<div class="mi-info">'
+                    + '<h4 class="accompagnant-name">' + escHtml(a.nom_accompagnant) + '</h4>'
+                    + '<p class="mi-sub">Accompagnant</p>'
+                    + '</div>'
+                    + '<button class="btn btn-small btn-red" onclick="supprimerAccompagnant(\'' + esc(a.nom_accompagnant) + '\')">Supprimer</button>'
+                    + '</div>';
+            }).join('');
+        }
+
+        // Cacher le formulaire d'ajout si on a atteint le maximum de 3
+        addForm.style.display = accompagnantsList.length >= 3 ? 'none' : 'block';
+
+    } catch(e) {
+        console.warn('Erreur chargement accompagnants:', e);
+    }
+}
+
+/**
+ * Ajoute un nouvel accompagnant via le backend.
+ * Verifie que le champ n'est pas vide et que l'utilisateur est connecte.
+ */
+async function ajouterAccompagnant() {
+    var input = document.getElementById('inputNomAccompagnant');
+    var nom = input.value.trim();
+    if (!nom) { toast('Entrez le nom de l\'accompagnant', 'error'); return; }
+    if (!APP.currentUser) { toast('Connectez-vous d\'abord', 'error'); return; }
+    try {
+        var r = await callAPIPost({
+            action: 'add_accompagnant',
+            email: APP.currentUser.email,
+            nom_accompagnant: nom
+        });
+        toast(r.message, 'success');
+        input.value = '';
+        // Recharger la liste des accompagnants et les inscriptions JDR
+        loadAccompagnants();
+    } catch(e) { toast(e.message, 'error'); }
+}
+
+/**
+ * Supprime un accompagnant apres confirmation.
+ * Attention : toutes les inscriptions de cet accompagnant seront annulees.
+ * @param {string} nomAccompagnant - Le nom de l'accompagnant a supprimer
+ */
+async function supprimerAccompagnant(nomAccompagnant) {
+    if (!confirm('Supprimer ' + nomAccompagnant + ' ? Toutes ses inscriptions seront annul\u00e9es.')) return;
+    try {
+        var r = await callAPIPost({
+            action: 'remove_accompagnant',
+            email: APP.currentUser.email,
+            nom_accompagnant: nomAccompagnant
+        });
+        toast(r.message, 'success');
+        // Recharger accompagnants et inscriptions JDR (les inscriptions accompagnant ont pu etre annulees)
+        loadAccompagnants();
+        loadMesInscriptionsJdr();
+    } catch(e) { toast(e.message, 'error'); }
+}
+
+// =========================================================================
+// SECTION 3 : Mes creneaux benevole
+// =========================================================================
+
+/**
+ * Charge les inscriptions benevole de l'utilisateur et les affiche.
+ */
+async function loadMesBenevoles() {
+    var user = APP.currentUser;
+    if (!user) return;
+    try {
+        var r = await callAPI({ action: 'get_mes_benevoles', email: user.email });
+        var grid = document.getElementById('mesBenevolesGrid');
+
+        if (!r.benevoles || r.benevoles.length === 0) {
+            grid.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:16px;padding:20px 0">Vous n\'&ecirc;tes inscrit&middot;e &agrave; aucun cr&eacute;neau b&eacute;n&eacute;vole. <a href="benevoles.html" style="color:var(--gold)">S\'inscrire</a></p>';
+            return;
+        }
+
+        grid.innerHTML = r.benevoles.map(function(b) {
+            return '<div class="mes-inscriptions">'
+                + '<div class="mi-info"><h4>B&eacute;n&eacute;vole &mdash; ' + escHtml(b.creneau) + '</h4></div>'
+                + '<button class="btn btn-small btn-red" onclick="annulerBenevole(\'' + esc(b.creneau) + '\')">Annuler</button>'
+                + '</div>';
+        }).join('');
+    } catch(e) {
+        console.warn('Erreur chargement b\u00e9n\u00e9voles:', e);
+        document.getElementById('mesBenevolesGrid').innerHTML = '<p style="text-align:center;color:var(--text-muted)">Erreur lors du chargement.</p>';
+    }
+}
+
+/**
+ * Annule une inscription benevole.
+ * @param {string} creneau - Le creneau benevole a annuler
+ */
+async function annulerBenevole(creneau) {
+    var user = APP.currentUser;
+    if (!user) return;
+    try {
+        var r = await callAPIPost({
+            action: 'annuler_benevole',
+            email: user.email,
+            creneau: creneau
+        });
+        toast(r.message, 'success');
+        loadMesBenevoles();
+    } catch(e) { toast(e.message, 'error'); }
+}
+
+// =========================================================================
+// SECTION 4 : Mes propositions MJ (visible uniquement si role mj ou admin)
+// =========================================================================
+
+/**
+ * Charge les propositions de tables du MJ connecte et les affiche avec
+ * des badges de statut (en attente / validee / refusee).
+ */
+async function loadMesPropositionsMj() {
+    var user = APP.currentUser;
+    if (!user) return;
+    try {
+        var r = await callAPI({ action: 'get_mes_propositions', email: user.email });
+        var grid = document.getElementById('mesPropositionsGrid');
+
+        if (!r.propositions || r.propositions.length === 0) {
+            grid.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:16px;padding:20px 0">Aucune proposition de table pour le moment.</p>';
+            return;
+        }
+
+        // Correspondance statut -> badge CSS et libelle affiche
+        var statusLabels = {
+            'en_attente': 'En attente',
+            'valid\u00e9': 'Valid\u00e9e',
+            'refus\u00e9': 'Refus\u00e9e'
+        };
+        var statusBadge = {
+            'en_attente': 'attente',
+            'valid\u00e9': 'inscrit',
+            'refus\u00e9': 'complet'
+        };
+
+        grid.innerHTML = r.propositions.map(function(p) {
+            var statut = p.statut_table || 'en_attente';
+            var badgeCls = statusBadge[statut] || 'attente';
+            var badgeTxt = statusLabels[statut] || statut;
+            return '<div class="mes-inscriptions">'
+                + '<div class="mi-info">'
+                + '<h4>' + escHtml(p.jeu) + '</h4>'
+                + '<p>' + escHtml(p.creneau) + ' &middot; ' + escHtml(p.places) + ' places'
+                + (p.systeme ? ' &middot; ' + escHtml(p.systeme) : '')
+                + '</p>'
+                + '</div>'
+                + '<span class="badge badge-' + badgeCls + '">' + escHtml(badgeTxt) + '</span>'
+                + '</div>';
+        }).join('');
+    } catch(e) {
+        console.warn('Erreur chargement propositions MJ:', e);
+        document.getElementById('mesPropositionsGrid').innerHTML = '<p style="text-align:center;color:var(--text-muted)">Erreur lors du chargement.</p>';
+    }
+}
+
+// ── Exports window ──────────────────────────────────────────────────────────
+// Necessaires pour les handlers onclick dans le HTML
+window.annulerJdr = annulerJdr;
+window.ajouterAccompagnant = ajouterAccompagnant;
+window.supprimerAccompagnant = supprimerAccompagnant;
+window.annulerBenevole = annulerBenevole;
+
+})();
+</script>
+</body>
+</html>

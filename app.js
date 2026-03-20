@@ -155,8 +155,11 @@ async function fetchRole() {
 function updateNavForRole() {
     var mjLink = document.getElementById('navMjLink');
     var adminLink = document.getElementById('navAdminLink');
+    var inscriptionsLink = document.getElementById('navInscriptionsLink');
     if (mjLink) mjLink.style.display = (currentRole === 'mj' || currentRole === 'admin') ? '' : 'none';
     if (adminLink) adminLink.style.display = currentRole === 'admin' ? '' : 'none';
+    // "Mes inscriptions" est visible des que l'utilisateur est connecte
+    if (inscriptionsLink) inscriptionsLink.style.display = currentUser ? '' : 'none';
 }
 
 // ── Auth ────────────────────────────────────────────────────────────────────

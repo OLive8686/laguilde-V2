@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Programme — Sous l'Œil de Mélusine</title>
+    <meta name="description" content="Programme des tables de jeu de rôle — Convention Sous l'Œil de Mélusine, 16 & 17 mai 2026, Poitiers.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@400;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <link rel="icon" type="image/png" href="https://sousloeildemelusine.fr/wp-content/uploads/2023/02/cropped-cropped-logo_guilde.png">
+    <link rel="apple-touch-icon" href="https://sousloeildemelusine.fr/wp-content/uploads/2023/02/cropped-cropped-logo_guilde.png">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="toast-container" id="toasts"></div>
+
+<!-- AUTH MODAL -->
+<div class="modal-overlay" id="authModal">
+    <div class="modal">
+        <button class="modal-close" onclick="closeAuthModal()">✕</button>
+        <h3>S'inscrire</h3>
+        <p class="modal-game" id="modalGame"></p>
+        <p id="modalSubtext">Connectez-vous pour vous inscrire à une table</p>
+        <div id="authOptions" class="auth-options">
+            <button class="auth-btn" onclick="loginGoogle()"><span class="auth-btn-icon">🔑</span><div><div class="auth-btn-text">Continuer avec Google</div><div class="auth-btn-sub">Connexion rapide</div></div></button>
+            <button class="auth-btn" onclick="loginDiscord()"><span class="auth-btn-icon">🎮</span><div><div class="auth-btn-text">Continuer avec Discord</div><div class="auth-btn-sub">Compte Discord</div></div></button>
+            <div class="auth-divider">ou</div>
+            <button class="auth-btn" onclick="showEmailForm()"><span class="auth-btn-icon">✉️</span><div><div class="auth-btn-text">Pseudo & email</div><div class="auth-btn-sub">Sans compte</div></div></button>
+        </div>
+        <div id="emailForm" class="auth-form">
+            <label>Pseudo / Nom</label>
+            <input type="text" id="inputNom" placeholder="Votre pseudo ou prénom">
+            <label>Email</label>
+            <input type="email" id="inputEmail" placeholder="votre@email.com">
+            <button class="btn btn-primary" style="width:100%" onclick="loginEmail()">Valider et s'inscrire</button>
+            <p style="margin-top:12px;font-size:14px;color:var(--text-muted);cursor:pointer" onclick="showAuthOptions()">← Retour</p>
+        </div>
+        <div id="pseudoForm" class="auth-form">
+            <p style="font-size:15px;color:var(--text-light);text-align:center;margin-bottom:16px" id="pseudoHint">Connecté·e ! Choisissez votre pseudo pour la convention :</p>
+            <label>Pseudo affiché</label>
+            <input type="text" id="inputPseudo" placeholder="Votre pseudo pour la convention" onkeydown="if(event.key==='Enter')confirmPseudo()">
+            <p style="font-size:13px;color:var(--text-muted);margin:-10px 0 16px;text-align:center">C'est ce nom qui apparaîtra sur les listes d'inscription</p>
+            <button class="btn btn-primary" style="width:100%" onclick="confirmPseudo()">Confirmer et continuer</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL CHOIX ACCOMPAGNANT -->
+<div class="modal-overlay" id="choixModal">
+    <div class="modal">
+        <button class="modal-close" onclick="closeChoixModal()">✕</button>
+        <h3>Pour qui ?</h3>
+        <p class="modal-game" id="choixModalGame"></p>
+        <p id="choixModalCreneau" style="font-size:15px;color:var(--text-muted);text-align:center;margin-bottom:20px"></p>
+        <div id="choixOptions" class="auth-options"></div>
+    </div>
+</div>
+
+<!-- NAV -->
+<nav class="nav" id="nav">
+    <div class="nav-inner">
+        <a href="index.html" class="nav-brand"><img src="https://sousloeildemelusine.fr/wp-content/uploads/2023/02/cropped-cropped-logo_guilde.png" alt="Logo" onerror="this.style.display='none'"><span>Mélusine</span></a>
+        <button class="nav-toggle" id="navToggle" aria-label="Menu"><span></span><span></span><span></span></button>
+        <ul class="nav-links" id="navLinks">
+            <li><a href="index.html">Accueil</a></li>
+            <li><a href="programme.html" class="active">Programme</a></li>
+            <li><a href="infos.html">Infos</a></li>
+            <li><a href="benevoles.html">Bénévoles</a></li>
+            <li id="navInscriptionsLink" style="display:none"><a href="mes-inscriptions.html">Mes inscriptions</a></li>
+            <li id="navMjLink" style="display:none"></li>
+            <li id="navAdminLink" style="display:none"></li>
+            <li id="navUserArea"><button class="nav-user-btn" onclick="openAuthModal()">Se connecter</button></li>
+        </ul>
+    </div>
+</nav>
+
+<!-- Espacement pour la nav fixe -->
+<div style="padding-top:90px"></div>
+
+<!-- PROGRAMME -->
+<section class="section section-dark" id="programme">
+    <div class="section-inner">
+        <div class="section-header animate-on-scroll">
+            <p class="section-label">Créneaux de jeu</p>
+            <h2 class="section-title">Programme</h2>
+            <div class="section-sep"></div>
+        </div>
+        <div id="mjProposerBtn" style="display:none;text-align:center;margin-bottom:24px">
+            <a href="espace-mj.html" class="btn btn-gold">Proposer une table (MJ)</a>
+        </div>
+        <div class="tabs" id="programmeTabs"></div>
+        <div class="programme-grid" id="programmeGrid">
+            <div class="loading-shimmer" style="height:80px"></div>
+            <div class="loading-shimmer" style="height:80px"></div>
+            <div class="loading-shimmer" style="height:80px"></div>
+        </div>
+    </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+    <div class="footer-inner">
+        <div>
+            <div class="footer-brand">Sous l'Œil de Mélusine</div>
+            <div class="footer-sub">Organisé par La Guilde · Foyer du Porteau · Poitiers</div>
+        </div>
+        <div class="footer-right">16 & 17 mai 2026</div>
+    </div>
+</footer>
+<button class="scroll-top" id="scrollTop" aria-label="Retour en haut">↑</button>
+
+<!-- Scripts : app.js (partagé) puis code spécifique à la page programme -->
+<script src="app.js"></script>
+<script>
+// =============================================================================
+// CODE SPÉCIFIQUE À LA PAGE PROGRAMME (programme.html)
+// =============================================================================
+// Gère : affichage du programme, filtres par créneau, inscription aux tables,
+// sélection d'accompagnant, bouton "Proposer une table" pour les MJ.
+// Le code partagé (auth, nav, API, toasts) est dans app.js.
+// =============================================================================
+(function() {
+'use strict';
+
+// ── Callbacks appelés par app.js après login/logout ─────────────────────────
+
+/**
+ * Appelé par app.js quand l'utilisateur se connecte.
+ * Recharge les accompagnants (pour la modal de choix) et met à jour l'affichage.
+ */
+window.onUserLogin = function() {
+    loadAccompagnants();
+    updateMJButton();
+    refreshProgramme();
+};
+
+/**
+ * Appelé par app.js quand l'utilisateur se déconnecte.
+ * Masque le bouton MJ et rafraîchit le programme (plus de boutons personnalisés).
+ */
+window.onUserLogout = function() {
+    updateMJButton();
+    refreshProgramme();
+};
+
+// ── Bouton MJ ───────────────────────────────────────────────────────────────
+
+/**
+ * Affiche ou masque le bouton "Proposer une table" selon le rôle de l'utilisateur.
+ * Visible uniquement pour les rôles 'mj' et 'admin'.
+ */
+function updateMJButton() {
+    var btn = document.getElementById('mjProposerBtn');
+    var role = APP.currentRole;
+    btn.style.display = (role === 'mj' || role === 'admin') ? 'block' : 'none';
+}
+
+// ── Init page ───────────────────────────────────────────────────────────────
+
+/**
+ * Point d'entrée de la page, appelé par app.js une fois le DOM prêt.
+ * Charge le programme et, si l'utilisateur est connecté, ses accompagnants.
+ */
+window.onPageInit = async function() {
+    await refreshProgramme();
+    if (APP.currentUser) {
+        loadAccompagnants();
+    }
+    updateMJButton();
+};
+
+// ── Accompagnants (chargement pour la modal de choix) ───────────────────────
+
+/**
+ * Récupère la liste des accompagnants de l'utilisateur connecté depuis le backend.
+ * Stocke le résultat dans APP.accompagnants et dans le localStorage.
+ * Ces données servent à alimenter la modal "Pour qui ?" (choixModal).
+ */
+async function loadAccompagnants() {
+    if (!APP.currentUser || !APP.SCRIPT_URL) return;
+    try {
+        var r = await callAPI({ action: 'get_accompagnants', email: APP.currentUser.email });
+        APP.accompagnants = r.accompagnants || [];
+        localStorage.setItem('melusine_accompagnants', JSON.stringify(APP.accompagnants));
+    } catch(e) {
+        console.warn('Erreur chargement accompagnants:', e);
+    }
+}
+
+// ── Modal "Pour qui ?" ──────────────────────────────────────────────────────
+
+/**
+ * Affiche la modal de choix : s'inscrire pour soi-même ou pour un accompagnant.
+ * @param {string} creneau - Le créneau horaire de la table
+ * @param {string} jeu - Le nom du jeu
+ */
+function showChoixModal(creneau, jeu) {
+    document.getElementById('choixModalGame').textContent = jeu;
+    document.getElementById('choixModalCreneau').textContent = 'Créneau : ' + creneau;
+
+    // Bouton pour s'inscrire soi-même
+    var options = `
+        <button class="auth-btn" onclick="doInscrire('${esc(creneau)}','${esc(jeu)}'); closeChoixModal()">
+            <span class="auth-btn-icon">🧑</span>
+            <div><div class="auth-btn-text">${escHtml(APP.currentUser.nom)} (moi)</div><div class="auth-btn-sub">Inscription personnelle</div></div>
+        </button>`;
+
+    // Un bouton par accompagnant
+    APP.accompagnants.forEach(function(a) {
+        options += `
+            <button class="auth-btn" onclick="doInscrireAccompagnant('${esc(creneau)}','${esc(jeu)}','${esc(a.nom_accompagnant)}'); closeChoixModal()">
+                <span class="auth-btn-icon">👤</span>
+                <div><div class="auth-btn-text">${escHtml(a.nom_accompagnant)}</div><div class="auth-btn-sub">Accompagnant</div></div>
+            </button>`;
+    });
+
+    document.getElementById('choixOptions').innerHTML = options;
+    document.getElementById('choixModal').classList.add('active');
+}
+
+// ── Inscriptions ────────────────────────────────────────────────────────────
+
+/**
+ * Gère le clic sur un bouton "S'inscrire" ou "Liste d'attente".
+ * - Si l'utilisateur n'est pas connecté : ouvre la modal d'authentification.
+ * - Si l'utilisateur a des accompagnants : ouvre la modal de choix.
+ * - Sinon : inscrit directement l'utilisateur.
+ * @param {string} creneau - Le créneau horaire
+ * @param {string} jeu - Le nom du jeu
+ */
+function handleInscrire(creneau, jeu) {
+    if (!APP.currentUser) {
+        openAuthModal(creneau, jeu);
+        return;
+    }
+    if (APP.accompagnants && APP.accompagnants.length > 0) {
+        showChoixModal(creneau, jeu);
+    } else {
+        doInscrire(creneau, jeu);
+    }
+}
+
+/**
+ * Inscrit l'utilisateur connecté à une table.
+ * Appelle le backend via callAPIPost, affiche un toast, et rafraîchit le programme.
+ * @param {string} creneau - Le créneau horaire
+ * @param {string} jeu - Le nom du jeu
+ */
+async function doInscrire(creneau, jeu) {
+    if (!APP.SCRIPT_URL) { toast('Backend non configuré', 'info'); return; }
+    try {
+        var u = APP.currentUser;
+        var r = await callAPIPost({
+            action: 'inscrire',
+            nom: u.nom,
+            email: u.email,
+            auth_type: u.auth_type,
+            auth_id: u.auth_id || '',
+            creneau: creneau,
+            jeu: jeu
+        });
+        toast(r.message, r.statut === 'inscrit' ? 'success' : 'info');
+        refreshProgramme();
+    } catch(e) {
+        toast(e.message, 'error');
+    }
+}
+
+/**
+ * Inscrit un accompagnant de l'utilisateur à une table.
+ * Même logique que doInscrire mais avec type_inscrit='accompagnant'.
+ * @param {string} creneau - Le créneau horaire
+ * @param {string} jeu - Le nom du jeu
+ * @param {string} nomAccompagnant - Le nom de l'accompagnant à inscrire
+ */
+async function doInscrireAccompagnant(creneau, jeu, nomAccompagnant) {
+    if (!APP.SCRIPT_URL) { toast('Backend non configuré', 'info'); return; }
+    try {
+        var u = APP.currentUser;
+        var r = await callAPIPost({
+            action: 'inscrire',
+            nom: u.nom,
+            email: u.email,
+            auth_type: u.auth_type,
+            auth_id: u.auth_id || '',
+            creneau: creneau,
+            jeu: jeu,
+            type_inscrit: 'accompagnant',
+            nom_accompagnant: nomAccompagnant
+        });
+        toast(r.message, r.statut === 'inscrit' ? 'success' : 'info');
+        refreshProgramme();
+    } catch(e) {
+        toast(e.message, 'error');
+    }
+}
+
+/**
+ * Annule l'inscription de l'utilisateur (ou d'un accompagnant) à une table.
+ * @param {string} creneau - Le créneau horaire
+ * @param {string} jeu - Le nom du jeu
+ * @param {string} [nomAccompagnant] - Si renseigné, annule l'inscription de cet accompagnant
+ */
+async function annulerInscription(creneau, jeu, nomAccompagnant) {
+    if (!APP.currentUser || !APP.SCRIPT_URL) return;
+    try {
+        var params = { action: 'annuler', email: APP.currentUser.email, creneau: creneau, jeu: jeu };
+        if (nomAccompagnant) params.nom_accompagnant = nomAccompagnant;
+        var r = await callAPIPost(params);
+        toast(r.message, 'success');
+        refreshProgramme();
+    } catch(e) {
+        toast(e.message, 'error');
+    }
+}
+
+// ── Programme ───────────────────────────────────────────────────────────────
+
+/**
+ * Récupère les données du programme depuis le backend (get_programme),
+ * avec fallback sur la feuille Google Sheets (fetchSheetData).
+ * Appelle renderProgramme pour afficher les résultats.
+ */
+async function refreshProgramme() {
+    var items;
+    if (APP.SCRIPT_URL) {
+        try {
+            items = (await callAPI({ action: 'get_programme' })).programme;
+        } catch(e) {
+            items = await fetchSheetData('programme');
+        }
+    } else {
+        items = await fetchSheetData('programme');
+    }
+    if (items) renderProgramme(items);
+}
+
+/**
+ * Affiche le programme dans le DOM : onglets de filtrage par créneau + cartes de jeu.
+ * Chaque carte affiche : nom du jeu, MJ, système, description, places restantes,
+ * et un bouton d'inscription (ou liste d'attente si complet).
+ * @param {Array} items - Liste des tables (objets avec creneau, jeu, mj, etc.)
+ */
+function renderProgramme(items) {
+    // Si le programme est vide, afficher un message au lieu de shimmers
+    if (!items || !items.length) {
+        document.getElementById('programmeGrid').innerHTML =
+            '<p style="text-align:center;color:var(--text-muted);font-size:16px;padding:40px 0">' +
+            'Le programme sera bientôt disponible.</p>';
+        document.getElementById('programmeTabs').innerHTML = '';
+        return;
+    }
+
+    var grid = document.getElementById('programmeGrid');
+    var tabsEl = document.getElementById('programmeTabs');
+
+    // Extraire les créneaux uniques pour les onglets de filtre
+    var creneaux = [];
+    var creneauxSet = {};
+    items.forEach(function(i) {
+        if (i.creneau && !creneauxSet[i.creneau]) {
+            creneauxSet[i.creneau] = true;
+            creneaux.push(i.creneau);
+        }
+    });
+
+    // Générer les onglets : "Tous" + un onglet par créneau
+    tabsEl.innerHTML = '<button class="tab active" data-filter="all">Tous</button>' +
+        creneaux.map(function(c) {
+            return '<button class="tab" data-filter="' + esc(c) + '">' + escHtml(c) + '</button>';
+        }).join('');
+
+    /**
+     * Rendu des cartes de jeu pour un filtre donné.
+     * @param {string} filter - 'all' ou le nom d'un créneau
+     */
+    function render(filter) {
+        var list = filter === 'all' ? items : items.filter(function(i) { return i.creneau === filter; });
+
+        grid.innerHTML = list.map(function(item) {
+            // Calcul des places restantes
+            var max = parseInt(item.places) || 0;
+            var ins = parseInt(item.inscrits) || 0;
+            var rest = item.places_restantes !== undefined ? parseInt(item.places_restantes) : max - ins;
+            var full = item.complet || rest <= 0;
+
+            // Texte du badge (places restantes ou complet)
+            var statusTxt = full
+                ? 'Complet (' + ins + '/' + max + ')'
+                : rest + ' place' + (rest > 1 ? 's' : '') + ' sur ' + max;
+            var badgeCls = full ? 'badge-complet' : 'badge-dispo';
+
+            // Bouton d'inscription ou de liste d'attente
+            var btn = full
+                ? '<button class="btn btn-small btn-gold" onclick="handleInscrire(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">Liste d\'attente</button>'
+                : '<button class="btn btn-small btn-green" onclick="handleInscrire(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">S\'inscrire</button>';
+
+            // Carte du jeu
+            return '<div class="creneau">' +
+                '<div class="creneau-time">' + (escHtml(item.creneau) || '') + '</div>' +
+                '<div class="creneau-info">' +
+                    '<h4>' + (escHtml(item.jeu) || '') + '</h4>' +
+                    '<div class="mj">MJ : ' + (escHtml(item.mj) || '—') + (item.systeme ? ' · ' + escHtml(item.systeme) : '') + '</div>' +
+                    '<div class="desc">' + (escHtml(item.description) || '') + '</div>' +
+                    (item.content ? '<div class="content-warning">⚠️ ' + escHtml(item.content) + '</div>' : '') +
+                    '<span class="badge ' + badgeCls + '">' + statusTxt + '</span>' +
+                '</div>' +
+                '<div class="creneau-actions">' + btn + '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    // Rendu initial : afficher tous les créneaux
+    render('all');
+
+    // Gestion des clics sur les onglets de filtre
+    tabsEl.onclick = function(e) {
+        if (e.target.classList.contains('tab')) {
+            tabsEl.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+            e.target.classList.add('active');
+            render(e.target.dataset.filter);
+        }
+    };
+}
+
+// ── Exports window (pour les onclick dans le HTML) ──────────────────────────
+window.handleInscrire = handleInscrire;
+window.doInscrire = doInscrire;
+window.doInscrireAccompagnant = doInscrireAccompagnant;
+window.annulerInscription = annulerInscription;
+window.showChoixModal = showChoixModal;
+
+})();
+</script>
+</body>
+</html>
