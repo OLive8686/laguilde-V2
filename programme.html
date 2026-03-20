@@ -152,8 +152,8 @@ window.onUserLogout = function() {
  */
 function updateMJButton() {
     var btn = document.getElementById('mjProposerBtn');
-    var role = APP.currentRole;
-    btn.style.display = (role === 'mj' || role === 'admin') ? 'block' : 'none';
+    // Tout utilisateur connecté peut proposer une table
+    btn.style.display = APP.currentUser ? 'block' : 'none';
 }
 
 // ── Init page ───────────────────────────────────────────────────────────────

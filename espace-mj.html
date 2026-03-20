@@ -177,10 +177,10 @@ function updateMJView() {
     var role = APP.currentRole;
 
     document.getElementById('mjLoginPrompt').style.display = !user ? 'block' : 'none';
-    document.getElementById('mjAccessDenied').style.display = (user && role !== 'mj' && role !== 'admin') ? 'block' : 'none';
-    document.getElementById('mjContent').style.display = (user && (role === 'mj' || role === 'admin')) ? 'block' : 'none';
+    document.getElementById('mjAccessDenied').style.display = 'none'; // Plus de restriction de rôle
+    document.getElementById('mjContent').style.display = user ? 'block' : 'none';
 
-    if (user && (role === 'mj' || role === 'admin')) {
+    if (user) {
         // Pré-remplir le nom du MJ
         var mjNomInput = document.getElementById('mjNom');
         if (mjNomInput && !mjNomInput.value) mjNomInput.value = user.nom;

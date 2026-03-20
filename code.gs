@@ -1699,10 +1699,8 @@ function proposerTable(params) {
   var places = parseInt(params.places) || 0;
   var emailMj = (params.email_mj || '').toLowerCase().trim();
 
-  // Contrôle d'accès : seuls les MJ et admins peuvent proposer des tables
-  if (!hasRole(emailMj, 'mj')) {
-    return { error: 'Seuls les MJ peuvent proposer des tables. Contactez un administrateur pour obtenir le rôle MJ.' };
-  }
+  // Tout utilisateur connecté peut proposer une table.
+  // Il sera automatiquement promu MJ quand sa table sera validée.
 
   // Validation des champs obligatoires
   if (!jeu) return { error: 'Le nom du jeu est requis' };
@@ -1933,6 +1931,21 @@ function _changeStatutTable(params, newStatut) {
       // Envoyer un email de notification au MJ
       if (newStatut === 'validé') {
         sendEmailTableValidee(emailMj, jeu, creneau);
+        // Auto-promotion : si le proposant est joueur, le passer en MJ
+        var currentRole = getOrCreateRole(emailMj, '');
+        if (currentRole === 'joueur') {
+          var rolesSheet = getSheet('roles');
+          var rolesData = rolesSheet.getDataRange().getValues();
+          var rolesHeaders = rolesData[0].map(function(h) { return h.toString().trim(); });
+          var rEmailCol = rolesHeaders.indexOf('email');
+          var rRoleCol = rolesHeaders.indexOf('role');
+          for (var r = 1; r < rolesData.length; r++) {
+            if (rolesData[r][rEmailCol] && rolesData[r][rEmailCol].toString().toLowerCase().trim() === emailMj) {
+              rolesSheet.getRange(r + 1, rRoleCol + 1).setValue('mj');
+              break;
+            }
+          }
+        }
       } else if (newStatut === 'refusé') {
         sendEmailTableRefusee(emailMj, jeu, creneau);
       }
