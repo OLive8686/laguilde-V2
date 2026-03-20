@@ -455,6 +455,9 @@ async function loadTheme() {
             var theme = config.theme.trim().toLowerCase();
             if (theme === 'clair' || theme === 'dark') {
                 document.documentElement.setAttribute('data-theme', theme);
+                // Sauvegarder en localStorage pour les prochains chargements
+                // (évite le flash dark → clair au reload)
+                localStorage.setItem('melusine_theme', theme);
             }
         }
     } catch(e) { /* silencieux — reste en dark par défaut */ }
