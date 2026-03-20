@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Espace Bénévoles — Sous l'Œil de Mélusine</title>
+    <meta name="description" content="Inscrivez-vous comme bénévole pour la convention Sous l'Œil de Mélusine.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@400;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <link rel="icon" type="image/png" href="https://sousloeildemelusine.fr/wp-content/uploads/2023/02/cropped-cropped-logo_guilde.png">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="toast-container" id="toasts"></div>
+
+<!-- AUTH MODAL -->
+<div class="modal-overlay" id="authModal">
+    <div class="modal">
+        <button class="modal-close" onclick="closeAuthModal()">✕</button>
+        <h3>Se connecter</h3>
+        <p class="modal-game" id="modalGame"></p>
+        <p id="modalSubtext">Connectez-vous pour vous inscrire comme bénévole</p>
+        <div id="authOptions" class="auth-options">
+            <button class="auth-btn" onclick="loginGoogle()"><span class="auth-btn-icon">🔑</span><div><div class="auth-btn-text">Continuer avec Google</div><div class="auth-btn-sub">Connexion rapide</div></div></button>
+            <button class="auth-btn" onclick="loginDiscord()"><span class="auth-btn-icon">🎮</span><div><div class="auth-btn-text">Continuer avec Discord</div><div class="auth-btn-sub">Compte Discord</div></div></button>
+            <div class="auth-divider">ou</div>
+            <button class="auth-btn" onclick="showEmailForm()"><span class="auth-btn-icon">✉️</span><div><div class="auth-btn-text">Pseudo & email</div><div class="auth-btn-sub">Sans compte</div></div></button>
+        </div>
+        <div id="emailForm" class="auth-form">
+            <label>Pseudo / Nom</label>
+            <input type="text" id="inputNom" placeholder="Votre pseudo ou prénom">
+            <label>Email</label>
+            <input type="email" id="inputEmail" placeholder="votre@email.com">
+            <button class="btn btn-primary" style="width:100%" onclick="loginEmail()">Valider</button>
+            <p style="margin-top:12px;font-size:14px;color:var(--text-muted);cursor:pointer" onclick="showAuthOptions()">← Retour</p>
+        </div>
+        <div id="pseudoForm" class="auth-form">
+            <p id="pseudoHint" style="font-size:15px;color:var(--text-light);text-align:center;margin-bottom:16px">Choisissez votre pseudo :</p>
+            <label>Pseudo affiché</label>
+            <input type="text" id="inputPseudo" placeholder="Votre pseudo" onkeydown="if(event.key==='Enter')confirmPseudo()">
+            <button class="btn btn-primary" style="width:100%" onclick="confirmPseudo()">Confirmer</button>
+        </div>
+    </div>
+</div>
+
+<!-- NAV -->
+<nav class="nav" id="nav">
+    <div class="nav-inner">
+        <a href="index.html" class="nav-brand"><img src="https://sousloeildemelusine.fr/wp-content/uploads/2023/02/cropped-cropped-logo_guilde.png" alt="Logo" onerror="this.style.display='none'"><span>Mélusine</span></a>
+        <button class="nav-toggle" id="navToggle" aria-label="Menu"><span></span><span></span><span></span></button>
+        <ul class="nav-links" id="navLinks">
+            <li><a href="index.html">Accueil</a></li>
+            <li><a href="index.html#programme">Programme</a></li>
+            <li><a href="benevoles.html" class="active">Bénévoles</a></li>
+            <li id="navMjLink" style="display:none"><a href="espace-mj.html">Espace MJ</a></li>
+            <li id="navAdminLink" style="display:none"><a href="admin.html">Admin</a></li>
+            <li id="navUserArea"><button class="nav-user-btn" onclick="openAuthModal()">Se connecter</button></li>
+        </ul>
+    </div>
+</nav>
+
+<!-- CONTENU -->
+<div style="padding-top:90px">
+
+    <!-- Non connecté -->
+    <section class="section section-dark" id="benevoleLoginPrompt">
+        <div class="section-inner" style="text-align:center">
+            <div class="section-header"><p class="section-label">Bénévolat</p><h2 class="section-title">Devenir bénévole</h2><div class="section-sep"></div></div>
+            <p class="mj-intro">La convention a besoin de bénévoles pour l'accueil, la buvette, l'installation et le rangement. Inscrivez-vous sur un ou plusieurs créneaux !</p>
+            <button class="btn btn-primary" onclick="openAuthModal()">Se connecter pour s'inscrire</button>
+        </div>
+    </section>
+
+    <!-- Connecté : mes inscriptions bénévoles -->
+    <section class="section section-dark" id="mesBenevoles" style="display:none">
+        <div class="section-inner">
+            <div class="section-header"><p class="section-label">Mes créneaux</p><h2 class="section-title">Mon bénévolat</h2><div class="section-sep"></div></div>
+            <div id="mesBenevoleGrid"></div>
+        </div>
+    </section>
+
+    <!-- Créneaux disponibles -->
+    <section class="section section-dark" id="benevoleCreneaux" style="display:none">
+        <div class="section-inner">
+            <div class="section-header"><p class="section-label">Créneaux disponibles</p><h2 class="section-title">S'inscrire comme bénévole</h2><div class="section-sep"></div></div>
+            <div class="programme-grid" id="benevoleGrid"><div class="loading-shimmer" style="height:80px"></div></div>
+        </div>
+    </section>
+
+</div>
+
+<!-- FOOTER -->
+<footer class="footer"><div class="footer-inner"><div><div class="footer-brand">Sous l'Œil de Mélusine</div><div class="footer-sub">Organisé par La Guilde · Foyer du Porteau · Poitiers</div></div><div class="footer-right">16 & 17 mai 2026</div></div></footer>
+<button class="scroll-top" id="scrollTop" aria-label="Retour en haut">↑</button>
+
+<script src="app.js"></script>
+<script>
+(function() {
+'use strict';
+
+// ── Callbacks app.js ────────────────────────────────────────────────────────
+window.onUserLogin = function() { updateBenevoleView(); };
+window.onUserLogout = function() { updateBenevoleView(); };
+
+window.onPageInit = async function() {
+    updateBenevoleView();
+};
+
+// ── Affichage conditionnel ──────────────────────────────────────────────────
+
+function updateBenevoleView() {
+    var user = APP.currentUser;
+    document.getElementById('benevoleLoginPrompt').style.display = !user ? 'block' : 'none';
+    document.getElementById('mesBenevoles').style.display = user ? 'block' : 'none';
+    document.getElementById('benevoleCreneaux').style.display = user ? 'block' : 'none';
+
+    if (user) {
+        loadCreneauxBenevoles();
+        loadMesBenevoles();
+    }
+}
+
+// ── Créneaux disponibles ────────────────────────────────────────────────────
+
+async function loadCreneauxBenevoles() {
+    try {
+        var r = await callAPI({ action: 'get_postes_benevoles' });
+        var grid = document.getElementById('benevoleGrid');
+        if (!r.creneaux || r.creneaux.length === 0) {
+            grid.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:16px;padding:40px 0">Aucun créneau bénévole disponible pour le moment.</p>';
+            return;
+        }
+
+        grid.innerHTML = r.creneaux.map(function(c) {
+            var rest = parseInt(c.places_restantes) || 0;
+            var max = parseInt(c.places) || 0;
+            var ins = parseInt(c.inscrits) || 0;
+            var full = c.complet || rest <= 0;
+            var statusTxt = full ? 'Complet (' + ins + '/' + max + ')' : rest + ' place' + (rest > 1 ? 's' : '') + ' sur ' + max;
+            var badgeCls = full ? 'badge-complet' : 'badge-dispo';
+            var btn = full
+                ? '<span class="badge badge-complet">Complet</span>'
+                : '<button class="btn btn-small btn-green" onclick="inscrireBenevole(\'' + esc(c.creneau) + '\')">S\'inscrire</button>';
+
+            return '<div class="creneau">'
+                + '<div class="creneau-time">' + escHtml(c.creneau) + '</div>'
+                + '<div class="creneau-info">'
+                + '<h4>Bénévolat</h4>'
+                + (c.description ? '<div class="desc">' + escHtml(c.description) + '</div>' : '')
+                + '<span class="badge ' + badgeCls + '">' + statusTxt + '</span>'
+                + '</div>'
+                + '<div class="creneau-actions">' + btn + '</div>'
+                + '</div>';
+        }).join('');
+    } catch(e) { console.warn('Erreur chargement créneaux bénévoles:', e); }
+}
+
+// ── Mes inscriptions bénévoles ──────────────────────────────────────────────
+
+async function loadMesBenevoles() {
+    var user = APP.currentUser;
+    if (!user) return;
+    try {
+        var r = await callAPI({ action: 'get_mes_benevoles', email: user.email });
+        var grid = document.getElementById('mesBenevoleGrid');
+        if (!r.benevoles || r.benevoles.length === 0) {
+            grid.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:16px">Vous n\'êtes inscrit·e à aucun créneau bénévole.</p>';
+            return;
+        }
+        grid.innerHTML = r.benevoles.map(function(b) {
+            return '<div class="mes-inscriptions">'
+                + '<div class="mi-info"><h4>Bénévole — ' + escHtml(b.creneau) + '</h4></div>'
+                + '<button class="btn btn-small btn-red" onclick="annulerBenevole(\'' + esc(b.creneau) + '\')">Annuler</button>'
+                + '</div>';
+        }).join('');
+    } catch(e) { console.warn('Erreur chargement bénévoles:', e); }
+}
+
+// ── Actions ─────────────────────────────────────────────────────────────────
+
+async function inscrireBenevole(creneau) {
+    var user = APP.currentUser;
+    if (!user) { openAuthModal(); return; }
+    try {
+        var r = await callAPIPost({
+            action: 'inscrire_benevole',
+            nom: user.nom,
+            email: user.email,
+            creneau: creneau
+        });
+        toast(r.message, 'success');
+        loadCreneauxBenevoles();
+        loadMesBenevoles();
+    } catch(e) { toast(e.message, 'error'); }
+}
+
+async function annulerBenevole(creneau) {
+    var user = APP.currentUser;
+    if (!user) return;
+    try {
+        var r = await callAPIPost({
+            action: 'annuler_benevole',
+            email: user.email,
+            creneau: creneau
+        });
+        toast(r.message, 'success');
+        loadCreneauxBenevoles();
+        loadMesBenevoles();
+    } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── Exports ─────────────────────────────────────────────────────────────────
+window.inscrireBenevole = inscrireBenevole;
+window.annulerBenevole = annulerBenevole;
+
+})();
+</script>
+</body>
+</html>

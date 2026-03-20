@@ -235,6 +235,16 @@ function getSheet(tabName) {
       sheet.appendRow(['email', 'nom', 'role', 'date_inscription']);
       sheet.getRange(1, 1, 1, 4).setFontWeight('bold');
     }
+
+    if (tabName === 'benevoles') {
+      sheet.appendRow(['timestamp', 'nom', 'email', 'creneau', 'statut']);
+      sheet.getRange(1, 1, 1, 5).setFontWeight('bold');
+    }
+
+    if (tabName === 'creneaux_benevoles') {
+      sheet.appendRow(['creneau', 'description', 'places']);
+      sheet.getRange(1, 1, 1, 3).setFontWeight('bold');
+    }
   }
 
   // Migration : ajoute les colonnes accompagnants si l'onglet inscriptions
@@ -584,6 +594,13 @@ function doGet(e) {
       case 'get_mes_propositions':
         return jsonResponse(getMesPropositions(e.parameter));
 
+      // --- Bénévoles (lecture) ---
+      case 'get_postes_benevoles':
+        return jsonResponse(getPostesBenevoles());
+
+      case 'get_mes_benevoles':
+        return jsonResponse(getMesBenevoles(e.parameter));
+
       // --- Rôles (lecture) ---
       case 'get_role':
         var roleEmail = (e.parameter.email || '').toLowerCase().trim();
@@ -632,6 +649,12 @@ function doPost(e) {
         return jsonResponse(addAccompagnant(data));
       case 'remove_accompagnant':
         return jsonResponse(removeAccompagnant(data));
+
+      // --- Bénévoles (écritures) ---
+      case 'inscrire_benevole':
+        return jsonResponse(inscrireBenevole(data));
+      case 'annuler_benevole':
+        return jsonResponse(annulerBenevole(data));
 
       // --- MJ (propositions de tables) ---
       case 'proposer_table':
@@ -883,6 +906,20 @@ function inscrire(params) {
     if (autreJeuMemeCreneau) {
       var qui2 = typeInscrit === 'accompagnant' ? nomAccompagnant + ' est' : 'Vous êtes';
       return { error: qui2 + ' déjà inscrit·e sur ce créneau (' + autreJeuMemeCreneau.jeu + '). Annulez d\'abord pour changer de table.' };
+    }
+
+    // Anti-chevauchement bénévole : pas inscrit comme bénévole sur le même créneau
+    // (uniquement pour le joueur principal — les accompagnants ne sont pas bénévoles)
+    if (typeInscrit !== 'accompagnant') {
+      var benevoles = readSheet('benevoles');
+      var estBenevole = benevoles.some(function(b) {
+        return b.email.toLowerCase().trim() === email
+          && b.creneau.trim() === creneau
+          && b.statut === 'inscrit';
+      });
+      if (estBenevole) {
+        return { error: 'Vous êtes déjà bénévole sur ce créneau. Annulez votre bénévolat d\'abord.' };
+      }
     }
 
     // Vérifier les places disponibles
@@ -1714,6 +1751,156 @@ function _changeStatutTable(params, newStatut) {
 
   return { error: 'Proposition introuvable' };
 }
+
+// ─── Bénévoles ──────────────────────────────────────────────────────────────
+// Les utilisateurs peuvent s'inscrire comme bénévoles sur des créneaux.
+// Les créneaux disponibles sont dans l'onglet "creneaux_benevoles".
+// Les inscriptions bénévoles sont dans l'onglet "benevoles".
+// Anti-chevauchement : un bénévole ne peut pas être inscrit à une table JDR
+// sur le même créneau, et inversement.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Retourne les créneaux bénévoles avec le nombre de places restantes.
+ * @returns {Object} { ok, creneaux: [...] }
+ */
+function getPostesBenevoles() {
+  var creneaux = readSheet('creneaux_benevoles');
+  var benevoles = readSheet('benevoles');
+
+  // Compter les inscrits par créneau
+  var counts = {};
+  benevoles.forEach(function(b) {
+    if (b.statut === 'inscrit') {
+      counts[b.creneau] = (counts[b.creneau] || 0) + 1;
+    }
+  });
+
+  creneaux.forEach(function(c) {
+    var maxPlaces = parseInt(c.places) || 0;
+    var inscrits = counts[c.creneau] || 0;
+    c.inscrits = inscrits;
+    c.places_restantes = Math.max(0, maxPlaces - inscrits);
+    c.complet = c.places_restantes <= 0;
+  });
+
+  return { ok: true, creneaux: creneaux };
+}
+
+/**
+ * Retourne les inscriptions bénévoles d'un utilisateur.
+ * @param {Object} params - { email: string }
+ * @returns {Object} { ok, benevoles: [...] }
+ */
+function getMesBenevoles(params) {
+  var email = (params.email || '').toLowerCase().trim();
+  if (!email) return { error: 'Email requis' };
+
+  var benevoles = readSheet('benevoles');
+  var miens = benevoles.filter(function(b) {
+    return b.email.toLowerCase().trim() === email && b.statut === 'inscrit';
+  }).map(function(b) {
+    return { creneau: b.creneau, nom: b.nom };
+  });
+
+  return { ok: true, benevoles: miens };
+}
+
+/**
+ * Inscrit un utilisateur comme bénévole sur un créneau.
+ * Vérifications :
+ *   1. Créneau existant et places disponibles
+ *   2. Pas déjà bénévole sur ce créneau
+ *   3. Pas inscrit à une table JDR sur le même créneau (anti-chevauchement)
+ *
+ * @param {Object} params - { nom, email, creneau }
+ * @returns {Object} { ok, message } ou { error }
+ */
+function inscrireBenevole(params) {
+  var nom = (params.nom || '').trim();
+  var email = (params.email || '').toLowerCase().trim();
+  var creneau = (params.creneau || '').trim();
+
+  if (!nom) return { error: 'Le nom est requis' };
+  if (!email) return { error: "L'email est requis" };
+  if (!isValidEmail(email)) return { error: "Format d'email invalide" };
+  if (!creneau) return { error: 'Créneau requis' };
+
+  return withLock(function() {
+    // Vérifier que le créneau existe
+    var creneauxDispo = readSheet('creneaux_benevoles');
+    var creneauInfo = creneauxDispo.find(function(c) { return c.creneau.trim() === creneau; });
+    if (!creneauInfo) return { error: 'Créneau bénévole introuvable' };
+
+    var benevoles = readSheet('benevoles');
+
+    // Anti-doublon : déjà bénévole sur ce créneau ?
+    var dejaBenevole = benevoles.some(function(b) {
+      return b.email.toLowerCase().trim() === email
+        && b.creneau.trim() === creneau
+        && b.statut === 'inscrit';
+    });
+    if (dejaBenevole) return { error: 'Vous êtes déjà bénévole sur ce créneau.' };
+
+    // Places disponibles ?
+    var maxPlaces = parseInt(creneauInfo.places) || 0;
+    var inscritsCount = benevoles.filter(function(b) {
+      return b.creneau.trim() === creneau && b.statut === 'inscrit';
+    }).length;
+    if (inscritsCount >= maxPlaces) return { error: 'Ce créneau bénévole est complet.' };
+
+    // Anti-chevauchement : pas inscrit à une table JDR sur le même créneau ?
+    var inscriptions = readSheet('inscriptions');
+    var inscritJDR = inscriptions.some(function(i) {
+      return i.email.toLowerCase().trim() === email
+        && i.creneau.trim() === creneau
+        && (i.statut === 'inscrit' || i.statut === 'attente')
+        && (!i.nom_accompagnant || i.nom_accompagnant.trim() === '');
+    });
+    if (inscritJDR) {
+      return { error: 'Vous êtes déjà inscrit·e à une table JDR sur ce créneau. Annulez d\'abord votre inscription.' };
+    }
+
+    // Écrire l'inscription bénévole
+    var sheet = getSheet('benevoles');
+    sheet.appendRow([new Date().toISOString(), nom, email, creneau, 'inscrit']);
+
+    return { ok: true, message: 'Inscription bénévole confirmée pour ' + creneau + ' !' };
+  });
+}
+
+/**
+ * Annule une inscription bénévole.
+ * @param {Object} params - { email, creneau }
+ * @returns {Object} { ok, message } ou { error }
+ */
+function annulerBenevole(params) {
+  var email = (params.email || '').toLowerCase().trim();
+  var creneau = (params.creneau || '').trim();
+
+  if (!email || !creneau) return { error: 'Paramètres manquants' };
+
+  return withLock(function() {
+    var sheet = getSheet('benevoles');
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+    var emailCol = headers.indexOf('email');
+    var creneauCol = headers.indexOf('creneau');
+    var statutCol = headers.indexOf('statut');
+
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][emailCol].toString().toLowerCase().trim() === email
+          && data[i][creneauCol].toString().trim() === creneau
+          && data[i][statutCol] === 'inscrit') {
+        sheet.getRange(i + 1, statutCol + 1).setValue('annulé');
+        return { ok: true, message: 'Inscription bénévole annulée pour ' + creneau + '.' };
+      }
+    }
+
+    return { error: 'Inscription bénévole introuvable' };
+  });
+}
+
 
 /**
  * Enrichit getAdminData pour inclure les propositions de tables en attente.
