@@ -1630,6 +1630,52 @@ function adminRefuserTable(params) {
  * @param {string} newStatut - Le nouveau statut ("validé" ou "refusé")
  * @returns {Object} { ok, message } ou { error }
  */
+/**
+ * Envoie un email au MJ quand sa proposition de table est validée.
+ * @param {string} email   - Adresse du MJ
+ * @param {string} jeu     - Nom du jeu proposé
+ * @param {string} creneau - Créneau de la table
+ */
+function sendEmailTableValidee(email, jeu, creneau) {
+  var successColor = cfg('email_success', '#4A8B5E');
+  var siteUrl = cfg('lien_inscription', '');
+
+  sendEmail(email, '✅ Table validée — ' + jeu, buildEmailHtml({
+    titreBloc: '✅ Table validée !',
+    couleurTitre: successColor,
+    champs: [
+      { label: 'Table', valeur: jeu },
+      { label: 'Créneau', valeur: creneau }
+    ],
+    paragraphe: 'Votre proposition de table a été <strong>validée</strong> par l\'équipe organisatrice. '
+      + 'Elle est maintenant visible dans le programme et les joueurs peuvent s\'y inscrire.'
+      + (siteUrl ? '<br><br>Voir le programme : <a href="' + siteUrl + '" style="color:' + cfg('email_accent', '#D4A843') + '">' + siteUrl + '</a>' : ''),
+    pied: 'Merci pour votre participation ! 🎲'
+  }));
+}
+
+/**
+ * Envoie un email au MJ quand sa proposition de table est refusée.
+ * @param {string} email   - Adresse du MJ
+ * @param {string} jeu     - Nom du jeu proposé
+ * @param {string} creneau - Créneau de la table
+ */
+function sendEmailTableRefusee(email, jeu, creneau) {
+  var errorColor = cfg('email_error', '#B8293A');
+
+  sendEmail(email, '❌ Table non retenue — ' + jeu, buildEmailHtml({
+    titreBloc: 'Table non retenue',
+    couleurTitre: errorColor,
+    champs: [
+      { label: 'Table', valeur: jeu },
+      { label: 'Créneau', valeur: creneau }
+    ],
+    paragraphe: 'Votre proposition de table n\'a pas été retenue pour cette édition. '
+      + 'N\'hésitez pas à contacter l\'équipe organisatrice si vous avez des questions ou souhaitez proposer une autre table.',
+    pied: ''
+  }));
+}
+
 function _changeStatutTable(params, newStatut) {
   var emailMj = (params.email_mj || '').toLowerCase().trim();
   var jeu = (params.jeu || '').trim();
@@ -1654,6 +1700,14 @@ function _changeStatutTable(params, newStatut) {
 
     if (rowEmail === emailMj && rowJeu.toLowerCase() === jeu.toLowerCase() && rowCreneau === creneau) {
       sheet.getRange(i + 1, statutCol + 1).setValue(newStatut);
+
+      // Envoyer un email de notification au MJ
+      if (newStatut === 'validé') {
+        sendEmailTableValidee(emailMj, jeu, creneau);
+      } else if (newStatut === 'refusé') {
+        sendEmailTableRefusee(emailMj, jeu, creneau);
+      }
+
       return { ok: true, message: 'Table ' + (newStatut === 'validé' ? 'validée' : 'refusée') + ' : ' + jeu };
     }
   }
