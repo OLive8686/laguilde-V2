@@ -285,7 +285,7 @@ function renderAnimations(items) {
     }
 
     document.getElementById('animationsGrid').innerHTML = items.map(function(i) {
-        return '<div class="animation-card animate-on-scroll">' +
+        return '<div class="animation-card animate-on-scroll visible">' +
             '<h4>' + (escHtml(i.nom) || '') + '</h4>' +
             '<div class="anim-time">📅 ' + (escHtml(i.horaire) || '') +
                 (i.lieu ? ' · 📍 ' + escHtml(i.lieu) : '') +
