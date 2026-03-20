@@ -97,6 +97,27 @@ function isValidEmail(email) {
 }
 
 
+/**
+ * Vérifie si un utilisateur est MJ sur un créneau donné.
+ * Un MJ est considéré "occupé" sur un créneau si sa table est validée ou en attente.
+ * @param {string} email - L'email à vérifier
+ * @param {string} creneau - Le créneau à vérifier
+ * @returns {string|null} Le nom du jeu s'il est MJ, null sinon
+ */
+function getMJTableOnCreneau(email, creneau) {
+  var programme = readSheet('programme');
+  for (var i = 0; i < programme.length; i++) {
+    var p = programme[i];
+    if ((p.email_mj || '').toLowerCase().trim() === email.toLowerCase().trim()
+        && p.creneau.trim() === creneau
+        && p.statut_table !== 'refusé') {
+      return p.jeu;
+    }
+  }
+  return null;
+}
+
+
 // ─── Gestion des rôles ──────────────────────────────────────────────────────
 // L'onglet "roles" recense TOUS les utilisateurs inscrits sur le site.
 // Chaque email a un rôle : "joueur" (défaut), "mj", ou "admin".
@@ -920,6 +941,12 @@ function inscrire(params) {
       if (estBenevole) {
         return { error: 'Vous êtes déjà bénévole sur ce créneau. Annulez votre bénévolat d\'abord.' };
       }
+
+      // Anti-chevauchement MJ : pas MJ d'une table sur le même créneau
+      var mjTable = getMJTableOnCreneau(email, creneau);
+      if (mjTable) {
+        return { error: 'Vous êtes MJ sur ce créneau (' + mjTable + '). Vous ne pouvez pas vous inscrire comme joueur.' };
+      }
     }
 
     // Vérifier les places disponibles
@@ -1561,6 +1588,35 @@ function proposerTable(params) {
   if (jeu.length > 100) return { error: 'Nom du jeu trop long (100 caractères max)' };
   if (description.length > 500) return { error: 'Description trop longue (500 caractères max)' };
 
+  // Anti-chevauchement joueur : pas inscrit à une table JDR sur le même créneau
+  var inscriptions = readSheet('inscriptions');
+  var inscritJoueur = inscriptions.some(function(i) {
+    return i.email.toLowerCase().trim() === emailMj
+      && i.creneau.trim() === creneau
+      && (i.statut === 'inscrit' || i.statut === 'attente')
+      && (!i.nom_accompagnant || i.nom_accompagnant.trim() === '');
+  });
+  if (inscritJoueur) {
+    return { error: 'Vous êtes inscrit·e comme joueur sur ce créneau. Annulez d\'abord votre inscription.' };
+  }
+
+  // Anti-chevauchement bénévole : pas bénévole sur le même créneau
+  var benevoles = readSheet('benevoles');
+  var estBenevole = benevoles.some(function(b) {
+    return b.email.toLowerCase().trim() === emailMj
+      && b.creneau.trim() === creneau
+      && b.statut === 'inscrit';
+  });
+  if (estBenevole) {
+    return { error: 'Vous êtes bénévole sur ce créneau. Annulez votre bénévolat d\'abord.' };
+  }
+
+  // Anti-chevauchement MJ : pas déjà MJ d'une autre table sur le même créneau
+  var dejaAutreTable = getMJTableOnCreneau(emailMj, creneau);
+  if (dejaAutreTable) {
+    return { error: 'Vous êtes déjà MJ sur ce créneau (' + dejaAutreTable + ').' };
+  }
+
   // Anti-doublon : vérifier qu'il n'y a pas déjà une proposition identique
   var programme = readSheet('programme');
   var dejaPropose = programme.some(function(p) {
@@ -1859,6 +1915,12 @@ function inscrireBenevole(params) {
     });
     if (inscritJDR) {
       return { error: 'Vous êtes déjà inscrit·e à une table JDR sur ce créneau. Annulez d\'abord votre inscription.' };
+    }
+
+    // Anti-chevauchement MJ : pas MJ d'une table sur le même créneau
+    var mjTable = getMJTableOnCreneau(email, creneau);
+    if (mjTable) {
+      return { error: 'Vous êtes MJ sur ce créneau (' + mjTable + '). Vous ne pouvez pas être bénévole en même temps.' };
     }
 
     // Écrire l'inscription bénévole
