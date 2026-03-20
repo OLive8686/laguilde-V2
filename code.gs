@@ -97,6 +97,116 @@ function isValidEmail(email) {
 }
 
 
+// ─── Liens agenda (Google Calendar + .ics) ──────────────────────────────────
+// Ajoutés dans les emails de confirmation pour permettre aux joueurs
+// d'ajouter automatiquement leur inscription à leur agenda.
+//
+// Le parsing des créneaux est basé sur le format "Samedi 10h-13h".
+// Les dates de la convention sont lues depuis la config (clés "date_samedi",
+// "date_dimanche") ou par défaut 2026-05-16 et 2026-05-17.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Parse un créneau type "Samedi 10h-13h" et retourne les dates ISO de début/fin.
+ * Utilise les dates de la convention lues depuis la config.
+ * @param {string} creneau - Le créneau au format "Jour HHh-HHh"
+ * @returns {Object|null} { start: "20260516T100000", end: "20260516T130000" } ou null
+ */
+function parseCreneauDates(creneau) {
+  if (!creneau) return null;
+
+  // Dates de la convention (configurables via l'onglet config)
+  var dateSamedi = cfg('date_samedi', '2026-05-16');
+  var dateDimanche = cfg('date_dimanche', '2026-05-17');
+
+  // Déterminer le jour
+  var date;
+  var lower = creneau.toLowerCase();
+  if (lower.indexOf('samedi') !== -1) date = dateSamedi;
+  else if (lower.indexOf('dimanche') !== -1) date = dateDimanche;
+  else return null;
+
+  // Extraire les heures : cherche le pattern "XXh-YYh" ou "XXh00-YYh00"
+  var match = creneau.match(/(\d{1,2})h(\d{2})?[–\-](\d{1,2})h(\d{2})?/i);
+  if (!match) return null;
+
+  var startH = parseInt(match[1]);
+  var startM = match[2] ? parseInt(match[2]) : 0;
+  var endH = parseInt(match[3]);
+  var endM = match[4] ? parseInt(match[4]) : 0;
+
+  // Si le créneau passe minuit (ex: 21h-01h), la fin est le lendemain
+  var endDate = date;
+  if (endH < startH) {
+    endDate = dateDimanche; // Le lendemain
+  }
+
+  // Formater en YYYYMMDDTHHMMSS (format Google Calendar)
+  var fmt = function(d, h, m) {
+    return d.replace(/-/g, '') + 'T' + (h < 10 ? '0' : '') + h + (m < 10 ? '0' : '') + m + '00';
+  };
+
+  return {
+    start: fmt(date, startH, startM),
+    end: fmt(endDate, endH, endM)
+  };
+}
+
+/**
+ * Construit le HTML des liens "Ajouter à l'agenda" pour un email.
+ * Génère un lien Google Calendar et un lien .ics (data URI).
+ * @param {string} creneau - Le créneau (ex: "Samedi 10h-13h")
+ * @param {string} jeu     - Le nom du jeu / événement
+ * @param {string} type    - "table" ou "benevole" (pour le titre de l'événement)
+ * @returns {string} HTML des liens, ou chaîne vide si le créneau n'est pas parsable
+ */
+function buildCalendarLinks(creneau, jeu, type) {
+  var dates = parseCreneauDates(creneau);
+  if (!dates) return '';
+
+  var lieu = cfg('lieu_nom', 'Salle Gérard Gaschet') + ', ' + cfg('lieu_adresse', 'Poitiers');
+  var titre = type === 'benevole'
+    ? 'Bénévolat Mélusine — ' + creneau
+    : jeu + ' — Sous l\'Œil de Mélusine';
+  var description = type === 'benevole'
+    ? 'Créneau bénévole à la convention Sous l\'Œil de Mélusine'
+    : 'Table de JDR : ' + jeu + ' · Créneau : ' + creneau;
+
+  // Lien Google Calendar
+  var gcalUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE'
+    + '&text=' + encodeURIComponent(titre)
+    + '&dates=' + dates.start + '/' + dates.end
+    + '&location=' + encodeURIComponent(lieu)
+    + '&details=' + encodeURIComponent(description);
+
+  // Contenu .ics (fichier iCalendar universel — Outlook, Apple Calendar, etc.)
+  var ics = 'BEGIN:VCALENDAR\r\n'
+    + 'VERSION:2.0\r\n'
+    + 'PRODID:-//Melusine//Convention JDR//FR\r\n'
+    + 'BEGIN:VEVENT\r\n'
+    + 'DTSTART:' + dates.start + '\r\n'
+    + 'DTEND:' + dates.end + '\r\n'
+    + 'SUMMARY:' + titre.replace(/[,;\\]/g, ' ') + '\r\n'
+    + 'LOCATION:' + lieu.replace(/[,;\\]/g, ' ') + '\r\n'
+    + 'DESCRIPTION:' + description.replace(/[,;\\]/g, ' ') + '\r\n'
+    + 'END:VEVENT\r\n'
+    + 'END:VCALENDAR';
+
+  // Encoder le .ics en data URI pour le lien de téléchargement
+  var icsDataUri = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
+
+  var accent = cfg('email_accent', '#D4A843');
+  var muted = cfg('email_muted', '#7A9999');
+
+  return '<p style="margin-top:16px;font-size:13px;color:' + muted + '">'
+    + '📅 Ajouter à mon agenda : '
+    + '<a href="' + gcalUrl + '" target="_blank" style="color:' + accent + ';text-decoration:underline">Google Agenda</a>'
+    + ' · '
+    + '<a href="' + icsDataUri + '" download="melusine.ics" style="color:' + accent + ';text-decoration:underline">iCal / Outlook (.ics)</a>'
+    + '</p>';
+}
+
+
 /**
  * Vérifie si un utilisateur est MJ sur un créneau donné.
  * Un MJ est considéré "occupé" sur un créneau si sa table est validée ou en attente.
@@ -495,13 +605,17 @@ function sendEmailConfirmation(email, nom, jeu, creneau, statut) {
     { label: 'Créneau', valeur: creneau }
   ];
 
+  // Liens agenda (Google Calendar + .ics)
+  var calLinks = buildCalendarLinks(creneau, jeu, 'table');
+
   if (statut === 'inscrit') {
     sendEmail(email, '🎲 Inscription confirmée — ' + jeu, buildEmailHtml({
       titreBloc: '✅ Inscription confirmée !',
       couleurTitre: successColor,
       champs: champs,
       paragraphe: 'Votre place est réservée. Vous pouvez annuler ou modifier votre inscription à tout moment sur '
-        + (siteUrl ? '<a href="' + siteUrl + '" style="color:' + accentColor + '">' + siteUrl + '</a>' : 'le site de la convention') + '.',
+        + (siteUrl ? '<a href="' + siteUrl + '" style="color:' + accentColor + '">' + siteUrl + '</a>' : 'le site de la convention') + '.'
+        + calLinks,
       pied: 'À bientôt aux tables ! 🐉'
     }));
   } else if (statut === 'attente') {
@@ -526,6 +640,7 @@ function sendEmailPromotion(email, nom, jeu, creneau) {
   var siteUrl = cfg('lien_inscription', '');
   var successColor = cfg('email_success', '#4A8B5E');
   var accentColor  = cfg('email_accent', '#D4A843');
+  var calLinks = buildCalendarLinks(creneau, jeu, 'table');
 
   sendEmail(email, '🎉 Place libérée — ' + jeu, buildEmailHtml({
     titreBloc: '🎉 Bonne nouvelle !',
@@ -536,7 +651,8 @@ function sendEmailPromotion(email, nom, jeu, creneau) {
       { label: 'Créneau', valeur: creneau }
     ],
     paragraphe: 'Une place s\'est libérée et vous êtes maintenant <strong style="color:' + successColor + '">inscrit·e</strong> ! '
-      + (siteUrl ? 'Rendez-vous sur <a href="' + siteUrl + '" style="color:' + accentColor + '">' + siteUrl + '</a> pour gérer vos inscriptions.' : ''),
+      + (siteUrl ? 'Rendez-vous sur <a href="' + siteUrl + '" style="color:' + accentColor + '">' + siteUrl + '</a> pour gérer vos inscriptions.' : '')
+      + calLinks,
     pied: 'On se retrouve aux tables ! 🐉'
   }));
 }
@@ -1732,6 +1848,7 @@ function adminRefuserTable(params) {
 function sendEmailTableValidee(email, jeu, creneau) {
   var successColor = cfg('email_success', '#4A8B5E');
   var siteUrl = cfg('lien_inscription', '');
+  var calLinks = buildCalendarLinks(creneau, jeu, 'table');
 
   sendEmail(email, '✅ Table validée — ' + jeu, buildEmailHtml({
     titreBloc: '✅ Table validée !',
@@ -1742,7 +1859,8 @@ function sendEmailTableValidee(email, jeu, creneau) {
     ],
     paragraphe: 'Votre proposition de table a été <strong>validée</strong> par l\'équipe organisatrice. '
       + 'Elle est maintenant visible dans le programme et les joueurs peuvent s\'y inscrire.'
-      + (siteUrl ? '<br><br>Voir le programme : <a href="' + siteUrl + '" style="color:' + cfg('email_accent', '#D4A843') + '">' + siteUrl + '</a>' : ''),
+      + (siteUrl ? '<br><br>Voir le programme : <a href="' + siteUrl + '" style="color:' + cfg('email_accent', '#D4A843') + '">' + siteUrl + '</a>' : '')
+      + calLinks,
     pied: 'Merci pour votre participation ! 🎲'
   }));
 }
