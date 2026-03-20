@@ -312,7 +312,11 @@ function loginGoogle() {
 
 function loginDiscord() {
     if (!DISCORD_CLIENT_ID || !SCRIPT_URL) { toast('SSO Discord non configuré — utilisez pseudo/email', 'info'); showEmailForm(); return; }
-    const redirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
+    // Toujours rediriger vers la racine du site après Discord OAuth —
+    // seule cette URL est enregistrée dans le Discord Developer Portal.
+    // L'utilisateur sera connecté sur toutes les pages (même localStorage).
+    var baseUrl = window.location.origin + window.location.pathname.replace(/[^\/]*$/, '');
+    const redirectUri = encodeURIComponent(baseUrl);
     window.location.href = 'https://discord.com/api/oauth2/authorize?client_id=' + DISCORD_CLIENT_ID + '&redirect_uri=' + redirectUri + '&response_type=code&scope=identify%20email';
 }
 
@@ -329,7 +333,9 @@ function checkAuthCallback() {
     const p = new URLSearchParams(location.search);
     if (p.get('code') && !p.get('auth')) {
         const code = p.get('code');
-        const redirectUri = window.location.origin + window.location.pathname;
+        // Doit correspondre exactement à la redirect_uri envoyée dans loginDiscord()
+        var baseUrl = window.location.origin + window.location.pathname.replace(/[^\/]*$/, '');
+        const redirectUri = baseUrl;
         history.replaceState({}, '', location.pathname + location.hash);
         toast('Connexion Discord en cours...', 'info');
         callAPI({ action: 'discord_exchange', code: code, redirect_uri: redirectUri })
