@@ -191,7 +191,8 @@ function updateNavUser() {
     const area = document.getElementById('navUserArea');
     if (!area) return;
     if (currentUser) {
-        area.innerHTML = `<div class="nav-user"><span class="nav-user-name" title="${escHtml(currentUser.email)}" onclick="editPseudo()" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px">${escHtml(currentUser.nom)}</span><button class="nav-user-btn logout" onclick="logout()">Déco</button></div>`;
+        var adminBtn = currentRole === 'admin' ? `<a href="admin.html" class="nav-user-btn" style="font-size:11px;padding:4px 10px">Admin</a>` : '';
+        area.innerHTML = `<div class="nav-user"><span class="nav-user-name" title="${escHtml(currentUser.email)}" onclick="editPseudo()" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px">${escHtml(currentUser.nom)}</span>${adminBtn}<button class="nav-user-btn logout" onclick="logout()">Déco</button></div>`;
     } else {
         area.innerHTML = `<button class="nav-user-btn" onclick="openAuthModal()">Se connecter</button>`;
     }

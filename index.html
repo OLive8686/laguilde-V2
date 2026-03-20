@@ -68,12 +68,10 @@
         <ul class="nav-links" id="navLinks">
             <li><a href="#accueil" class="active">Accueil</a></li>
             <li><a href="#programme">Programme</a></li>
-            <li><a href="#animations">Animations</a></li>
-            <li><a href="#restauration">Restauration</a></li>
             <li><a href="#infos">Infos</a></li>
             <li><a href="benevoles.html">Bénévoles</a></li>
-            <li id="navMjLink" style="display:none"><a href="espace-mj.html">Espace MJ</a></li>
-            <li id="navAdminLink" style="display:none"><a href="admin.html">Admin</a></li>
+            <li id="navMjLink" style="display:none"></li>
+            <li id="navAdminLink" style="display:none"></li>
             <li id="navUserArea"><button class="nav-user-btn" onclick="openAuthModal()">Se connecter</button></li>
         </ul>
     </div>
@@ -143,6 +141,9 @@
 <section class="section section-dark" id="programme">
     <div class="section-inner">
         <div class="section-header animate-on-scroll"><p class="section-label">Créneaux de jeu</p><h2 class="section-title">Programme</h2><div class="section-sep"></div></div>
+        <div id="mjProposerBtn" style="display:none;text-align:center;margin-bottom:24px">
+            <a href="espace-mj.html" class="btn btn-gold">Proposer une table (MJ)</a>
+        </div>
         <div class="tabs" id="programmeTabs"></div>
         <div class="programme-grid" id="programmeGrid"><div class="loading-shimmer" style="height:80px"></div><div class="loading-shimmer" style="height:80px"></div><div class="loading-shimmer" style="height:80px"></div></div>
     </div>
@@ -186,13 +187,24 @@
 window.onUserLogin = function() {
     loadMesInscriptions();
     loadAccompagnants().then(renderAccompagnants);
+    updateMJButton();
 };
 
 window.onUserLogout = function() {
     document.getElementById('mesInscriptions').style.display = 'none';
     document.getElementById('mesAccompagnants').style.display = 'none';
+    updateMJButton();
     refreshProgramme();
 };
+
+/**
+ * Affiche le bouton "Proposer une table" dans le programme si l'utilisateur est MJ ou admin.
+ */
+function updateMJButton() {
+    var btn = document.getElementById('mjProposerBtn');
+    var role = APP.currentRole;
+    btn.style.display = (role === 'mj' || role === 'admin') ? 'block' : 'none';
+}
 
 // ── Init page ───────────────────────────────────────────────────────────────
 
@@ -207,6 +219,7 @@ window.onPageInit = async function() {
         loadMesInscriptions();
         loadAccompagnants().then(renderAccompagnants);
     }
+    updateMJButton();
 };
 
 // ── Accompagnants ───────────────────────────────────────────────────────────
