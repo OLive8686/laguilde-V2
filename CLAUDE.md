@@ -1,17 +1,28 @@
 # Mélusine — Convention JDR "Sous l'Œil de Mélusine"
 
 ## Vue d'ensemble
-Site d'inscription pour une convention de jeu de rôle à Poitiers (16-17 mai 2026), organisée par La Guilde Poitiers. Les joueurs peuvent consulter le programme et s'inscrire aux tables de JDR.
+Site d'inscription pour une convention de jeu de rôle à Poitiers (16-17 mai 2026), organisée par La Guilde Poitiers. Les joueurs consultent le programme et s'inscrivent aux tables. Les MJ proposent des tables. Les admins gèrent le tout.
 
 ## Architecture
-- **Frontend** : `index.html` — site statique hébergé sur GitHub Pages (https://olive8686.github.io/laguilde-V2/)
-- **Backend** : `code.gs` — Google Apps Script déployé en webapp, gère les inscriptions et l'envoi d'emails
-- **Base de données** : Google Sheets avec 3 onglets principaux : `programme` (tables de jeu), `inscriptions` (joueurs inscrits) et `accompagnants` (accompagnants liés aux joueurs)
+- **Frontend** : 3 pages HTML + 1 JS partagé + 1 CSS, hébergés sur GitHub Pages
+- **Backend** : `code.gs` — Google Apps Script déployé en webapp
+- **Base de données** : Google Sheets avec 5 onglets : `programme`, `inscriptions`, `accompagnants`, `config`, `roles`
 - **Authentification** : 3 méthodes — pseudo/email, SSO Google, SSO Discord
+- **Rôles** : joueur (défaut), mj, admin — stockés dans l'onglet `roles`
 
 ## Fichiers
-- `index.html` : Site complet (HTML + CSS + JS inline). Contient la config en haut (SHEET_ID, SCRIPT_URL, GOOGLE_CLIENT_ID, DISCORD_CLIENT_ID)
-- `code.gs` : Backend Apps Script. À copier manuellement dans l'éditeur script.google.com après modification. Les secrets (DISCORD_SECRET, ADMIN_PASSWORD) sont dans les Propriétés de script, PAS dans le code.
+
+### Pages
+- `index.html` : Page publique (accueil, programme, inscriptions, accompagnants, animations, restauration)
+- `espace-mj.html` : Espace MJ (proposer des tables, voir ses propositions). Accès : rôle `mj` ou `admin`
+- `admin.html` : Panneau admin (stats, inscriptions, validation tables MJ, gestion des rôles). Accès : rôle `admin`
+
+### Code
+- `app.js` : JavaScript partagé — config, helpers (escHtml, esc), API (callAPI, callAPIPost), auth, navigation, rôles. Importé par les 3 pages.
+- `styles.css` : Feuille de styles unique, partagée par les 3 pages
+- `code.gs` : Backend Apps Script. À copier manuellement dans script.google.com après modification.
+
+### Documentation
 - `CLAUDE.md` : Ce fichier
 
 ## Stack technique
@@ -21,59 +32,79 @@ Site d'inscription pour une convention de jeu de rôle à Poitiers (16-17 mai 20
 - API Google Identity Services (SSO Google)
 - API Discord OAuth2 (SSO Discord)
 - MailApp (emails de confirmation)
+- LockService (protection contre les race conditions)
+
+## Gestion des rôles
+
+### Onglet `roles`
+| email | nom | role | date_inscription |
+
+- **joueur** : rôle par défaut, créé automatiquement à la première connexion
+- **mj** : peut proposer des tables via l'espace MJ
+- **admin** : accès complet (panneau admin, validation tables, gestion rôles)
+
+### Flux
+1. L'utilisateur se connecte → `get_role` est appelé → crée l'entrée si nouvelle
+2. Le rôle est stocké en `localStorage` (`melusine_role`) pour la navigation
+3. La navigation s'adapte : liens "Espace MJ" et "Admin" affichés selon le rôle
+4. Les pages MJ et admin vérifient le rôle côté client ET côté backend
+
+### API rôles
+- `get_role` (GET) : `{ email, nom }` → retourne le rôle (crée si nouveau)
+- `set_role` (POST) : `{ password, email, role }` → change le rôle (admin only)
+- `get_all_roles` (POST) : `{ password }` → liste tous les utilisateurs
+
+## Architecture JS (app.js)
+- Pattern : IIFE + exports `window.xxx` pour les onclick handlers
+- `window.APP` : objet global exposant l'état (currentUser, currentRole, accompagnants, SCRIPT_URL, SHEET_ID)
+- Callbacks de page : `window.onPageInit`, `window.onUserLogin`, `window.onUserLogout` — définis dans le `<script>` de chaque page, appelés par app.js
+- Flux init : `DOMContentLoaded` → `initApp()` → checkAuth → fetchRole → updateNav → `onPageInit()`
 
 ## Flux d'inscription
 1. L'utilisateur se connecte (pseudo/email, Google SSO, ou Discord SSO)
 2. Après SSO, un formulaire de pseudo modifiable s'affiche
 3. L'utilisateur consulte le programme et clique "S'inscrire" sur une table
-4. **Si le joueur a des accompagnants** → un modal "Pour qui ?" apparaît (moi ou un accompagnant)
-5. Le backend vérifie : pas de doublon sur le même créneau, places disponibles
+4. **Si le joueur a des accompagnants** → un modal "Pour qui ?" apparaît
+5. Le backend vérifie sous verrou (LockService) : pas de doublon, places disponibles
 6. Si la table est pleine → liste d'attente automatique
-7. Un email de confirmation est envoyé (toujours au joueur principal, même pour un accompagnant)
+7. Email de confirmation envoyé
 8. En cas d'annulation, le premier en liste d'attente est promu automatiquement
 
 ## Accompagnants
-Les joueurs peuvent ajouter jusqu'à 3 accompagnants (enfants, conjoints) liés à leur compte :
-- Identifiés par le couple **(email_parent + nom_accompagnant)**
-- Peuvent être inscrits à des tables **différentes** du joueur principal
-- Même règle anti-doublon : 1 seule table par créneau par personne
-- Pas d'email propre → le parent reçoit toutes les notifications
-- Suppression d'un accompagnant → annule automatiquement toutes ses inscriptions
+Les joueurs peuvent ajouter jusqu'à 3 accompagnants liés à leur compte :
+- Identifiés par **(email_parent + nom_accompagnant)**
+- Peuvent être inscrits à des tables différentes du joueur principal
+- Anti-doublon : 1 seule table par créneau par personne
+- Suppression → annule automatiquement toutes les inscriptions
 
-### Onglet Google Sheets `accompagnants`
-| email_parent | nom_accompagnant | date_ajout |
+## Propositions de tables (MJ)
+- Le MJ remplit un formulaire (jeu, système, créneau, places, description, content warning)
+- Écrit dans `programme` avec `statut_table = "en_attente"`
+- L'admin valide ou refuse depuis `admin.html`
+- Tables validées (`statut_table = "validé"`) apparaissent dans le programme
+- Contrôle d'accès backend : `hasRole(email, 'mj')` vérifié avant écriture
 
-### Colonnes ajoutées à `inscriptions`
-| ... 8 colonnes existantes ... | type_inscrit | nom_accompagnant |
-- `type_inscrit` : "principal" ou "accompagnant" (vide = principal pour rétrocompat)
-- `nom_accompagnant` : vide si principal, nom de l'accompagnant sinon
+## API — GET vs POST
+- **GET** (`callAPI`) : lectures (programme, inscriptions, accompagnants, config, propositions, rôles)
+- **POST** (`callAPIPost`) : écritures et actions sensibles (inscription, annulation, admin, MJ, rôles)
+- Le mot de passe admin ne passe **jamais** dans l'URL
 
-### API accompagnants (code.gs)
-- `get_accompagnants` : `{ email }` → liste des accompagnants
-- `add_accompagnant` : `{ email, nom_accompagnant }` → ajoute (max 3)
-- `remove_accompagnant` : `{ email, nom_accompagnant }` → supprime + annule inscriptions
-
-## Flux Discord SSO
-Le SSO Discord ne passe PAS par Apps Script pour la redirection (Google encapsule dans un iframe, bloqué par Discord). Le flux est :
-1. Le site redirige directement vers Discord OAuth (`loginDiscord()`)
-2. Discord redirige vers le site avec un `code` dans l'URL
-3. Le site envoie le code à Apps Script via l'action `discord_exchange`
-4. Apps Script échange le code contre un token, récupère les infos utilisateur et les renvoie au site
+## Sécurité
+- **XSS** : `escHtml()` dans app.js, appliquée partout dans les innerHTML
+- **Race conditions** : `withLock()` (LockService) protège inscription/annulation
+- **Validation email** : regex côté backend (`isValidEmail()`)
+- **Admin** : mot de passe en POST + rôle `admin` vérifié
+- **MJ** : rôle `mj` ou `admin` vérifié côté backend
+- **Secrets** : dans les Script Properties, jamais dans le code
+- **htmlRedirect** : URL sanitisée
 
 ## Déploiement
-- **Frontend** : `git push` sur GitHub → GitHub Pages se met à jour (~5 min de cache)
-- **Backend** : Copier code.gs dans Apps Script → Déployer → Gérer les déploiements → ✏️ → Nouvelle version → Déployer
-- **Important** : Si l'URL de déploiement change, la mettre à jour dans `index.html` (SCRIPT_URL) ET dans Discord Developer (Redirects)
+- **Frontend** : `git push` → GitHub Pages (~5 min de cache)
+- **Backend** : Copier code.gs dans Apps Script → Déployer → Nouvelle version
+- **Important** : si l'URL change, mettre à jour `app.js` (SCRIPT_URL) ET Discord (Redirects)
 
 ## Conventions
 - Langue du code : français pour les commentaires et messages utilisateur
-- CSS inline dans index.html (pas de fichier séparé)
+- CSS dans `styles.css`, JS partagé dans `app.js`, JS page-spécifique inline dans chaque HTML
 - Thème visuel : dark fantasy médiéval (couleurs : #0D2B2B, #D4A843, #4A8B5E)
 - Polices : Cinzel Decorative (titres), Lora (corps)
-
-## Points d'attention
-- Chaque redéploiement Apps Script peut changer l'URL → vérifier SCRIPT_URL
-- Hard refresh (Ctrl+Maj+R) nécessaire après mise à jour GitHub Pages
-- Les emails nécessitent l'autorisation `script.send_mail` dans appsscript.json
-- Anti-doublon : un joueur (ou accompagnant) ne peut s'inscrire qu'à une seule table par créneau horaire
-- Accompagnants : max 3 par joueur, stockés en localStorage (`melusine_accompagnants`) ET côté serveur (onglet `accompagnants`)

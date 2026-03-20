@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Espace MJ — Sous l'Œil de Mélusine</title>
+    <meta name="description" content="Proposez une table de JDR pour la convention Sous l'Œil de Mélusine.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@400;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <link rel="icon" type="image/png" href="https://sousloeildemelusine.fr/wp-content/uploads/2023/02/cropped-cropped-logo_guilde.png">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="toast-container" id="toasts"></div>
+
+<!-- AUTH MODAL (identique sur toutes les pages) -->
+<div class="modal-overlay" id="authModal">
+    <div class="modal">
+        <button class="modal-close" onclick="closeAuthModal()">✕</button>
+        <h3>Se connecter</h3>
+        <p class="modal-game" id="modalGame"></p>
+        <p id="modalSubtext">Connectez-vous pour accéder à l'espace MJ</p>
+        <div id="authOptions" class="auth-options">
+            <button class="auth-btn" onclick="loginGoogle()"><span class="auth-btn-icon">🔑</span><div><div class="auth-btn-text">Continuer avec Google</div><div class="auth-btn-sub">Connexion rapide</div></div></button>
+            <button class="auth-btn" onclick="loginDiscord()"><span class="auth-btn-icon">🎮</span><div><div class="auth-btn-text">Continuer avec Discord</div><div class="auth-btn-sub">Compte Discord</div></div></button>
+            <div class="auth-divider">ou</div>
+            <button class="auth-btn" onclick="showEmailForm()"><span class="auth-btn-icon">✉️</span><div><div class="auth-btn-text">Pseudo & email</div><div class="auth-btn-sub">Sans compte</div></div></button>
+        </div>
+        <div id="emailForm" class="auth-form">
+            <label>Pseudo / Nom</label>
+            <input type="text" id="inputNom" placeholder="Votre pseudo ou prénom">
+            <label>Email</label>
+            <input type="email" id="inputEmail" placeholder="votre@email.com">
+            <button class="btn btn-primary" style="width:100%" onclick="loginEmail()">Valider</button>
+            <p style="margin-top:12px;font-size:14px;color:var(--text-muted);cursor:pointer" onclick="showAuthOptions()">← Retour</p>
+        </div>
+        <div id="pseudoForm" class="auth-form">
+            <p id="pseudoHint" style="font-size:15px;color:var(--text-light);text-align:center;margin-bottom:16px">Choisissez votre pseudo :</p>
+            <label>Pseudo affiché</label>
+            <input type="text" id="inputPseudo" placeholder="Votre pseudo" onkeydown="if(event.key==='Enter')confirmPseudo()">
+            <button class="btn btn-primary" style="width:100%" onclick="confirmPseudo()">Confirmer</button>
+        </div>
+    </div>
+</div>
+
+<!-- NAV -->
+<nav class="nav" id="nav">
+    <div class="nav-inner">
+        <a href="index.html" class="nav-brand"><img src="https://sousloeildemelusine.fr/wp-content/uploads/2023/02/cropped-cropped-logo_guilde.png" alt="Logo" onerror="this.style.display='none'"><span>Mélusine</span></a>
+        <button class="nav-toggle" id="navToggle" aria-label="Menu"><span></span><span></span><span></span></button>
+        <ul class="nav-links" id="navLinks">
+            <li><a href="index.html">Accueil</a></li>
+            <li><a href="index.html#programme">Programme</a></li>
+            <li id="navMjLink"><a href="espace-mj.html" class="active">Espace MJ</a></li>
+            <li id="navAdminLink" style="display:none"><a href="admin.html">Admin</a></li>
+            <li id="navUserArea"><button class="nav-user-btn" onclick="openAuthModal()">Se connecter</button></li>
+        </ul>
+    </div>
+</nav>
+
+<!-- CONTENU PRINCIPAL -->
+<div style="padding-top:90px">
+
+    <!-- Message si non connecté -->
+    <section class="section section-dark" id="mjLoginPrompt">
+        <div class="section-inner" style="text-align:center">
+            <div class="section-header"><p class="section-label">Espace MJ</p><h2 class="section-title">Proposer une table</h2><div class="section-sep"></div></div>
+            <p style="color:var(--text-light);font-size:17px;margin-bottom:24px">Connectez-vous pour proposer une table de JDR.</p>
+            <button class="btn btn-primary" onclick="openAuthModal()">Se connecter</button>
+        </div>
+    </section>
+
+    <!-- Message si rôle insuffisant -->
+    <section class="section section-dark" id="mjAccessDenied" style="display:none">
+        <div class="section-inner" style="text-align:center">
+            <div class="section-header"><p class="section-label">Espace MJ</p><h2 class="section-title">Accès restreint</h2><div class="section-sep"></div></div>
+            <p style="color:var(--text-light);font-size:17px;margin-bottom:16px">Cet espace est réservé aux MJ (Maîtres du Jeu).</p>
+            <p style="color:var(--text-muted);font-size:15px">Si vous souhaitez proposer une table, contactez un administrateur pour obtenir le rôle MJ.</p>
+        </div>
+    </section>
+
+    <!-- Formulaire MJ (visible si rôle mj ou admin) -->
+    <section class="section section-dark" id="mjContent" style="display:none">
+        <div class="section-inner">
+            <div class="section-header"><p class="section-label">Espace MJ</p><h2 class="section-title">Proposer une table</h2><div class="section-sep"></div></div>
+            <p class="mj-intro">Proposez une table de JDR pour la convention. Un administrateur validera votre proposition avant qu'elle apparaisse dans le programme.</p>
+            <div class="mj-form" id="mjForm">
+                <div class="mj-form-grid">
+                    <div class="mj-form-group">
+                        <label class="mj-label">Nom du jeu *</label>
+                        <input type="text" id="mjJeu" class="mj-input" placeholder="Ex: La Malédiction de Strahd" maxlength="100">
+                    </div>
+                    <div class="mj-form-group">
+                        <label class="mj-label">Votre nom de MJ *</label>
+                        <input type="text" id="mjNom" class="mj-input" placeholder="Votre pseudo MJ">
+                    </div>
+                    <div class="mj-form-group">
+                        <label class="mj-label">Système de jeu</label>
+                        <input type="text" id="mjSysteme" class="mj-input" placeholder="Ex: D&D 5e, Cthulhu, Fate...">
+                    </div>
+                    <div class="mj-form-group">
+                        <label class="mj-label">Créneau souhaité *</label>
+                        <select id="mjCreneau" class="mj-input">
+                            <option value="">Choisir un créneau...</option>
+                            <option value="Samedi 10h-13h">Samedi 10h-13h</option>
+                            <option value="Samedi 14h-18h">Samedi 14h-18h</option>
+                            <option value="Samedi 21h-01h">Samedi 21h-01h</option>
+                            <option value="Dimanche 10h-13h">Dimanche 10h-13h</option>
+                            <option value="Dimanche 14h-16h">Dimanche 14h-16h</option>
+                        </select>
+                    </div>
+                    <div class="mj-form-group">
+                        <label class="mj-label">Nombre de places * (1-20)</label>
+                        <input type="number" id="mjPlaces" class="mj-input" min="1" max="20" value="5">
+                    </div>
+                    <div class="mj-form-group">
+                        <label class="mj-label">Avertissement contenu</label>
+                        <input type="text" id="mjContent" class="mj-input" placeholder="Ex: Horreur, violence (optionnel)">
+                    </div>
+                </div>
+                <div class="mj-form-group mj-form-full">
+                    <label class="mj-label">Description</label>
+                    <textarea id="mjDescription" class="mj-input mj-textarea" placeholder="Décrivez votre table en quelques lignes..." maxlength="500"></textarea>
+                    <p class="mj-char-count"><span id="mjDescCount">0</span>/500</p>
+                </div>
+                <div class="mj-form-actions">
+                    <button class="btn btn-primary" onclick="proposerTable()">Proposer cette table</button>
+                </div>
+            </div>
+            <div id="mjPropositions"></div>
+        </div>
+    </section>
+</div>
+
+<!-- FOOTER -->
+<footer class="footer"><div class="footer-inner"><div><div class="footer-brand">Sous l'Œil de Mélusine</div><div class="footer-sub">Organisé par La Guilde · Foyer du Porteau · Poitiers</div></div><div class="footer-right">16 & 17 mai 2026</div></div></footer>
+<button class="scroll-top" id="scrollTop" aria-label="Retour en haut">↑</button>
+
+<!-- Scripts partagés puis spécifiques -->
+<script src="app.js"></script>
+<script>
+(function() {
+'use strict';
+
+// ── Callbacks appelés par app.js après login/logout ─────────────────────────
+
+window.onUserLogin = function() {
+    updateMJView();
+};
+
+window.onUserLogout = function() {
+    updateMJView();
+};
+
+// ── Init de la page ─────────────────────────────────────────────────────────
+
+window.onPageInit = async function() {
+    updateMJView();
+    // Compteur de caractères pour la description
+    var descInput = document.getElementById('mjDescription');
+    if (descInput) {
+        descInput.addEventListener('input', function() {
+            document.getElementById('mjDescCount').textContent = this.value.length;
+        });
+    }
+};
+
+/**
+ * Affiche la bonne section selon l'état de connexion et le rôle.
+ */
+function updateMJView() {
+    var user = APP.currentUser;
+    var role = APP.currentRole;
+
+    document.getElementById('mjLoginPrompt').style.display = !user ? 'block' : 'none';
+    document.getElementById('mjAccessDenied').style.display = (user && role !== 'mj' && role !== 'admin') ? 'block' : 'none';
+    document.getElementById('mjContent').style.display = (user && (role === 'mj' || role === 'admin')) ? 'block' : 'none';
+
+    if (user && (role === 'mj' || role === 'admin')) {
+        // Pré-remplir le nom du MJ
+        var mjNomInput = document.getElementById('mjNom');
+        if (mjNomInput && !mjNomInput.value) mjNomInput.value = user.nom;
+        loadMesPropositions();
+    }
+}
+
+/**
+ * Envoie une proposition de table au backend.
+ */
+async function proposerTable() {
+    var user = APP.currentUser;
+    if (!user) { toast('Connectez-vous d\'abord', 'error'); return; }
+
+    var jeu = document.getElementById('mjJeu').value.trim();
+    var mj = document.getElementById('mjNom').value.trim();
+    var systeme = document.getElementById('mjSysteme').value.trim();
+    var creneau = document.getElementById('mjCreneau').value;
+    var places = document.getElementById('mjPlaces').value;
+    var content = document.getElementById('mjContent').value.trim();
+    var description = document.getElementById('mjDescription').value.trim();
+
+    if (!jeu) { toast('Le nom du jeu est requis', 'error'); return; }
+    if (!mj) { toast('Votre nom de MJ est requis', 'error'); return; }
+    if (!creneau) { toast('Choisissez un créneau', 'error'); return; }
+
+    try {
+        var r = await callAPIPost({
+            action: 'proposer_table',
+            jeu: jeu, mj: mj, systeme: systeme, description: description,
+            content: content, creneau: creneau, places: places, email_mj: user.email
+        });
+        toast(r.message, 'success');
+        document.getElementById('mjJeu').value = '';
+        document.getElementById('mjSysteme').value = '';
+        document.getElementById('mjDescription').value = '';
+        document.getElementById('mjContent').value = '';
+        document.getElementById('mjDescCount').textContent = '0';
+        loadMesPropositions();
+    } catch(e) { toast(e.message, 'error'); }
+}
+
+/**
+ * Charge et affiche les propositions du MJ connecté.
+ */
+async function loadMesPropositions() {
+    var user = APP.currentUser;
+    if (!user) return;
+    try {
+        var r = await callAPI({ action: 'get_mes_propositions', email: user.email });
+        var container = document.getElementById('mjPropositions');
+        if (!r.propositions || r.propositions.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        var statusLabels = { 'en_attente': '⏳ En attente', 'validé': '✅ Validée', 'refusé': '❌ Refusée' };
+        var statusBadge = { 'en_attente': 'attente', 'validé': 'inscrit', 'refusé': 'complet' };
+
+        container.innerHTML = `
+            <h3 class="mj-propositions-title">Mes propositions</h3>
+            ${r.propositions.map(p => `
+                <div class="mes-inscriptions">
+                    <div class="mi-info">
+                        <h4>${escHtml(p.jeu)}</h4>
+                        <p>${escHtml(p.creneau)} · ${escHtml(p.places)} places${p.systeme ? ' · ' + escHtml(p.systeme) : ''}</p>
+                    </div>
+                    <span class="badge badge-${statusBadge[p.statut_table] || 'attente'}">${statusLabels[p.statut_table] || p.statut_table}</span>
+                </div>`).join('')}`;
+    } catch(e) { /* silencieux */ }
+}
+
+window.proposerTable = proposerTable;
+
+})();
+</script>
+</body>
+</html>

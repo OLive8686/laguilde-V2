@@ -66,6 +66,143 @@ function getProp(key) {
 }
 
 /**
+ * Exécute une fonction dans un verrou exclusif (LockService).
+ * Empêche les race conditions quand plusieurs utilisateurs écrivent
+ * en même temps (ex : deux inscriptions simultanées à la dernière place).
+ * Si le verrou n'est pas obtenu dans les 15 secondes, renvoie une erreur.
+ * @param {Function} fn - La fonction à exécuter sous verrou
+ * @returns {*} Le résultat de la fonction
+ */
+function withLock(fn) {
+  var lock = LockService.getScriptLock();
+  var acquired = lock.tryLock(15000); // 15 secondes max d'attente
+  if (!acquired) {
+    return { error: 'Serveur occupé, réessayez dans quelques secondes.' };
+  }
+  try {
+    return fn();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Valide le format d'une adresse email avec une regex simple.
+ * Ne vérifie pas que l'adresse existe, juste le format basique.
+ * @param {string} email - L'adresse à vérifier
+ * @returns {boolean} true si le format est valide
+ */
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+
+// ─── Gestion des rôles ──────────────────────────────────────────────────────
+// L'onglet "roles" recense TOUS les utilisateurs inscrits sur le site.
+// Chaque email a un rôle : "joueur" (défaut), "mj", ou "admin".
+// Le rôle est créé automatiquement à la première connexion.
+// Seul un admin peut modifier le rôle d'un utilisateur.
+//
+// Colonnes : email | nom | role | date_inscription
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Récupère le rôle d'un utilisateur. Si l'utilisateur n'existe pas
+ * dans l'onglet roles, crée une entrée avec le rôle "joueur".
+ * Appelé à chaque connexion (action "get_role") pour informer le frontend.
+ *
+ * @param {string} email - L'email de l'utilisateur
+ * @param {string} nom   - Le pseudo (pour l'enregistrement initial)
+ * @returns {string} Le rôle : "joueur", "mj", ou "admin"
+ */
+function getOrCreateRole(email, nom) {
+  email = (email || '').toLowerCase().trim();
+  if (!email) return 'joueur';
+
+  var sheet = getSheet('roles');
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0].map(function(h) { return h.toString().trim(); });
+  var emailCol = headers.indexOf('email');
+  var roleCol = headers.indexOf('role');
+
+  // Chercher l'utilisateur existant
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][emailCol] && data[i][emailCol].toString().toLowerCase().trim() === email) {
+      return (data[i][roleCol] || 'joueur').toString().trim();
+    }
+  }
+
+  // Utilisateur inconnu → créer avec le rôle "joueur"
+  sheet.appendRow([email, (nom || '').trim(), 'joueur', new Date().toISOString()]);
+  return 'joueur';
+}
+
+/**
+ * Vérifie qu'un utilisateur a au moins le rôle requis.
+ * Hiérarchie : admin > mj > joueur.
+ * @param {string} email - L'email à vérifier
+ * @param {string} roleMinimum - Le rôle minimum requis ("mj" ou "admin")
+ * @returns {boolean} true si l'utilisateur a le rôle suffisant
+ */
+function hasRole(email, roleMinimum) {
+  var role = getOrCreateRole(email, '');
+  if (roleMinimum === 'admin') return role === 'admin';
+  if (roleMinimum === 'mj') return role === 'mj' || role === 'admin';
+  return true; // "joueur" → tout le monde
+}
+
+/**
+ * Change le rôle d'un utilisateur (admin uniquement).
+ * @param {Object} params - { password, email, role }
+ * @returns {Object} { ok, message } ou { error }
+ */
+function setRole(params) {
+  var password = (params.password || '').trim();
+  if (password !== getProp('ADMIN_PASSWORD')) {
+    return { error: 'Mot de passe incorrect' };
+  }
+
+  var targetEmail = (params.email || '').toLowerCase().trim();
+  var newRole = (params.role || '').trim().toLowerCase();
+
+  if (!targetEmail || !isValidEmail(targetEmail)) return { error: 'Email invalide' };
+  if (['joueur', 'mj', 'admin'].indexOf(newRole) === -1) {
+    return { error: 'Rôle invalide. Valeurs possibles : joueur, mj, admin' };
+  }
+
+  var sheet = getSheet('roles');
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0].map(function(h) { return h.toString().trim(); });
+  var emailCol = headers.indexOf('email');
+  var roleCol = headers.indexOf('role');
+
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][emailCol] && data[i][emailCol].toString().toLowerCase().trim() === targetEmail) {
+      sheet.getRange(i + 1, roleCol + 1).setValue(newRole);
+      return { ok: true, message: 'Rôle de ' + targetEmail + ' changé en ' + newRole };
+    }
+  }
+
+  return { error: 'Utilisateur non trouvé. Il doit se connecter au moins une fois.' };
+}
+
+/**
+ * Retourne la liste de tous les utilisateurs avec leurs rôles (admin uniquement).
+ * @param {Object} params - { password }
+ * @returns {Object} { ok, users: [...] }
+ */
+function getAllRoles(params) {
+  var password = (params.password || '').trim();
+  if (password !== getProp('ADMIN_PASSWORD')) {
+    return { error: 'Mot de passe incorrect' };
+  }
+
+  var users = readSheet('roles');
+  return { ok: true, users: users };
+}
+
+
+/**
  * Ouvre un onglet de la Google Sheet. Crée l'onglet avec les bons en-têtes
  * s'il n'existe pas encore (utile lors de la première utilisation).
  * Gère aussi la migration : ajoute les colonnes accompagnants si manquantes.
@@ -93,6 +230,11 @@ function getSheet(tabName) {
       sheet.appendRow(['email_parent', 'nom_accompagnant', 'date_ajout']);
       sheet.getRange(1, 1, 1, 3).setFontWeight('bold');
     }
+
+    if (tabName === 'roles') {
+      sheet.appendRow(['email', 'nom', 'role', 'date_inscription']);
+      sheet.getRange(1, 1, 1, 4).setFontWeight('bold');
+    }
   }
 
   // Migration : ajoute les colonnes accompagnants si l'onglet inscriptions
@@ -106,6 +248,22 @@ function getSheet(tabName) {
       sheet.getRange(1, nextCol).setFontWeight('bold');
       sheet.getRange(1, nextCol + 1).setValue('nom_accompagnant');
       sheet.getRange(1, nextCol + 1).setFontWeight('bold');
+    }
+  }
+
+  // Migration : ajoute la colonne statut_table à l'onglet programme
+  // pour la fonctionnalité de proposition de table par les MJ.
+  // "validé" = visible dans le programme, "en_attente" = en attente de validation admin.
+  // Les anciennes lignes sans cette colonne sont traitées comme "validé".
+  if (tabName === 'programme' && sheet.getLastColumn() > 0) {
+    var progHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (progHeaders.indexOf('statut_table') === -1) {
+      var nextProgCol = sheet.getLastColumn() + 1;
+      sheet.getRange(1, nextProgCol).setValue('statut_table');
+      sheet.getRange(1, nextProgCol).setFontWeight('bold');
+      // Colonne email_mj : pour identifier qui a proposé la table
+      sheet.getRange(1, nextProgCol + 1).setValue('email_mj');
+      sheet.getRange(1, nextProgCol + 1).setFontWeight('bold');
     }
   }
 
@@ -159,11 +317,16 @@ function jsonResponse(data, callback) {
 /**
  * Retourne une page HTML qui redirige immédiatement vers une URL.
  * Utilisé pour les redirections OAuth (Discord callback legacy).
+ * L'URL est encodée pour éviter toute injection HTML via les paramètres.
  * @param {string} url - L'URL de destination
  * @returns {GoogleAppsScript.HTML.HtmlOutput} La page HTML de redirection
  */
 function htmlRedirect(url) {
-  var html = '<html><head><meta http-equiv="refresh" content="0;url=' + url + '"></head>'
+  // Sanitization : on encode les caractères spéciaux HTML dans l'URL
+  // pour empêcher une injection via des paramètres malveillants
+  var safeUrl = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  var html = '<html><head><meta http-equiv="refresh" content="0;url=' + safeUrl + '"></head>'
     + '<body>Redirection...</body></html>';
   return HtmlService.createHtmlOutput(html);
 }
@@ -421,6 +584,12 @@ function doGet(e) {
       case 'get_mes_inscriptions':
         return jsonResponse(getMesInscriptions(e.parameter), callback);
 
+      // --- Rôles ---
+      case 'get_role':
+        var roleEmail = (e.parameter.email || '').toLowerCase().trim();
+        var roleNom = (e.parameter.nom || '').trim();
+        return jsonResponse({ ok: true, role: getOrCreateRole(roleEmail, roleNom) }, callback);
+
       // --- Inscription / Annulation ---
       case 'inscrire':
         return jsonResponse(inscrire(e.parameter), callback);
@@ -449,15 +618,16 @@ function doGet(e) {
       case 'discord_exchange':
         return jsonResponse(discordExchange(e.parameter), callback);
 
-      // --- Admin ---
+      // --- MJ (propositions de tables — lecture) ---
+      case 'get_mes_propositions':
+        return jsonResponse(getMesPropositions(e.parameter), callback);
+
+      // --- Admin --- (LECTURE seule en GET — les actions sensibles passent par POST)
       case 'admin_data':
         return jsonResponse(getAdminData(e.parameter), callback);
 
-      case 'admin_promouvoir':
-        return jsonResponse(adminPromouvoir(e.parameter), callback);
-
-      case 'admin_supprimer':
-        return jsonResponse(adminSupprimer(e.parameter), callback);
+      case 'get_propositions_en_attente':
+        return jsonResponse(getPropositionsEnAttente(e.parameter), callback);
 
       default:
         return jsonResponse({ ok: true, message: 'API Mélusine active' }, callback);
@@ -469,8 +639,10 @@ function doGet(e) {
 }
 
 /**
- * Point d'entrée POST — utilisé comme alternative au GET pour les écritures.
+ * Point d'entrée POST — utilisé pour toutes les écritures et actions sensibles.
  * Le body doit être du JSON avec un champ "action".
+ * Les actions admin passent obligatoirement par POST pour éviter que le mot
+ * de passe apparaisse dans les URL / logs / historique navigateur.
  */
 function doPost(e) {
   var data;
@@ -482,10 +654,34 @@ function doPost(e) {
 
   try {
     switch (data.action) {
+      // --- Inscription / Annulation ---
       case 'inscrire':
         return jsonResponse(inscrire(data));
       case 'annuler':
         return jsonResponse(annuler(data));
+
+      // --- MJ (propositions de tables) ---
+      case 'proposer_table':
+        return jsonResponse(proposerTable(data));
+
+      // --- Admin (actions sensibles — POST obligatoire) ---
+      case 'admin_data':
+        return jsonResponse(getAdminData(data));
+      case 'admin_promouvoir':
+        return jsonResponse(adminPromouvoir(data));
+      case 'admin_supprimer':
+        return jsonResponse(adminSupprimer(data));
+      case 'admin_valider_table':
+        return jsonResponse(adminValiderTable(data));
+      case 'admin_refuser_table':
+        return jsonResponse(adminRefuserTable(data));
+
+      // --- Rôles (admin) ---
+      case 'set_role':
+        return jsonResponse(setRole(data));
+      case 'get_all_roles':
+        return jsonResponse(getAllRoles(data));
+
       default:
         return jsonResponse({ error: 'Action inconnue' });
     }
@@ -529,8 +725,13 @@ function getSheetData(params) {
  * @returns {Object} { ok, programme: [...] } avec places_restantes, inscrits, complet
  */
 function getProgrammeAvecPlaces() {
-  var programme = readSheet('programme');
+  var allProgramme = readSheet('programme');
   var inscriptions = readSheet('inscriptions');
+
+  // Filtrer : seules les tables validées (ou sans statut pour rétrocompat) sont publiques
+  var programme = allProgramme.filter(function(p) {
+    return !p.statut_table || p.statut_table === 'validé';
+  });
 
   // Compter les inscrits (statut "inscrit" uniquement) par couple créneau+jeu
   var counts = {};
@@ -639,128 +840,135 @@ function inscrire(params) {
   var typeInscrit = (params.type_inscrit || 'principal').trim();
   var nomAccompagnant = (params.nom_accompagnant || '').trim();
 
-  // Validation de base
+  // Validation de base (hors verrou — lecture seule, pas de race condition)
   if (!nom) return { error: 'Le nom est requis' };
   if (!email) return { error: "L'email est requis" };
+  if (!isValidEmail(email)) return { error: "Format d'email invalide" };
   if (!creneau || !jeu) return { error: 'Créneau et jeu requis' };
 
-  // Si c'est un accompagnant, vérifier qu'il existe bien dans la liste du parent
-  if (typeInscrit === 'accompagnant') {
-    if (!nomAccompagnant) return { error: 'Nom de l\'accompagnant requis' };
-    var accompagnants = readSheet('accompagnants');
-    var estValide = accompagnants.some(function(a) {
-      return a.email_parent.toLowerCase().trim() === email
-        && a.nom_accompagnant.trim().toLowerCase() === nomAccompagnant.toLowerCase();
-    });
-    if (!estValide) {
-      return { error: 'Accompagnant non trouvé. Ajoutez-le d\'abord.' };
-    }
-  }
+  // Verrou exclusif : toute la logique de vérification + écriture est protégée
+  // pour empêcher deux inscriptions simultanées à la dernière place.
+  return withLock(function() {
 
-  var inscriptions = readSheet('inscriptions');
-
-  // Fonction helper : détermine si une ligne d'inscription correspond
-  // à la même "personne" (le joueur principal OU un accompagnant précis).
-  // Pour le principal : email match ET pas d'accompagnant dans la ligne
-  // Pour un accompagnant : email match ET même nom_accompagnant
-  var personneMatch = function(i) {
+    // Si c'est un accompagnant, vérifier qu'il existe bien dans la liste du parent
     if (typeInscrit === 'accompagnant') {
-      return i.email.toLowerCase().trim() === email
-        && (i.nom_accompagnant || '').trim().toLowerCase() === nomAccompagnant.toLowerCase();
-    } else {
-      return i.email.toLowerCase().trim() === email
-        && (!i.nom_accompagnant || i.nom_accompagnant.trim() === '');
+      if (!nomAccompagnant) return { error: 'Nom de l\'accompagnant requis' };
+      var accompagnants = readSheet('accompagnants');
+      var estValide = accompagnants.some(function(a) {
+        return a.email_parent.toLowerCase().trim() === email
+          && a.nom_accompagnant.trim().toLowerCase() === nomAccompagnant.toLowerCase();
+      });
+      if (!estValide) {
+        return { error: 'Accompagnant non trouvé. Ajoutez-le d\'abord.' };
+      }
     }
-  };
 
-  // Anti-doublon : déjà inscrit à cette table ?
-  var dejaInscrit = inscriptions.some(function(i) {
-    return personneMatch(i)
-      && i.creneau === creneau
-      && i.jeu === jeu
-      && (i.statut === 'inscrit' || i.statut === 'attente');
-  });
+    var inscriptions = readSheet('inscriptions');
 
-  if (dejaInscrit) {
-    var qui = typeInscrit === 'accompagnant' ? nomAccompagnant + ' est' : 'Vous êtes';
-    return { error: qui + ' déjà inscrit·e à cette table.' };
-  }
+    // Fonction helper : détermine si une ligne d'inscription correspond
+    // à la même "personne" (le joueur principal OU un accompagnant précis).
+    // Pour le principal : email match ET pas d'accompagnant dans la ligne
+    // Pour un accompagnant : email match ET même nom_accompagnant
+    var personneMatch = function(i) {
+      if (typeInscrit === 'accompagnant') {
+        return i.email.toLowerCase().trim() === email
+          && (i.nom_accompagnant || '').trim().toLowerCase() === nomAccompagnant.toLowerCase();
+      } else {
+        return i.email.toLowerCase().trim() === email
+          && (!i.nom_accompagnant || i.nom_accompagnant.trim() === '');
+      }
+    };
 
-  // Anti-doublon : déjà inscrit à un AUTRE jeu sur le même créneau ?
-  var autreJeuMemeCreneau = inscriptions.find(function(i) {
-    return personneMatch(i)
-      && i.creneau === creneau
-      && i.jeu !== jeu
-      && (i.statut === 'inscrit' || i.statut === 'attente');
-  });
+    // Anti-doublon : déjà inscrit à cette table ?
+    var dejaInscrit = inscriptions.some(function(i) {
+      return personneMatch(i)
+        && i.creneau === creneau
+        && i.jeu === jeu
+        && (i.statut === 'inscrit' || i.statut === 'attente');
+    });
 
-  if (autreJeuMemeCreneau) {
-    var qui2 = typeInscrit === 'accompagnant' ? nomAccompagnant + ' est' : 'Vous êtes';
-    return { error: qui2 + ' déjà inscrit·e sur ce créneau (' + autreJeuMemeCreneau.jeu + '). Annulez d\'abord pour changer de table.' };
-  }
+    if (dejaInscrit) {
+      var qui = typeInscrit === 'accompagnant' ? nomAccompagnant + ' est' : 'Vous êtes';
+      return { error: qui + ' déjà inscrit·e à cette table.' };
+    }
 
-  // Vérifier les places disponibles
-  var programme = readSheet('programme');
-  var creneauInfo = programme.find(function(p) {
-    return p.creneau === creneau && p.jeu === jeu;
-  });
+    // Anti-doublon : déjà inscrit à un AUTRE jeu sur le même créneau ?
+    var autreJeuMemeCreneau = inscriptions.find(function(i) {
+      return personneMatch(i)
+        && i.creneau === creneau
+        && i.jeu !== jeu
+        && (i.statut === 'inscrit' || i.statut === 'attente');
+    });
 
-  if (!creneauInfo) return { error: 'Créneau introuvable' };
+    if (autreJeuMemeCreneau) {
+      var qui2 = typeInscrit === 'accompagnant' ? nomAccompagnant + ' est' : 'Vous êtes';
+      return { error: qui2 + ' déjà inscrit·e sur ce créneau (' + autreJeuMemeCreneau.jeu + '). Annulez d\'abord pour changer de table.' };
+    }
 
-  var maxPlaces = parseInt(creneauInfo.places) || 0;
-  var inscritsCount = inscriptions.filter(function(i) {
-    return i.creneau === creneau && i.jeu === jeu && i.statut === 'inscrit';
-  }).length;
+    // Vérifier les places disponibles
+    var programme = readSheet('programme');
+    var creneauInfo = programme.find(function(p) {
+      return p.creneau === creneau && p.jeu === jeu;
+    });
 
-  // Déterminer le statut : inscrit si places dispo, sinon liste d'attente
-  var statut = (inscritsCount < maxPlaces) ? 'inscrit' : 'attente';
+    if (!creneauInfo) return { error: 'Créneau introuvable' };
 
-  // Le nom affiché dans la ligne : le nom de l'accompagnant si c'en est un
-  var nomAffiche = typeInscrit === 'accompagnant' ? nomAccompagnant : nom;
+    var maxPlaces = parseInt(creneauInfo.places) || 0;
+    var inscritsCount = inscriptions.filter(function(i) {
+      return i.creneau === creneau && i.jeu === jeu && i.statut === 'inscrit';
+    }).length;
 
-  // Écrire l'inscription (10 colonnes)
-  var sheet = getSheet('inscriptions');
-  sheet.appendRow([
-    new Date().toISOString(),  // timestamp
-    nomAffiche,                 // nom (accompagnant ou joueur)
-    email,                      // email (toujours celui du parent)
-    authType,                   // auth_type
-    authId,                     // auth_id
-    creneau,                    // creneau
-    jeu,                        // jeu
-    statut,                     // statut
-    typeInscrit,                // 'principal' ou 'accompagnant'
-    nomAccompagnant             // vide si principal
-  ]);
+    // Déterminer le statut : inscrit si places dispo, sinon liste d'attente
+    var statut = (inscritsCount < maxPlaces) ? 'inscrit' : 'attente';
 
-  // Envoyer l'email de confirmation au parent
-  // Le nom dans l'email mentionne l'accompagnant si applicable
-  var nomEmail = typeInscrit === 'accompagnant'
-    ? nomAccompagnant + ' (accompagnant de ' + nom + ')'
-    : nom;
-  sendEmailConfirmation(email, nomEmail, jeu, creneau, statut);
+    // Le nom affiché dans la ligne : le nom de l'accompagnant si c'en est un
+    var nomAffiche = typeInscrit === 'accompagnant' ? nomAccompagnant : nom;
 
-  // Calculer les places restantes après cette inscription
-  var placesRestantes = Math.max(0, maxPlaces - inscritsCount - (statut === 'inscrit' ? 1 : 0));
+    // Écrire l'inscription (10 colonnes)
+    var sheet = getSheet('inscriptions');
+    sheet.appendRow([
+      new Date().toISOString(),  // timestamp
+      nomAffiche,                 // nom (accompagnant ou joueur)
+      email,                      // email (toujours celui du parent)
+      authType,                   // auth_type
+      authId,                     // auth_id
+      creneau,                    // creneau
+      jeu,                        // jeu
+      statut,                     // statut
+      typeInscrit,                // 'principal' ou 'accompagnant'
+      nomAccompagnant             // vide si principal
+    ]);
 
-  // Messages de retour lus depuis la config (avec valeurs par défaut)
-  var message;
-  if (statut === 'inscrit') {
-    message = typeInscrit === 'accompagnant'
-      ? cfg('msg_inscription_acc', '%NOM% est inscrit·e ! 🎲').replace(/%NOM%/g, nomAccompagnant)
-      : cfg('msg_inscription_ok', 'Inscription confirmée ! 🎲');
-  } else {
-    message = typeInscrit === 'accompagnant'
-      ? cfg('msg_attente_acc', '%NOM% est en liste d\'attente.').replace(/%NOM%/g, nomAccompagnant)
-      : cfg('msg_attente', 'Créneau complet — vous êtes en liste d\'attente. Vous serez notifié·e si une place se libère.');
-  }
+    // Envoyer l'email de confirmation au parent
+    // Le nom dans l'email mentionne l'accompagnant si applicable
+    var nomEmail = typeInscrit === 'accompagnant'
+      ? nomAccompagnant + ' (accompagnant de ' + nom + ')'
+      : nom;
+    sendEmailConfirmation(email, nomEmail, jeu, creneau, statut);
 
-  return {
-    ok: true,
-    statut: statut,
-    message: message,
-    places_restantes: placesRestantes
-  };
+    // Calculer les places restantes après cette inscription
+    var placesRestantes = Math.max(0, maxPlaces - inscritsCount - (statut === 'inscrit' ? 1 : 0));
+
+    // Messages de retour lus depuis la config (avec valeurs par défaut)
+    var message;
+    if (statut === 'inscrit') {
+      message = typeInscrit === 'accompagnant'
+        ? cfg('msg_inscription_acc', '%NOM% est inscrit·e ! 🎲').replace(/%NOM%/g, nomAccompagnant)
+        : cfg('msg_inscription_ok', 'Inscription confirmée ! 🎲');
+    } else {
+      message = typeInscrit === 'accompagnant'
+        ? cfg('msg_attente_acc', '%NOM% est en liste d\'attente.').replace(/%NOM%/g, nomAccompagnant)
+        : cfg('msg_attente', 'Créneau complet — vous êtes en liste d\'attente. Vous serez notifié·e si une place se libère.');
+    }
+
+    return {
+      ok: true,
+      statut: statut,
+      message: message,
+      places_restantes: placesRestantes
+    };
+
+  }); // fin withLock
 }
 
 
@@ -783,62 +991,68 @@ function annuler(params) {
 
   if (!email || !creneau || !jeu) return { error: 'Paramètres manquants' };
 
-  var sheet = getSheet('inscriptions');
-  var data = sheet.getDataRange().getValues();
-  var headers = data[0];
-  var emailCol = headers.indexOf('email');
-  var creneauCol = headers.indexOf('creneau');
-  var jeuCol = headers.indexOf('jeu');
-  var statutCol = headers.indexOf('statut');
-  var nomAccCol = headers.indexOf('nom_accompagnant');
+  // Verrou exclusif : protège contre annulation + inscription simultanées
+  // qui pourraient corrompre le comptage des places
+  return withLock(function() {
 
-  // Chercher la ligne correspondante et la marquer comme "annulé"
-  var annule = false;
-  var wasInscrit = false;
+    var sheet = getSheet('inscriptions');
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+    var emailCol = headers.indexOf('email');
+    var creneauCol = headers.indexOf('creneau');
+    var jeuCol = headers.indexOf('jeu');
+    var statutCol = headers.indexOf('statut');
+    var nomAccCol = headers.indexOf('nom_accompagnant');
 
-  for (var i = 1; i < data.length; i++) {
-    var rowEmail = data[i][emailCol].toString().toLowerCase().trim();
-    var rowCreneau = data[i][creneauCol].toString().trim();
-    var rowJeu = data[i][jeuCol].toString().trim();
-    var rowStatut = data[i][statutCol];
-    var rowNomAcc = nomAccCol >= 0 ? (data[i][nomAccCol] || '').toString().trim() : '';
+    // Chercher la ligne correspondante et la marquer comme "annulé"
+    var annule = false;
+    var wasInscrit = false;
 
-    // Matcher la bonne "personne" : accompagnant si nom fourni, sinon principal
-    var personneMatch;
-    if (nomAccompagnant) {
-      personneMatch = (rowNomAcc.toLowerCase() === nomAccompagnant.toLowerCase());
-    } else {
-      personneMatch = (rowNomAcc === '');
+    for (var i = 1; i < data.length; i++) {
+      var rowEmail = data[i][emailCol].toString().toLowerCase().trim();
+      var rowCreneau = data[i][creneauCol].toString().trim();
+      var rowJeu = data[i][jeuCol].toString().trim();
+      var rowStatut = data[i][statutCol];
+      var rowNomAcc = nomAccCol >= 0 ? (data[i][nomAccCol] || '').toString().trim() : '';
+
+      // Matcher la bonne "personne" : accompagnant si nom fourni, sinon principal
+      var personneMatch;
+      if (nomAccompagnant) {
+        personneMatch = (rowNomAcc.toLowerCase() === nomAccompagnant.toLowerCase());
+      } else {
+        personneMatch = (rowNomAcc === '');
+      }
+
+      if (rowEmail === email && rowCreneau === creneau && rowJeu === jeu
+          && personneMatch
+          && (rowStatut === 'inscrit' || rowStatut === 'attente')) {
+
+        wasInscrit = (rowStatut === 'inscrit');
+        sheet.getRange(i + 1, statutCol + 1).setValue('annulé');
+        annule = true;
+        break;
+      }
     }
 
-    if (rowEmail === email && rowCreneau === creneau && rowJeu === jeu
-        && personneMatch
-        && (rowStatut === 'inscrit' || rowStatut === 'attente')) {
+    if (!annule) return { error: 'Inscription introuvable' };
 
-      wasInscrit = (rowStatut === 'inscrit');
-      sheet.getRange(i + 1, statutCol + 1).setValue('annulé');
-      annule = true;
-      break;
+    // Email d'annulation au parent
+    var nomAnnule = nomAccompagnant ? nomAccompagnant + ' (accompagnant)' : '';
+    sendEmailAnnulation(email, nomAnnule, jeu, creneau);
+
+    // Si c'était un "inscrit" (pas en attente), promouvoir le premier en liste d'attente
+    if (wasInscrit) {
+      promouvoirPremierEnAttente(creneau, jeu);
     }
-  }
 
-  if (!annule) return { error: 'Inscription introuvable' };
+    // Message de retour lu depuis la config
+    var message = nomAccompagnant
+      ? cfg('msg_annulation_acc', 'Inscription de %NOM% annulée.').replace(/%NOM%/g, nomAccompagnant)
+      : cfg('msg_annulation', 'Inscription annulée.');
 
-  // Email d'annulation au parent
-  var nomAnnule = nomAccompagnant ? nomAccompagnant + ' (accompagnant)' : '';
-  sendEmailAnnulation(email, nomAnnule, jeu, creneau);
+    return { ok: true, message: message };
 
-  // Si c'était un "inscrit" (pas en attente), promouvoir le premier en liste d'attente
-  if (wasInscrit) {
-    promouvoirPremierEnAttente(creneau, jeu);
-  }
-
-  // Message de retour lu depuis la config
-  var message = nomAccompagnant
-    ? cfg('msg_annulation_acc', 'Inscription de %NOM% annulée.').replace(/%NOM%/g, nomAccompagnant)
-    : cfg('msg_annulation', 'Inscription annulée.');
-
-  return { ok: true, message: message };
+  }); // fin withLock
 }
 
 /**
@@ -1121,7 +1335,30 @@ function getAdminData(params) {
     return { error: 'Mot de passe incorrect' };
   }
 
-  var inscriptions = readSheet('inscriptions');
+  // Lecture directe de la Sheet pour avoir les vrais numéros de ligne
+  // (readSheet() ne retourne pas les index → impossible de cibler une ligne)
+  var sheet = getSheet('inscriptions');
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0].map(function(h) { return h.toString().trim(); });
+
+  // Construire les inscriptions avec le vrai numéro de ligne Sheet (_row)
+  var inscriptions = [];
+  for (var i = 1; i < data.length; i++) {
+    var obj = {};
+    var isEmpty = true;
+    for (var j = 0; j < headers.length; j++) {
+      var val = data[i][j];
+      obj[headers[j]] = (val !== undefined && val !== null) ? val.toString().trim() : '';
+      if (obj[headers[j]] !== '') isEmpty = false;
+    }
+    if (!isEmpty) {
+      // _row = numéro de ligne réel dans la Sheet (1-indexed, en-tête = ligne 1)
+      // Utilisé par le frontend pour cibler la bonne ligne lors de promouvoir/supprimer
+      obj._row = i + 1;
+      inscriptions.push(obj);
+    }
+  }
+
   var programme = readSheet('programme');
 
   // Stats par couple créneau+jeu
@@ -1203,4 +1440,206 @@ function adminSupprimer(params) {
 
   sheet.getRange(rowIndex, statutCol).setValue('supprimé');
   return { ok: true, message: 'Inscription supprimée.' };
+}
+
+
+// ─── Propositions de tables (MJ) ────────────────────────────────────────────
+// Un MJ connecté peut proposer une table de JDR. La proposition est écrite
+// dans l'onglet "programme" avec statut_table = "en_attente".
+// Elle n'apparaît dans le programme public qu'après validation par un admin.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Propose une nouvelle table de JDR (côté MJ).
+ * Écrit dans l'onglet programme avec statut_table = "en_attente".
+ *
+ * Validations :
+ *   - Champs obligatoires : jeu, mj, creneau, places, email_mj
+ *   - Format email valide
+ *   - Nombre de places entre 1 et 20 (protection anti-abus)
+ *   - Anti-doublon : pas deux propositions identiques (même MJ + même jeu + même créneau)
+ *
+ * @param {Object} params - { jeu, mj, systeme, description, content, creneau, places, email_mj }
+ * @returns {Object} { ok, message } ou { error }
+ */
+function proposerTable(params) {
+  var jeu = (params.jeu || '').trim();
+  var mj = (params.mj || '').trim();
+  var systeme = (params.systeme || '').trim();
+  var description = (params.description || '').trim();
+  var content = (params.content || '').trim();
+  var creneau = (params.creneau || '').trim();
+  var places = parseInt(params.places) || 0;
+  var emailMj = (params.email_mj || '').toLowerCase().trim();
+
+  // Contrôle d'accès : seuls les MJ et admins peuvent proposer des tables
+  if (!hasRole(emailMj, 'mj')) {
+    return { error: 'Seuls les MJ peuvent proposer des tables. Contactez un administrateur pour obtenir le rôle MJ.' };
+  }
+
+  // Validation des champs obligatoires
+  if (!jeu) return { error: 'Le nom du jeu est requis' };
+  if (!mj) return { error: 'Le nom du MJ est requis' };
+  if (!creneau) return { error: 'Le créneau est requis' };
+  if (!places || places < 1 || places > 20) return { error: 'Nombre de places invalide (1 à 20)' };
+  if (!emailMj) return { error: 'Email requis' };
+  if (!isValidEmail(emailMj)) return { error: "Format d'email invalide" };
+
+  // Longueur max des champs texte (protection anti-abus)
+  if (jeu.length > 100) return { error: 'Nom du jeu trop long (100 caractères max)' };
+  if (description.length > 500) return { error: 'Description trop longue (500 caractères max)' };
+
+  // Anti-doublon : vérifier qu'il n'y a pas déjà une proposition identique
+  var programme = readSheet('programme');
+  var dejaPropose = programme.some(function(p) {
+    return (p.email_mj || '').toLowerCase().trim() === emailMj
+      && p.jeu.trim().toLowerCase() === jeu.toLowerCase()
+      && p.creneau.trim() === creneau;
+  });
+  if (dejaPropose) {
+    return { error: 'Vous avez déjà proposé ce jeu sur ce créneau.' };
+  }
+
+  // Écrire la proposition dans l'onglet programme
+  // Les colonnes correspondent à celles du programme existant + statut_table + email_mj
+  var sheet = getSheet('programme');
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+    .map(function(h) { return h.toString().trim(); });
+
+  // Construire la ligne en respectant l'ordre des colonnes existantes
+  var newRow = [];
+  headers.forEach(function(h) {
+    switch (h) {
+      case 'jeu': newRow.push(jeu); break;
+      case 'mj': newRow.push(mj); break;
+      case 'systeme': newRow.push(systeme); break;
+      case 'description': newRow.push(description); break;
+      case 'content': newRow.push(content); break;
+      case 'creneau': newRow.push(creneau); break;
+      case 'places': newRow.push(places); break;
+      case 'statut_table': newRow.push('en_attente'); break;
+      case 'email_mj': newRow.push(emailMj); break;
+      default: newRow.push(''); break;
+    }
+  });
+
+  sheet.appendRow(newRow);
+
+  return { ok: true, message: 'Table proposée ! Un administrateur va la valider.' };
+}
+
+/**
+ * Retourne les propositions de tables d'un MJ (identifié par son email).
+ * Permet au MJ de voir l'état de ses propositions (en_attente, validé, refusé).
+ * @param {Object} params - { email: string }
+ * @returns {Object} { ok, propositions: [...] }
+ */
+function getMesPropositions(params) {
+  var email = (params.email || '').toLowerCase().trim();
+  if (!email) return { error: 'Email requis' };
+
+  var programme = readSheet('programme');
+  var miennes = programme.filter(function(p) {
+    return (p.email_mj || '').toLowerCase().trim() === email;
+  }).map(function(p) {
+    return {
+      jeu: p.jeu,
+      mj: p.mj,
+      systeme: p.systeme || '',
+      description: p.description || '',
+      content: p.content || '',
+      creneau: p.creneau,
+      places: p.places,
+      statut_table: p.statut_table || 'validé'
+    };
+  });
+
+  return { ok: true, propositions: miennes };
+}
+
+/**
+ * Valide une proposition de table (admin uniquement).
+ * Change le statut de "en_attente" à "validé" → la table apparaît dans le programme public.
+ * Identifie la proposition par email_mj + jeu + creneau (combinaison unique).
+ * @param {Object} params - { password, email_mj, jeu, creneau }
+ * @returns {Object} { ok, message } ou { error }
+ */
+function adminValiderTable(params) {
+  var password = (params.password || '').trim();
+  if (password !== getProp('ADMIN_PASSWORD')) {
+    return { error: 'Mot de passe incorrect' };
+  }
+
+  return _changeStatutTable(params, 'validé');
+}
+
+/**
+ * Refuse une proposition de table (admin uniquement).
+ * Change le statut de "en_attente" à "refusé".
+ * @param {Object} params - { password, email_mj, jeu, creneau }
+ * @returns {Object} { ok, message } ou { error }
+ */
+function adminRefuserTable(params) {
+  var password = (params.password || '').trim();
+  if (password !== getProp('ADMIN_PASSWORD')) {
+    return { error: 'Mot de passe incorrect' };
+  }
+
+  return _changeStatutTable(params, 'refusé');
+}
+
+/**
+ * Fonction interne : change le statut_table d'une proposition dans le programme.
+ * Cherche la ligne par email_mj + jeu + creneau et met à jour statut_table.
+ * @param {Object} params - { email_mj, jeu, creneau }
+ * @param {string} newStatut - Le nouveau statut ("validé" ou "refusé")
+ * @returns {Object} { ok, message } ou { error }
+ */
+function _changeStatutTable(params, newStatut) {
+  var emailMj = (params.email_mj || '').toLowerCase().trim();
+  var jeu = (params.jeu || '').trim();
+  var creneau = (params.creneau || '').trim();
+
+  if (!emailMj || !jeu || !creneau) return { error: 'Paramètres manquants' };
+
+  var sheet = getSheet('programme');
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0].map(function(h) { return h.toString().trim(); });
+  var emailMjCol = headers.indexOf('email_mj');
+  var jeuCol = headers.indexOf('jeu');
+  var creneauCol = headers.indexOf('creneau');
+  var statutCol = headers.indexOf('statut_table');
+
+  if (statutCol === -1) return { error: 'Colonne statut_table introuvable' };
+
+  for (var i = 1; i < data.length; i++) {
+    var rowEmail = emailMjCol >= 0 ? (data[i][emailMjCol] || '').toString().toLowerCase().trim() : '';
+    var rowJeu = (data[i][jeuCol] || '').toString().trim();
+    var rowCreneau = (data[i][creneauCol] || '').toString().trim();
+
+    if (rowEmail === emailMj && rowJeu.toLowerCase() === jeu.toLowerCase() && rowCreneau === creneau) {
+      sheet.getRange(i + 1, statutCol + 1).setValue(newStatut);
+      return { ok: true, message: 'Table ' + (newStatut === 'validé' ? 'validée' : 'refusée') + ' : ' + jeu };
+    }
+  }
+
+  return { error: 'Proposition introuvable' };
+}
+
+/**
+ * Enrichit getAdminData pour inclure les propositions de tables en attente.
+ * L'admin peut voir toutes les propositions et les valider/refuser.
+ */
+function getPropositionsEnAttente(params) {
+  var password = (params.password || '').trim();
+  if (password !== getProp('ADMIN_PASSWORD')) {
+    return { error: 'Mot de passe incorrect' };
+  }
+
+  var programme = readSheet('programme');
+  var enAttente = programme.filter(function(p) {
+    return p.statut_table === 'en_attente';
+  });
+
+  return { ok: true, propositions: enAttente };
 }
