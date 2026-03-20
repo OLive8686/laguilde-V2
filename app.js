@@ -18,7 +18,7 @@
 // 📌 CONFIGURATION
 // =============================================================================
 const SHEET_ID = '1x_XBv6Y6nih-SevBIE6KRGmg9eDoSGyNpi9VwFHcHjM';
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwBzYRBOAZOhwAaqGL-2PNP9OhCWrrrbhDXj--FK91L3XtzYUoZVENwoMDgCSK2TTl7/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby01lYf4lSk5Du1Bx1eJp1W5vXyhH-sFL_DbtY5PPBSYA5veBJiLQnNbFvubxN8TIZq/exec';
 const GOOGLE_CLIENT_ID = '274189183408-qgjihd7cg6k6tbb4gomeq44gbarih723.apps.googleusercontent.com';
 const DISCORD_CLIENT_ID = '1477424032532922530';
 // =============================================================================
