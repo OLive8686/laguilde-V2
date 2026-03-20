@@ -216,6 +216,9 @@ function showAuthOptions() {
     document.getElementById('authOptions').style.display='flex';
     document.getElementById('emailForm').classList.remove('active');
     document.getElementById('pseudoForm').classList.remove('active');
+    // Cacher le conteneur du bouton Google si présent
+    var googleBtn = document.getElementById('googleBtnContainer');
+    if (googleBtn) googleBtn.style.display = 'none';
 }
 
 function showEmailForm() {
@@ -255,14 +258,44 @@ window.handleGoogleLogin = function(response) {
 // Flag pour ne pas initialiser Google SSO plusieurs fois
 var _googleInitialized = false;
 
+/**
+ * Connexion Google : utilise renderButton() au lieu de prompt().
+ * prompt() (FedCM/One Tap) est instable sur Chrome récent — il se fait
+ * bloquer ou annuler silencieusement. renderButton() affiche un vrai
+ * bouton Google dans le modal, beaucoup plus fiable.
+ */
 function loginGoogle() {
     if (!GOOGLE_CLIENT_ID) { toast('SSO Google non configuré — utilisez pseudo/email', 'info'); showEmailForm(); return; }
-    // Initialiser une seule fois — appels multiples causent des conflits FedCM
+
+    // Masquer les options d'auth et afficher un conteneur pour le bouton Google
+    document.getElementById('authOptions').style.display = 'none';
+    // Créer ou réutiliser le conteneur du bouton Google
+    var container = document.getElementById('googleBtnContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'googleBtnContainer';
+        container.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:16px;padding:20px 0';
+        container.innerHTML = '<p style="font-size:15px;color:var(--text-light);text-align:center">Cliquez sur le bouton Google ci-dessous :</p><div id="googleBtnTarget"></div><p style="font-size:14px;color:var(--text-muted);cursor:pointer" onclick="showAuthOptions()">← Retour</p>';
+        document.getElementById('authOptions').parentNode.insertBefore(container, document.getElementById('authOptions').nextSibling);
+    }
+    container.style.display = 'flex';
+
+    // Initialiser une seule fois
     if (!_googleInitialized) {
         google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleLogin });
         _googleInitialized = true;
     }
-    google.accounts.id.prompt();
+
+    // Rendre le bouton Google officiel dans le conteneur
+    var target = document.getElementById('googleBtnTarget');
+    target.innerHTML = '';
+    google.accounts.id.renderButton(target, {
+        theme: 'filled_black',
+        size: 'large',
+        text: 'signin_with',
+        shape: 'pill',
+        width: 280
+    });
 }
 
 function loginDiscord() {
