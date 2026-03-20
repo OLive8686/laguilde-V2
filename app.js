@@ -41,32 +41,77 @@ window.APP = {
     SHEET_ID: SHEET_ID
 };
 
-// ── Google Sheets CSV (fallback) ────────────────────────────────────────────
-function getSheetCSV(tab) {
-    return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}&_t=${Date.now()}`;
+// ── Cache localStorage (stale-while-revalidate) ────────────────────────────
+// Affiche les données en cache immédiatement, puis rafraîchit en arrière-plan.
+// Réduit le temps d'affichage perçu de ~2-5s (cold start GAS) à ~0ms.
+// Le cache expire après 5 minutes (les données sont rafraîchies en background).
+var CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Lit une valeur depuis le cache localStorage.
+ * Retourne null si absent ou expiré au-delà du TTL x2 (hard expiry).
+ */
+function cacheGet(key) {
+    try {
+        var raw = localStorage.getItem('melusine_cache_' + key);
+        if (!raw) return null;
+        var parsed = JSON.parse(raw);
+        // Hard expiry : supprimer le cache après 1 heure (données trop vieilles)
+        if (Date.now() - parsed.ts > 60 * 60 * 1000) return null;
+        return parsed;
+    } catch(e) { return null; }
+}
+
+/**
+ * Écrit une valeur dans le cache localStorage avec un timestamp.
+ */
+function cacheSet(key, data) {
+    try {
+        localStorage.setItem('melusine_cache_' + key, JSON.stringify({ data: data, ts: Date.now() }));
+    } catch(e) { /* localStorage plein — silencieux */ }
 }
 
 /**
  * Récupère les données d'un onglet Google Sheet.
- * Stratégie : backend Apps Script d'abord, puis fallback CSV.
+ * Stratégie stale-while-revalidate :
+ *   1. Si cache disponible et pas trop vieux → retourne le cache immédiatement
+ *   2. Lance un refresh en arrière-plan pour mettre à jour le cache
+ *   3. Si pas de cache → attend la réponse du backend
  */
 async function fetchSheetData(tab) {
-    if (SCRIPT_URL) {
-        try {
-            var result = await callAPI({ action: 'get_sheet', tab: tab });
-            if (result.ok && result.data) return result.data;
-        } catch(e) { /* fallback sur CSV */ }
+    var cached = cacheGet('sheet_' + tab);
+
+    // Si cache frais (< TTL), retourner immédiatement + refresh background
+    if (cached && (Date.now() - cached.ts < CACHE_TTL)) {
+        // Refresh en arrière-plan (fire and forget)
+        _fetchSheetFresh(tab).then(function(data) { if (data) cacheSet('sheet_' + tab, data); });
+        return cached.data;
     }
-    if (!SHEET_ID) return null;
-    try {
-        var resp = await fetch(getSheetCSV(tab), { cache: 'no-store' });
-        var text = await resp.text();
-        var parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-        return parsed.data;
-    } catch(e) { return null; }
+
+    // Pas de cache ou trop vieux → fetch synchrone
+    var fresh = await _fetchSheetFresh(tab);
+    if (fresh) {
+        cacheSet('sheet_' + tab, fresh);
+        return fresh;
+    }
+
+    // Fallback : retourner le cache périmé plutôt que rien
+    return cached ? cached.data : null;
 }
 
-// Cache config pour éviter les appels multiples (loadTheme + page init)
+/**
+ * Fetch frais depuis le backend Apps Script (sans cache).
+ */
+async function _fetchSheetFresh(tab) {
+    if (!SCRIPT_URL) return null;
+    try {
+        var result = await callAPI({ action: 'get_sheet', tab: tab });
+        if (result.ok && result.data) return result.data;
+    } catch(e) { /* silencieux */ }
+    return null;
+}
+
+// Cache config en mémoire (évite les appels multiples dans la même page)
 var _configCacheClient = null;
 
 async function fetchConfig() {
@@ -282,34 +327,50 @@ window.handleGoogleLogin = function(response) {
 
 // Flag pour ne pas initialiser Google SSO plusieurs fois
 var _googleInitialized = false;
+var _googleScriptLoaded = false;
 
 /**
- * Connexion Google : utilise renderButton() au lieu de prompt().
- * prompt() (FedCM/One Tap) est instable sur Chrome récent — il se fait
- * bloquer ou annuler silencieusement. renderButton() affiche un vrai
- * bouton Google dans le modal, beaucoup plus fiable.
+ * Charge le script Google Identity Services à la demande (lazy-load).
+ * Appelé uniquement quand l'utilisateur clique sur "Continuer avec Google".
+ * Évite de charger ~50KB de JS Google sur chaque page.
+ */
+function loadGoogleScript() {
+    return new Promise(function(resolve) {
+        if (_googleScriptLoaded) { resolve(); return; }
+        var script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.onload = function() { _googleScriptLoaded = true; resolve(); };
+        script.onerror = function() { toast('Erreur chargement Google — utilisez pseudo/email', 'error'); showEmailForm(); };
+        document.head.appendChild(script);
+    });
+}
+
+/**
+ * Connexion Google : charge le script GSI à la demande, puis renderButton().
  */
 function loginGoogle() {
     if (!GOOGLE_CLIENT_ID) { toast('SSO Google non configuré — utilisez pseudo/email', 'info'); showEmailForm(); return; }
 
     // Masquer les options d'auth et afficher un conteneur pour le bouton Google
     document.getElementById('authOptions').style.display = 'none';
-    // Créer ou réutiliser le conteneur du bouton Google
     var container = document.getElementById('googleBtnContainer');
     if (!container) {
         container = document.createElement('div');
         container.id = 'googleBtnContainer';
         container.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:16px;padding:20px 0';
-        container.innerHTML = '<p style="font-size:15px;color:var(--text-light);text-align:center">Cliquez sur le bouton Google ci-dessous :</p><div id="googleBtnTarget"></div><p style="font-size:14px;color:var(--text-muted);cursor:pointer" onclick="showAuthOptions()">← Retour</p>';
+        container.innerHTML = '<p style="font-size:15px;color:var(--text-light);text-align:center">Chargement de Google...</p><div id="googleBtnTarget"></div><p style="font-size:14px;color:var(--text-muted);cursor:pointer" onclick="showAuthOptions()">← Retour</p>';
         document.getElementById('authOptions').parentNode.insertBefore(container, document.getElementById('authOptions').nextSibling);
     }
     container.style.display = 'flex';
 
-    // Initialiser une seule fois
-    if (!_googleInitialized) {
-        google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleLogin });
-        _googleInitialized = true;
-    }
+    // Charger le script Google puis initialiser
+    loadGoogleScript().then(function() {
+        if (!_googleInitialized) {
+            google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleLogin });
+            _googleInitialized = true;
+        }
+        container.querySelector('p').textContent = 'Cliquez sur le bouton Google ci-dessous :';
+    });
 
     // Rendre le bouton Google officiel dans le conteneur
     var target = document.getElementById('googleBtnTarget');
@@ -464,13 +525,14 @@ async function loadTheme() {
 }
 
 async function initApp() {
-    // Charger le thème en premier pour éviter le flash de couleurs
-    await loadTheme();
     checkAuthCallback();
     updateNavUser();
-    if (currentUser) {
-        await fetchRole();
-    }
+
+    // Charger thème + rôle en parallèle (pas de dépendance entre eux)
+    var promises = [loadTheme()];
+    if (currentUser) promises.push(fetchRole());
+    await Promise.all(promises);
+
     updateNavForRole();
     initCommonUI();
     // Appeler l'init spécifique de la page si définie
