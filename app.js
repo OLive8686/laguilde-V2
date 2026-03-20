@@ -252,9 +252,16 @@ window.handleGoogleLogin = function(response) {
     showPseudoForm({ nom: p.name||p.given_name||'', email: p.email, auth_type:'google', auth_id:p.sub });
 };
 
+// Flag pour ne pas initialiser Google SSO plusieurs fois
+var _googleInitialized = false;
+
 function loginGoogle() {
     if (!GOOGLE_CLIENT_ID) { toast('SSO Google non configuré — utilisez pseudo/email', 'info'); showEmailForm(); return; }
-    google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleLogin });
+    // Initialiser une seule fois — appels multiples causent des conflits FedCM
+    if (!_googleInitialized) {
+        google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleLogin });
+        _googleInitialized = true;
+    }
     google.accounts.id.prompt();
 }
 
