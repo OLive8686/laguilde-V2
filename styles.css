@@ -37,6 +37,9 @@
 /* ── Overrides thème clair ───────────────────────────────────────────────── */
 /* Éléments qui utilisent des couleurs en dur (rgba, hex) au lieu de variables */
 [data-theme="clair"] .nav{background:linear-gradient(180deg,rgba(232,221,208,0.97),rgba(240,232,218,0.95));border-bottom:1px solid rgba(43,127,181,0.15)}
+[data-theme="clair"] .nav-toggle span{background:#1A2A3A}
+[data-theme="clair"] .nav-brand span{color:var(--teal-dark)}
+@media(max-width:900px){[data-theme="clair"] .nav-links{background:rgba(240,232,218,0.98);border-bottom:1px solid rgba(43,127,181,0.15)}}
 [data-theme="clair"] .nav.scrolled{background:rgba(232,221,208,0.99)}
 [data-theme="clair"] .hero-bg{background:radial-gradient(ellipse at 30% 20%,rgba(43,127,181,0.08) 0%,transparent 60%),radial-gradient(ellipse at 70% 80%,rgba(212,160,48,0.05) 0%,transparent 60%),linear-gradient(135deg,#E8DDD0 0%,#F5EFE5 50%,#E0D5C5 100%)}
 [data-theme="clair"] .hero-bg-overlay{background:linear-gradient(135deg,rgba(232,221,208,0.7) 0%,rgba(245,239,229,0.75) 50%,rgba(232,221,208,0.7) 100%)}
