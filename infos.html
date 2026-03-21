@@ -158,14 +158,19 @@ window.onUserLogout = function() {};
 // puis affiche chaque section une fois les données récupérées.
 
 window.onPageInit = async function() {
-    var results = await Promise.all([
-        fetchConfig(),
-        fetchSheetData('restauration'),
-        fetchSheetData('animations')
-    ]);
-    renderConfig(results[0]);
-    renderRestauration(results[1]);
-    renderAnimations(results[2]);
+    // Utiliser l'endpoint groupé : 1 seul appel au lieu de 3
+    var allData = await fetchAllPublic();
+    if (allData) {
+        renderConfig(allData.config || null);
+        renderRestauration(allData.restauration || null);
+        renderAnimations(allData.animations || null);
+    } else {
+        // Fallback : appels séparés si le groupé échoue
+        var results = await Promise.all([fetchConfig(), fetchSheetData('restauration'), fetchSheetData('animations')]);
+        renderConfig(results[0]);
+        renderRestauration(results[1]);
+        renderAnimations(results[2]);
+    }
 };
 
 // ── Affichage de la configuration (bienvenue, lieu, dates, tarif) ───────────

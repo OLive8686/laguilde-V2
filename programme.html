@@ -163,7 +163,13 @@ function updateMJButton() {
  * Charge le programme et, si l'utilisateur est connecté, ses accompagnants.
  */
 window.onPageInit = async function() {
-    await refreshProgramme();
+    // Utiliser l'endpoint groupé pour un seul appel API
+    var allData = await fetchAllPublic();
+    if (allData && allData.programme) {
+        renderProgramme(allData.programme);
+    } else {
+        await refreshProgramme(); // Fallback
+    }
     if (APP.currentUser) {
         loadAccompagnants();
     }

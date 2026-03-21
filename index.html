@@ -116,8 +116,9 @@ window.onUserLogin = function() {};
 window.onUserLogout = function() {};
 
 window.onPageInit = async function() {
-    // Charger la config pour les infos pratiques et le hero
-    var config = await fetchConfig();
+    // Utiliser l'endpoint groupé (partagé avec les autres pages via le cache)
+    var allData = await fetchAllPublic();
+    var config = allData ? allData.config : await fetchConfig();
     if (config) renderConfig(config);
 };
 

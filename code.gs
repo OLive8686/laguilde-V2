@@ -2151,3 +2151,20 @@ function getPropositionsEnAttente(params) {
 
   return { ok: true, propositions: enAttente };
 }
+
+
+// ─── Keep-alive ─────────────────────────────────────────────────────────────
+// Empêche le cold start de Google Apps Script en gardant le script "chaud".
+// À configurer : Déclencheurs → Ajouter un déclencheur →
+//   Fonction : keepAlive | Événement : Basé sur le temps | Toutes les 5 min
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Fonction keep-alive appelée par un trigger toutes les 5 minutes.
+ * Fait un appel minimal à la Sheet pour garder le contexte d'exécution chaud.
+ * Sans ça, Apps Script met ~2-5s de cold start après 5-10 min d'inactivité.
+ */
+function keepAlive() {
+  // Lecture minimale pour garder le script chaud
+  SpreadsheetApp.openById(getProp('SHEET_ID')).getSheetByName('config');
+}

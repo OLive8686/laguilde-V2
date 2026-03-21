@@ -106,20 +106,22 @@ window.onUserLogin = function() { updateBenevoleView(); };
 window.onUserLogout = function() { updateBenevoleView(); };
 
 window.onPageInit = async function() {
-    updateBenevoleView();
+    // Essayer de récupérer les créneaux bénévoles depuis le cache groupé
+    var allData = await fetchAllPublic();
+    updateBenevoleView(allData ? allData.creneaux_benevoles : null);
 };
 
 // ── Affichage conditionnel ──────────────────────────────────────────────────
 
-function updateBenevoleView() {
+function updateBenevoleView(cachedCreneaux) {
     var user = APP.currentUser;
     document.getElementById('benevoleLoginPrompt').style.display = !user ? 'block' : 'none';
     document.getElementById('mesBenevoles').style.display = user ? 'block' : 'none';
     // Les créneaux sont toujours visibles (même non connecté = consultation)
     document.getElementById('benevoleCreneaux').style.display = 'block';
 
-    // Toujours charger les créneaux (consultation pour tous)
-    loadCreneauxBenevoles();
+    // Charger les créneaux (depuis cache si dispo, sinon appel API)
+    loadCreneauxBenevoles(cachedCreneaux);
     if (user) {
         loadMesBenevoles();
     }
@@ -127,9 +129,12 @@ function updateBenevoleView() {
 
 // ── Créneaux disponibles ────────────────────────────────────────────────────
 
-async function loadCreneauxBenevoles() {
+async function loadCreneauxBenevoles(cachedCreneaux) {
     try {
-        var r = await callAPI({ action: 'get_postes_benevoles' });
+        // Utiliser les données en cache si fournies, sinon appel API
+        var r = cachedCreneaux
+            ? { creneaux: cachedCreneaux }
+            : await callAPI({ action: 'get_postes_benevoles' });
         var grid = document.getElementById('benevoleGrid');
         if (!r.creneaux || r.creneaux.length === 0) {
             grid.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:16px;padding:40px 0">Aucun créneau bénévole disponible pour le moment.</p>';

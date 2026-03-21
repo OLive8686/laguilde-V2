@@ -558,7 +558,9 @@ function closeChoixModal() {
  */
 async function loadTheme() {
     try {
-        var config = await fetchConfig();
+        // Utiliser le endpoint groupé (une seule requête pour tout)
+        var allData = await fetchAllPublic();
+        var config = allData ? allData.config : await fetchConfig();
         if (config && config.theme) {
             var theme = config.theme.trim().toLowerCase();
             if (theme === 'clair' || theme === 'dark') {
