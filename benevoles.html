@@ -141,6 +141,33 @@ async function loadCreneauxBenevoles(cachedCreneaux) {
             return;
         }
 
+        // Charger les engagements de l'utilisateur connecté (joueur + MJ)
+        // pour griser les créneaux où il est déjà pris
+        var engagements = {}; // { creneau: 'raison' }
+        var user = APP.currentUser;
+        if (user) {
+            try {
+                // Inscriptions JDR
+                var mesIns = await callAPI({ action: 'get_mes_inscriptions', email: user.email });
+                if (mesIns.inscriptions) {
+                    mesIns.inscriptions.forEach(function(i) {
+                        if (!i.nom_accompagnant || i.nom_accompagnant.trim() === '') {
+                            engagements[i.creneau] = 'Joueur : ' + i.jeu;
+                        }
+                    });
+                }
+                // Tables MJ
+                var mesProp = await callAPI({ action: 'get_mes_propositions', email: user.email });
+                if (mesProp.propositions) {
+                    mesProp.propositions.forEach(function(p) {
+                        if (p.statut_table !== 'refusé') {
+                            engagements[p.creneau] = 'MJ : ' + p.jeu;
+                        }
+                    });
+                }
+            } catch(e) { /* silencieux — on affiche quand même les créneaux */ }
+        }
+
         grid.innerHTML = r.creneaux.map(function(c) {
             var rest = parseInt(c.places_restantes) || 0;
             var max = parseInt(c.places) || 0;
@@ -148,11 +175,19 @@ async function loadCreneauxBenevoles(cachedCreneaux) {
             var full = c.complet || rest <= 0;
             var statusTxt = full ? 'Complet (' + ins + '/' + max + ')' : rest + ' place' + (rest > 1 ? 's' : '') + ' sur ' + max;
             var badgeCls = full ? 'badge-complet' : 'badge-dispo';
-            var btn = full
-                ? '<span class="badge badge-complet">Complet</span>'
-                : '<button class="btn btn-small btn-green" onclick="inscrireBenevole(\'' + esc(c.creneau) + '\')">S\'inscrire</button>';
 
-            return '<div class="creneau">'
+            // Vérifier si l'utilisateur est déjà engagé sur ce créneau
+            var engagement = engagements[c.creneau];
+            var btn;
+            if (engagement) {
+                btn = '<span class="badge badge-attente" title="' + escHtml(engagement) + '">Déjà pris (' + escHtml(engagement) + ')</span>';
+            } else if (full) {
+                btn = '<span class="badge badge-complet">Complet</span>';
+            } else {
+                btn = '<button class="btn btn-small btn-green" onclick="inscrireBenevole(\'' + esc(c.creneau) + '\')">S\'inscrire</button>';
+            }
+
+            return '<div class="creneau"' + (engagement ? ' style="opacity:0.6"' : '') + '>'
                 + '<div class="creneau-time">' + escHtml(c.creneau) + '</div>'
                 + '<div class="creneau-info">'
                 + '<h4>Bénévolat</h4>'
