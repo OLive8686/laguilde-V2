@@ -74,16 +74,7 @@
         </div>
     </section>
 
-    <!-- Message si rôle insuffisant -->
-    <section class="section section-dark" id="mjAccessDenied" style="display:none">
-        <div class="section-inner" style="text-align:center">
-            <div class="section-header"><p class="section-label">Espace MJ</p><h2 class="section-title">Accès restreint</h2><div class="section-sep"></div></div>
-            <p style="color:var(--text-light);font-size:17px;margin-bottom:16px">Cet espace est réservé aux MJ (Maîtres du Jeu).</p>
-            <p style="color:var(--text-muted);font-size:15px">Si vous souhaitez proposer une table, contactez un administrateur pour obtenir le rôle MJ.</p>
-        </div>
-    </section>
-
-    <!-- Formulaire MJ (visible si rôle mj ou admin) -->
+    <!-- Formulaire MJ (visible si connecté) -->
     <section class="section section-dark" id="mjContent" style="display:none">
         <div class="section-inner">
             <div class="section-header"><p class="section-label">Espace MJ</p><h2 class="section-title">Proposer une table</h2><div class="section-sep"></div></div>
@@ -177,7 +168,6 @@ function updateMJView() {
     var role = APP.currentRole;
 
     document.getElementById('mjLoginPrompt').style.display = !user ? 'block' : 'none';
-    document.getElementById('mjAccessDenied').style.display = 'none'; // Plus de restriction de rôle
     document.getElementById('mjContent').style.display = user ? 'block' : 'none';
 
     if (user) {

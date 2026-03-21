@@ -745,6 +745,19 @@ function doGet(e) {
     switch (action) {
 
       // --- Lectures publiques (GET uniquement) ---
+
+      // Endpoint groupé : retourne config + programme + restauration + animations
+      // en un seul appel. Divise le temps de chargement initial par 4.
+      case 'get_all_public':
+        return jsonResponse({
+          ok: true,
+          config: (function() { var r = readSheet('config'); var c = {}; r.forEach(function(row) { if (row.cle) c[row.cle.trim()] = (row.valeur || '').trim(); }); return c; })(),
+          programme: getProgrammeAvecPlaces().programme,
+          restauration: readSheet('restauration'),
+          animations: readSheet('animations'),
+          creneaux_benevoles: (function() { return getPostesBenevoles().creneaux; })()
+        });
+
       case 'get_programme':
         return jsonResponse(getProgrammeAvecPlaces());
 

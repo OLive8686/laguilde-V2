@@ -115,10 +115,12 @@ function updateBenevoleView() {
     var user = APP.currentUser;
     document.getElementById('benevoleLoginPrompt').style.display = !user ? 'block' : 'none';
     document.getElementById('mesBenevoles').style.display = user ? 'block' : 'none';
-    document.getElementById('benevoleCreneaux').style.display = user ? 'block' : 'none';
+    // Les créneaux sont toujours visibles (même non connecté = consultation)
+    document.getElementById('benevoleCreneaux').style.display = 'block';
 
+    // Toujours charger les créneaux (consultation pour tous)
+    loadCreneauxBenevoles();
     if (user) {
-        loadCreneauxBenevoles();
         loadMesBenevoles();
     }
 }

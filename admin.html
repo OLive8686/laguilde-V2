@@ -249,6 +249,8 @@ async function loadRolesAdmin() {
 // ── Actions admin ───────────────────────────────────────────────────────────
 
 window.adminAction = async function(action, row) {
+    // Confirmation avant suppression
+    if (action === 'admin_supprimer' && !confirm('Supprimer cette inscription ?')) return;
     try {
         await callAPIPost({ action, row, password: _adminPw });
         toast('OK', 'success');

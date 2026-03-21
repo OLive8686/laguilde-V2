@@ -111,6 +111,38 @@ async function _fetchSheetFresh(tab) {
     return null;
 }
 
+/**
+ * Charge TOUTES les données publiques en un seul appel API.
+ * Réduit le cold start de 4 requêtes à 1 seule.
+ * Utilise le cache stale-while-revalidate.
+ * @returns {Object} { config, programme, restauration, animations, creneaux_benevoles }
+ */
+async function fetchAllPublic() {
+    var cached = cacheGet('all_public');
+
+    if (cached && (Date.now() - cached.ts < CACHE_TTL)) {
+        // Refresh en arrière-plan
+        _fetchAllPublicFresh().then(function(data) { if (data) cacheSet('all_public', data); });
+        return cached.data;
+    }
+
+    var fresh = await _fetchAllPublicFresh();
+    if (fresh) {
+        cacheSet('all_public', fresh);
+        return fresh;
+    }
+    return cached ? cached.data : null;
+}
+
+async function _fetchAllPublicFresh() {
+    if (!SCRIPT_URL) return null;
+    try {
+        var result = await callAPI({ action: 'get_all_public' });
+        if (result.ok) return result;
+    } catch(e) { /* silencieux */ }
+    return null;
+}
+
 // Cache config en mémoire (évite les appels multiples dans la même page)
 var _configCacheClient = null;
 
@@ -234,6 +266,18 @@ function setUser(user) {
     fetchRole().then(function() {
         updateNavUser();
         updateNavForRole();
+
+        // Rediriger vers la page d'origine si on vient d'un SSO (Discord)
+        var returnPage = localStorage.getItem('melusine_return_page');
+        if (returnPage) {
+            localStorage.removeItem('melusine_return_page');
+            // Rediriger seulement si on est sur une autre page
+            if (window.location.href !== returnPage) {
+                window.location.href = returnPage;
+                return;
+            }
+        }
+
         // Appeler le callback de la page si défini
         if (window.onUserLogin) window.onUserLogin();
     });
@@ -267,6 +311,8 @@ function updateNavUser() {
 function openAuthModal(creneau, jeu) {
     if (creneau && jeu) {
         pendingInscription = { creneau, jeu };
+        // Persister pour survivre aux redirections SSO (Discord, Google)
+        localStorage.setItem('melusine_pending', JSON.stringify(pendingInscription));
         document.getElementById('modalGame').textContent = jeu;
         document.getElementById('modalSubtext').textContent = `Créneau : ${creneau}`;
     } else {
@@ -363,32 +409,33 @@ function loginGoogle() {
     }
     container.style.display = 'flex';
 
-    // Charger le script Google puis initialiser
+    // Charger le script Google puis initialiser ET rendre le bouton
+    // (tout dans le .then() pour éviter un crash si le script n'est pas encore chargé)
     loadGoogleScript().then(function() {
         if (!_googleInitialized) {
             google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleLogin });
             _googleInitialized = true;
         }
         container.querySelector('p').textContent = 'Cliquez sur le bouton Google ci-dessous :';
-    });
 
-    // Rendre le bouton Google officiel dans le conteneur
-    var target = document.getElementById('googleBtnTarget');
-    target.innerHTML = '';
-    google.accounts.id.renderButton(target, {
-        theme: 'filled_black',
-        size: 'large',
-        text: 'signin_with',
-        shape: 'pill',
-        width: 280
-    });
+        // Rendre le bouton Google officiel dans le conteneur
+        var target = document.getElementById('googleBtnTarget');
+        target.innerHTML = '';
+        google.accounts.id.renderButton(target, {
+            theme: 'filled_black',
+            size: 'large',
+            text: 'signin_with',
+            shape: 'pill',
+            width: 280
+        });
+    }); // fin loadGoogleScript().then()
 }
 
 function loginDiscord() {
     if (!DISCORD_CLIENT_ID || !SCRIPT_URL) { toast('SSO Discord non configuré — utilisez pseudo/email', 'info'); showEmailForm(); return; }
-    // Toujours rediriger vers la racine du site après Discord OAuth —
-    // seule cette URL est enregistrée dans le Discord Developer Portal.
-    // L'utilisateur sera connecté sur toutes les pages (même localStorage).
+    // Sauvegarder la page de retour pour rediriger après login
+    localStorage.setItem('melusine_return_page', window.location.href);
+    // Toujours rediriger vers la racine du site (seule URL enregistrée dans Discord)
     var baseUrl = window.location.origin + window.location.pathname.replace(/[^\/]*$/, '');
     const redirectUri = encodeURIComponent(baseUrl);
     window.location.href = 'https://discord.com/api/oauth2/authorize?client_id=' + DISCORD_CLIENT_ID + '&redirect_uri=' + redirectUri + '&response_type=code&scope=identify%20email';
@@ -564,6 +611,7 @@ window.callAPI = callAPI;
 window.callAPIPost = callAPIPost;
 window.fetchSheetData = fetchSheetData;
 window.fetchConfig = fetchConfig;
+window.fetchAllPublic = fetchAllPublic;
 window.fetchRole = fetchRole;
 
 })();
