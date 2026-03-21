@@ -931,13 +931,19 @@ function getProgrammeAvecPlaces() {
   });
 
   // Ajouter les infos de places à chaque ligne du programme
+  // places_web = quota de pré-inscriptions en ligne (optionnel)
+  // Si vide → toutes les places sont ouvertes en ligne
   programme.forEach(function(p) {
     var key = p.creneau + '|||' + p.jeu;
     var maxPlaces = parseInt(p.places) || 0;
+    var placesWeb = p.places_web ? parseInt(p.places_web) : maxPlaces;
     var inscrits = counts[key] || 0;
     p.places_restantes = Math.max(0, maxPlaces - inscrits);
+    p.places_web_restantes = Math.max(0, placesWeb - inscrits);
     p.inscrits = inscrits;
-    p.complet = p.places_restantes <= 0;
+    p.complet_web = p.places_web_restantes <= 0; // complet pour les inscriptions en ligne
+    p.complet = p.places_restantes <= 0; // complet total (jour J inclus)
+    p.has_quota = (p.places_web && parseInt(p.places_web) < maxPlaces);
   });
 
   return { ok: true, programme: programme };
@@ -1132,12 +1138,15 @@ function inscrire(params) {
     }
 
     var maxPlaces = parseInt(creneauInfo.places) || 0;
+    // Quota de pré-inscriptions en ligne : si places_web est défini, on l'utilise
+    // pour limiter les inscriptions web. Les places restantes sont pour le jour J.
+    var placesWeb = creneauInfo.places_web ? parseInt(creneauInfo.places_web) : maxPlaces;
     var inscritsCount = inscriptions.filter(function(i) {
       return i.creneau === creneau && i.jeu === jeu && i.statut === 'inscrit';
     }).length;
 
-    // Déterminer le statut : inscrit si places dispo, sinon liste d'attente
-    var statut = (inscritsCount < maxPlaces) ? 'inscrit' : 'attente';
+    // Déterminer le statut : inscrit si places web dispo, sinon liste d'attente
+    var statut = (inscritsCount < placesWeb) ? 'inscrit' : 'attente';
 
     // Le nom affiché dans la ligne : le nom de l'accompagnant si c'en est un
     var nomAffiche = typeInscrit === 'accompagnant' ? nomAccompagnant : nom;
@@ -1164,8 +1173,8 @@ function inscrire(params) {
       : nom;
     sendEmailConfirmation(email, nomEmail, jeu, creneau, statut);
 
-    // Calculer les places restantes après cette inscription
-    var placesRestantes = Math.max(0, maxPlaces - inscritsCount - (statut === 'inscrit' ? 1 : 0));
+    // Calculer les places web restantes après cette inscription
+    var placesRestantes = Math.max(0, placesWeb - inscritsCount - (statut === 'inscrit' ? 1 : 0));
 
     // Messages de retour lus depuis la config (avec valeurs par défaut)
     var message;

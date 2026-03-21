@@ -385,20 +385,32 @@ function renderProgramme(items) {
         var list = filter === 'all' ? items : items.filter(function(i) { return i.creneau === filter; });
 
         grid.innerHTML = list.map(function(item) {
-            // Calcul des places restantes
+            // Calcul des places — utiliser le quota web si défini
             var max = parseInt(item.places) || 0;
             var ins = parseInt(item.inscrits) || 0;
-            var rest = item.places_restantes !== undefined ? parseInt(item.places_restantes) : max - ins;
-            var full = item.complet || rest <= 0;
+            var hasQuota = item.has_quota;
+            var webRest = item.places_web_restantes !== undefined ? parseInt(item.places_web_restantes) : (max - ins);
+            var fullWeb = item.complet_web || webRest <= 0;
 
-            // Texte du badge (places restantes ou complet)
-            var statusTxt = full
-                ? 'Complet (' + ins + '/' + max + ')'
-                : rest + ' place' + (rest > 1 ? 's' : '') + ' sur ' + max;
-            var badgeCls = full ? 'badge-complet' : 'badge-dispo';
+            // Texte du badge adapté au quota
+            var statusTxt, badgeCls;
+            if (fullWeb && !item.complet) {
+                // Quota web atteint mais places dispo sur place
+                var placesJourJ = parseInt(item.places_restantes) || 0;
+                statusTxt = 'Complet en ligne' + (placesJourJ > 0 ? ' · ' + placesJourJ + ' place' + (placesJourJ > 1 ? 's' : '') + ' sur place' : '');
+                badgeCls = 'badge-attente';
+            } else if (fullWeb) {
+                statusTxt = 'Complet (' + ins + '/' + max + ')';
+                badgeCls = 'badge-complet';
+            } else {
+                statusTxt = webRest + ' place' + (webRest > 1 ? 's' : '') + ' en ligne';
+                if (hasQuota) statusTxt += ' sur ' + max;
+                else statusTxt += ' sur ' + max;
+                badgeCls = 'badge-dispo';
+            }
 
             // Bouton d'inscription ou de liste d'attente
-            var btn = full
+            var btn = fullWeb
                 ? '<button class="btn btn-small btn-gold" onclick="handleInscrire(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">Liste d\'attente</button>'
                 : '<button class="btn btn-small btn-green" onclick="handleInscrire(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">S\'inscrire</button>';
 
