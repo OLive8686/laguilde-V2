@@ -88,6 +88,15 @@
     </div></div>
 </section>
 
+<!-- COMPTEUR GLOBAL (rempli dynamiquement) -->
+<div id="globalStats" style="display:none;text-align:center;padding:24px;background:var(--dark-card);border-bottom:1px solid rgba(46,139,139,0.08)">
+    <div style="display:flex;justify-content:center;gap:40px;flex-wrap:wrap;max-width:600px;margin:0 auto">
+        <div><span id="statInscrits" style="font-family:var(--font-heading);font-size:28px;color:var(--gold)">-</span><div style="font-size:13px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px">Inscrits</div></div>
+        <div><span id="statTables" style="font-family:var(--font-heading);font-size:28px;color:var(--teal)">-</span><div style="font-size:13px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px">Tables</div></div>
+        <div><span id="statBenevoles" style="font-family:var(--font-heading);font-size:28px;color:var(--green)">-</span><div style="font-size:13px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px">Bénévoles</div></div>
+    </div>
+</div>
+
 <!-- INFOS RAPIDES -->
 <section class="section section-light" id="infos-rapides">
     <div class="section-inner">
@@ -120,6 +129,24 @@ window.onPageInit = async function() {
     var allData = await fetchAllPublic();
     var config = allData ? allData.config : await fetchConfig();
     if (config) renderConfig(config);
+
+    // Compteur global : inscrits + tables + bénévoles
+    if (allData) {
+        try {
+            var insData = await callAPI({ action: 'get_inscriptions' });
+            var nbInscrits = (insData.inscriptions || []).filter(function(i) { return i.statut === 'inscrit'; }).length;
+            var nbTables = (allData.programme || []).length;
+            var nbBenevoles = 0;
+            (allData.creneaux_benevoles || []).forEach(function(c) { nbBenevoles += parseInt(c.inscrits) || 0; });
+
+            if (nbInscrits > 0 || nbTables > 0 || nbBenevoles > 0) {
+                document.getElementById('statInscrits').textContent = nbInscrits;
+                document.getElementById('statTables').textContent = nbTables;
+                document.getElementById('statBenevoles').textContent = nbBenevoles;
+                document.getElementById('globalStats').style.display = 'block';
+            }
+        } catch(e) { /* silencieux */ }
+    }
 };
 
 /**

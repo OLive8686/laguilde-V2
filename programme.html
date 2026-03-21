@@ -129,17 +129,19 @@
  * Appelé par app.js quand l'utilisateur se connecte.
  * Recharge les accompagnants (pour la modal de choix) et met à jour l'affichage.
  */
-window.onUserLogin = function() {
+window.onUserLogin = async function() {
     loadAccompagnants();
     updateMJButton();
+    // Recharger les inscriptions de l'utilisateur
+    try {
+        var mesData = await callAPI({ action: 'get_mes_inscriptions', email: APP.currentUser.email });
+        _mesInscriptions = mesData.inscriptions || [];
+    } catch(e) { _mesInscriptions = []; }
     refreshProgramme();
 };
 
-/**
- * Appelé par app.js quand l'utilisateur se déconnecte.
- * Masque le bouton MJ et rafraîchit le programme (plus de boutons personnalisés).
- */
 window.onUserLogout = function() {
+    _mesInscriptions = [];
     updateMJButton();
     refreshProgramme();
 };
@@ -162,16 +164,33 @@ function updateMJButton() {
  * Point d'entrée de la page, appelé par app.js une fois le DOM prêt.
  * Charge le programme et, si l'utilisateur est connecté, ses accompagnants.
  */
+// Données globales pour le rendu du programme
+var _allInscriptions = []; // inscriptions publiques (pseudos par table)
+var _mesInscriptions = []; // inscriptions de l'utilisateur connecté
+
 window.onPageInit = async function() {
-    // Utiliser l'endpoint groupé pour un seul appel API
+    // Charger les données en parallèle
     var allData = await fetchAllPublic();
+
+    // Charger les inscriptions publiques (pseudos par table)
+    try {
+        var insData = await callAPI({ action: 'get_inscriptions' });
+        _allInscriptions = insData.inscriptions || [];
+    } catch(e) { _allInscriptions = []; }
+
+    // Charger les inscriptions de l'utilisateur connecté
+    if (APP.currentUser) {
+        try {
+            var mesData = await callAPI({ action: 'get_mes_inscriptions', email: APP.currentUser.email });
+            _mesInscriptions = mesData.inscriptions || [];
+        } catch(e) { _mesInscriptions = []; }
+        loadAccompagnants();
+    }
+
     if (allData && allData.programme) {
         renderProgramme(allData.programme);
     } else {
-        await refreshProgramme(); // Fallback
-    }
-    if (APP.currentUser) {
-        loadAccompagnants();
+        await refreshProgramme();
     }
     updateMJButton();
 };
@@ -267,7 +286,7 @@ async function doInscrire(creneau, jeu) {
             jeu: jeu
         });
         toast(r.message, r.statut === 'inscrit' ? 'success' : 'info');
-        refreshProgramme();
+        await reloadInscriptionsAndRefresh();
     } catch(e) {
         toast(e.message, 'error');
     }
@@ -296,7 +315,7 @@ async function doInscrireAccompagnant(creneau, jeu, nomAccompagnant) {
             nom_accompagnant: nomAccompagnant
         });
         toast(r.message, r.statut === 'inscrit' ? 'success' : 'info');
-        refreshProgramme();
+        await reloadInscriptionsAndRefresh();
     } catch(e) {
         toast(e.message, 'error');
     }
@@ -315,10 +334,26 @@ async function annulerInscription(creneau, jeu, nomAccompagnant) {
         if (nomAccompagnant) params.nom_accompagnant = nomAccompagnant;
         var r = await callAPIPost(params);
         toast(r.message, 'success');
-        refreshProgramme();
+        await reloadInscriptionsAndRefresh();
     } catch(e) {
         toast(e.message, 'error');
     }
+}
+
+/**
+ * Recharge les inscriptions publiques + perso puis rafraîchit le programme.
+ * Appelé après chaque inscription ou annulation.
+ */
+async function reloadInscriptionsAndRefresh() {
+    try {
+        var insData = await callAPI({ action: 'get_inscriptions' });
+        _allInscriptions = insData.inscriptions || [];
+        if (APP.currentUser) {
+            var mesData = await callAPI({ action: 'get_mes_inscriptions', email: APP.currentUser.email });
+            _mesInscriptions = mesData.inscriptions || [];
+        }
+    } catch(e) { /* silencieux */ }
+    refreshProgramme();
 }
 
 // ── Programme ───────────────────────────────────────────────────────────────
@@ -409,10 +444,41 @@ function renderProgramme(items) {
                 badgeCls = 'badge-dispo';
             }
 
-            // Bouton d'inscription ou de liste d'attente
-            var btn = fullWeb
-                ? '<button class="btn btn-small btn-gold" onclick="handleInscrire(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">Liste d\'attente</button>'
-                : '<button class="btn btn-small btn-green" onclick="handleInscrire(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">S\'inscrire</button>';
+            // Vérifier si l'utilisateur est inscrit à cette table
+            var monInscription = null;
+            if (APP.currentUser) {
+                monInscription = _mesInscriptions.find(function(mi) {
+                    return mi.creneau === item.creneau && mi.jeu === item.jeu
+                        && (!mi.nom_accompagnant || mi.nom_accompagnant.trim() === '');
+                });
+            }
+
+            // Bouton d'inscription adapté au statut
+            var btn;
+            if (monInscription) {
+                // Déjà inscrit → afficher statut + bouton annuler
+                var statutLabel = monInscription.statut === 'inscrit' ? '✅ Inscrit·e' : '⏳ En attente';
+                btn = '<span class="badge badge-inscrit">' + statutLabel + '</span>'
+                    + '<button class="btn btn-small btn-red" style="margin-top:6px" onclick="annulerInscription(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">Annuler</button>';
+            } else if (fullWeb) {
+                btn = '<button class="btn btn-small btn-gold" onclick="handleInscrire(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">Liste d\'attente</button>';
+            } else {
+                btn = '<button class="btn btn-small btn-green" onclick="handleInscrire(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">S\'inscrire</button>';
+            }
+
+            // Liste des inscrits à cette table (pseudos publics)
+            var inscritsTable = _allInscriptions.filter(function(i) {
+                return i.creneau === item.creneau && i.jeu === item.jeu && i.statut === 'inscrit';
+            });
+            var inscritsHtml = '';
+            if (inscritsTable.length > 0) {
+                var noms = inscritsTable.map(function(i) {
+                    var nom = escHtml(i.nom);
+                    if (i.type_inscrit === 'accompagnant') nom += ' <span style="font-size:12px;color:var(--text-muted)">(acc.)</span>';
+                    return nom;
+                });
+                inscritsHtml = '<div style="margin-top:8px;font-size:13px;color:var(--text-muted)">👥 ' + noms.join(', ') + '</div>';
+            }
 
             // Carte du jeu
             return '<div class="creneau">' +
@@ -423,6 +489,7 @@ function renderProgramme(items) {
                     '<div class="desc">' + (escHtml(item.description) || '') + '</div>' +
                     (item.content ? '<div class="content-warning">⚠️ ' + escHtml(item.content) + '</div>' : '') +
                     '<span class="badge ' + badgeCls + '">' + statusTxt + '</span>' +
+                    inscritsHtml +
                 '</div>' +
                 '<div class="creneau-actions">' + btn + '</div>' +
             '</div>';
