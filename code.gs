@@ -2011,11 +2011,14 @@ function getPostesBenevoles() {
   var creneaux = readSheet('creneaux_benevoles');
   var benevoles = readSheet('benevoles');
 
-  // Compter les inscrits par créneau
+  // Compter les inscrits et collecter les noms par créneau
   var counts = {};
+  var noms = {};
   benevoles.forEach(function(b) {
     if (b.statut === 'inscrit') {
       counts[b.creneau] = (counts[b.creneau] || 0) + 1;
+      if (!noms[b.creneau]) noms[b.creneau] = [];
+      noms[b.creneau].push(b.nom || '');
     }
   });
 
@@ -2025,6 +2028,7 @@ function getPostesBenevoles() {
     c.inscrits = inscrits;
     c.places_restantes = Math.max(0, maxPlaces - inscrits);
     c.complet = c.places_restantes <= 0;
+    c.noms_inscrits = noms[c.creneau] || [];
   });
 
   return { ok: true, creneaux: creneaux };

@@ -187,12 +187,19 @@ async function loadCreneauxBenevoles(cachedCreneaux) {
                 btn = '<button class="btn btn-small btn-green" onclick="inscrireBenevole(\'' + esc(c.creneau) + '\')">S\'inscrire</button>';
             }
 
+            // Liste des bénévoles inscrits sur ce créneau
+            var inscritsHtml = '';
+            if (c.noms_inscrits && c.noms_inscrits.length > 0) {
+                inscritsHtml = '<div style="margin-top:8px;font-size:13px;color:var(--text-muted)">👥 ' + c.noms_inscrits.map(function(n) { return escHtml(n); }).join(', ') + '</div>';
+            }
+
             return '<div class="creneau"' + (engagement ? ' style="opacity:0.6"' : '') + '>'
                 + '<div class="creneau-time">' + escHtml(c.creneau) + '</div>'
                 + '<div class="creneau-info">'
                 + '<h4>Bénévolat</h4>'
                 + (c.description ? '<div class="desc">' + escHtml(c.description) + '</div>' : '')
                 + '<span class="badge ' + badgeCls + '">' + statusTxt + '</span>'
+                + inscritsHtml
                 + '</div>'
                 + '<div class="creneau-actions">' + btn + '</div>'
                 + '</div>';
