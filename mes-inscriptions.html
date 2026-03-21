@@ -81,8 +81,9 @@
     </section>
 
     <!-- Bouton récap email (visible si connecté) -->
-    <div id="recapBtnSection" style="display:none;text-align:center;padding:20px 24px 0">
-        <button class="btn btn-outline" onclick="envoyerRecap()" id="recapBtn">Recevoir un récap par email</button>
+    <div id="recapBtnSection" style="display:none;text-align:center;padding:24px 24px 0">
+        <button class="btn btn-primary" onclick="envoyerRecap()" id="recapBtn">📧 Recevoir par email le détail de mes inscriptions</button>
+        <p style="color:var(--text-muted);font-size:13px;margin-top:8px">Un récap complet avec liens agenda sera envoyé à votre adresse email.</p>
     </div>
 
     <!-- ============================================================= -->
@@ -213,12 +214,12 @@ async function envoyerRecap() {
     btn.textContent = 'Envoi en cours...';
     try {
         var r = await callAPIPost({ action: 'send_recap', email: user.email });
-        toast(r.message, 'success');
+        toast('Récap envoyé ! Vérifiez votre boîte mail (' + user.email + ')', 'success');
     } catch(e) {
         toast(e.message || 'Erreur lors de l\'envoi', 'error');
     } finally {
         btn.disabled = false;
-        btn.textContent = 'Recevoir un récap par email';
+        btn.textContent = '📧 Recevoir par email le détail de mes inscriptions';
     }
 }
 window.envoyerRecap = envoyerRecap;
