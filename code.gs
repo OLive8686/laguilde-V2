@@ -247,7 +247,11 @@ function getMJTableOnCreneau(email, creneau) {
 /**
  * Récupère le rôle d'un utilisateur. Si l'utilisateur n'existe pas
  * dans l'onglet roles, crée une entrée avec le rôle "joueur".
- * Appelé à chaque connexion (action "get_role") pour informer le frontend.
+ *
+ * Le rôle MJ est DYNAMIQUE : un joueur qui a au moins une table validée
+ * dans le programme est automatiquement considéré comme MJ.
+ * Le rôle "admin" dans la Sheet est toujours prioritaire.
+ * Le rôle "mj" dans la Sheet est aussi prioritaire (attribution manuelle).
  *
  * @param {string} email - L'email de l'utilisateur
  * @param {string} nom   - Le pseudo (pour l'enregistrement initial)
@@ -264,15 +268,31 @@ function getOrCreateRole(email, nom) {
   var roleCol = headers.indexOf('role');
 
   // Chercher l'utilisateur existant
+  var sheetRole = null;
   for (var i = 1; i < data.length; i++) {
     if (data[i][emailCol] && data[i][emailCol].toString().toLowerCase().trim() === email) {
-      return (data[i][roleCol] || 'joueur').toString().trim();
+      sheetRole = (data[i][roleCol] || 'joueur').toString().trim();
+      break;
     }
   }
 
   // Utilisateur inconnu → créer avec le rôle "joueur"
-  sheet.appendRow([email, (nom || '').trim(), 'joueur', new Date().toISOString()]);
-  return 'joueur';
+  if (sheetRole === null) {
+    sheet.appendRow([email, (nom || '').trim(), 'joueur', new Date().toISOString()]);
+    sheetRole = 'joueur';
+  }
+
+  // Admin ou MJ manuel → prioritaire, on retourne directement
+  if (sheetRole === 'admin' || sheetRole === 'mj') return sheetRole;
+
+  // Rôle dynamique MJ : si le joueur a au moins une table validée → MJ
+  var programme = readSheet('programme');
+  var hasValidatedTable = programme.some(function(p) {
+    return (p.email_mj || '').toLowerCase().trim() === email
+      && p.statut_table === 'validé';
+  });
+
+  return hasValidatedTable ? 'mj' : 'joueur';
 }
 
 /**
@@ -1929,23 +1949,11 @@ function _changeStatutTable(params, newStatut) {
       sheet.getRange(i + 1, statutCol + 1).setValue(newStatut);
 
       // Envoyer un email de notification au MJ
+      // Le rôle MJ est calculé dynamiquement dans getOrCreateRole() :
+      // si l'utilisateur a au moins une table validée → rôle MJ automatique.
+      // Pas besoin de modifier l'onglet roles ici.
       if (newStatut === 'validé') {
         sendEmailTableValidee(emailMj, jeu, creneau);
-        // Auto-promotion : si le proposant est joueur, le passer en MJ
-        var currentRole = getOrCreateRole(emailMj, '');
-        if (currentRole === 'joueur') {
-          var rolesSheet = getSheet('roles');
-          var rolesData = rolesSheet.getDataRange().getValues();
-          var rolesHeaders = rolesData[0].map(function(h) { return h.toString().trim(); });
-          var rEmailCol = rolesHeaders.indexOf('email');
-          var rRoleCol = rolesHeaders.indexOf('role');
-          for (var r = 1; r < rolesData.length; r++) {
-            if (rolesData[r][rEmailCol] && rolesData[r][rEmailCol].toString().toLowerCase().trim() === emailMj) {
-              rolesSheet.getRange(r + 1, rRoleCol + 1).setValue('mj');
-              break;
-            }
-          }
-        }
       } else if (newStatut === 'refusé') {
         sendEmailTableRefusee(emailMj, jeu, creneau);
       }
