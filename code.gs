@@ -1155,6 +1155,7 @@ function inscrire(params) {
       ? nomAccompagnant + ' (accompagnant de ' + nom + ')'
       : nom;
     sendEmailConfirmation(email, nomEmail, jeu, creneau, statut);
+    scheduleRecap(email);
 
     // Calculer les places restantes après cette inscription
     var placesRestantes = Math.max(0, maxPlaces - inscritsCount - (statut === 'inscrit' ? 1 : 0));
@@ -1249,6 +1250,7 @@ function annuler(params) {
     // Email d'annulation au parent
     var nomAnnule = nomAccompagnant ? nomAccompagnant + ' (accompagnant)' : '';
     sendEmailAnnulation(email, nomAnnule, jeu, creneau);
+    scheduleRecap(email);
 
     // Si c'était un "inscrit" (pas en attente), promouvoir le premier en liste d'attente
     if (wasInscrit) {
@@ -2096,6 +2098,7 @@ function inscrireBenevole(params) {
     // Écrire l'inscription bénévole
     var sheet = getSheet('benevoles');
     sheet.appendRow([new Date().toISOString(), nom, email, creneau, 'inscrit']);
+    scheduleRecap(email);
 
     return { ok: true, message: 'Inscription bénévole confirmée pour ' + creneau + ' !' };
   });
@@ -2125,6 +2128,7 @@ function annulerBenevole(params) {
           && data[i][creneauCol].toString().trim() === creneau
           && data[i][statutCol] === 'inscrit') {
         sheet.getRange(i + 1, statutCol + 1).setValue('annulé');
+        scheduleRecap(email);
         return { ok: true, message: 'Inscription bénévole annulée pour ' + creneau + '.' };
       }
     }
@@ -2167,4 +2171,189 @@ function getPropositionsEnAttente(params) {
 function keepAlive() {
   // Lecture minimale pour garder le script chaud
   SpreadsheetApp.openById(getProp('SHEET_ID')).getSheetByName('config');
+}
+
+
+// ─── Email récap différé (debounce 10 min) ──────────────────────────────────
+// Après chaque modification (inscription, annulation, bénévolat), un trigger
+// est programmé pour envoyer un récap complet 10 min plus tard.
+// Si une nouvelle modification arrive avant, le timer est réinitialisé.
+// Le récap inclut : tables JDR, bénévolat, tables MJ + liens agenda.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Programme l'envoi d'un email récap dans 10 minutes.
+ * Si un trigger existe déjà pour cet email, il est annulé et recréé (debounce).
+ * L'email cible est stocké dans les Script Properties car le contexte
+ * est perdu entre l'appel actuel et l'exécution du trigger.
+ *
+ * @param {string} email - L'adresse email de l'utilisateur à récapituler
+ */
+function scheduleRecap(email) {
+  if (!email) return;
+  email = email.toLowerCase().trim();
+
+  var props = PropertiesService.getScriptProperties();
+
+  // Lire la liste des récaps en attente (JSON : { email: triggerId, ... })
+  var pending = {};
+  try { pending = JSON.parse(props.getProperty('RECAP_PENDING') || '{}'); } catch(e) { pending = {}; }
+
+  // Annuler le trigger précédent pour cet email (debounce)
+  if (pending[email]) {
+    try {
+      var triggers = ScriptApp.getProjectTriggers();
+      for (var i = 0; i < triggers.length; i++) {
+        if (triggers[i].getUniqueId() === pending[email]) {
+          ScriptApp.deleteTrigger(triggers[i]);
+          break;
+        }
+      }
+    } catch(e) { /* silencieux si le trigger n'existe plus */ }
+  }
+
+  // Créer un nouveau trigger dans 10 minutes
+  var trigger = ScriptApp.newTrigger('processRecapTrigger')
+    .timeBased()
+    .after(10 * 60 * 1000) // 10 minutes en millisecondes
+    .create();
+
+  // Sauvegarder l'association email → triggerId
+  pending[email] = trigger.getUniqueId();
+  props.setProperty('RECAP_PENDING', JSON.stringify(pending));
+
+  // Sauvegarder aussi l'email associé à ce trigger (pour le retrouver à l'exécution)
+  props.setProperty('RECAP_TRIGGER_' + trigger.getUniqueId(), email);
+}
+
+/**
+ * Fonction appelée par le trigger différé. Retrouve l'email associé
+ * au trigger et envoie le récap.
+ * @param {Object} e - L'événement trigger (contient triggerUid)
+ */
+function processRecapTrigger(e) {
+  var props = PropertiesService.getScriptProperties();
+  var triggerId = e.triggerUid;
+
+  // Retrouver l'email associé à ce trigger
+  var email = props.getProperty('RECAP_TRIGGER_' + triggerId);
+  if (!email) return;
+
+  // Nettoyer les properties
+  props.deleteProperty('RECAP_TRIGGER_' + triggerId);
+  var pending = {};
+  try { pending = JSON.parse(props.getProperty('RECAP_PENDING') || '{}'); } catch(err) { pending = {}; }
+  delete pending[email];
+  props.setProperty('RECAP_PENDING', JSON.stringify(pending));
+
+  // Supprimer le trigger lui-même
+  try {
+    var triggers = ScriptApp.getProjectTriggers();
+    for (var i = 0; i < triggers.length; i++) {
+      if (triggers[i].getUniqueId() === triggerId) {
+        ScriptApp.deleteTrigger(triggers[i]);
+        break;
+      }
+    }
+  } catch(err) { /* silencieux */ }
+
+  // Envoyer le récap
+  sendRecapEmail(email);
+}
+
+/**
+ * Envoie un email récapitulatif complet de toutes les inscriptions d'un utilisateur.
+ * Inclut : tables JDR (joueur + accompagnants), bénévolat, tables MJ.
+ * Chaque créneau a un lien Google Agenda + .ics.
+ *
+ * @param {string} email - L'adresse email de l'utilisateur
+ */
+function sendRecapEmail(email) {
+  if (!email || !email.includes('@')) return;
+
+  // 1. Tables JDR (joueur principal + accompagnants)
+  var inscriptions = readSheet('inscriptions').filter(function(i) {
+    return i.email.toLowerCase().trim() === email
+      && (i.statut === 'inscrit' || i.statut === 'attente');
+  });
+
+  // 2. Bénévolat
+  var benevoles = readSheet('benevoles').filter(function(b) {
+    return b.email.toLowerCase().trim() === email && b.statut === 'inscrit';
+  });
+
+  // 3. Tables MJ (validées ou en attente)
+  var programme = readSheet('programme');
+  var tablesMJ = programme.filter(function(p) {
+    return (p.email_mj || '').toLowerCase().trim() === email
+      && p.statut_table !== 'refusé';
+  });
+
+  // Si rien du tout, ne pas envoyer
+  if (inscriptions.length === 0 && benevoles.length === 0 && tablesMJ.length === 0) return;
+
+  // Construire le contenu du récap
+  var accent = cfg('email_accent', '#D4A843');
+  var success = cfg('email_success', '#4A8B5E');
+  var muted = cfg('email_muted', '#7A9999');
+  var textCol = cfg('email_text', '#FDF8F0');
+
+  var sections = '';
+
+  // --- Section MJ ---
+  if (tablesMJ.length > 0) {
+    sections += '<h3 style="color:' + accent + ';font-size:16px;margin:16px 0 8px">🎲 Mes tables MJ</h3>';
+    tablesMJ.forEach(function(t) {
+      var statut = t.statut_table === 'validé' ? '✅ Validée' : '⏳ En attente';
+      sections += '<p style="color:' + textCol + ';margin:0 0 4px">• <strong>' + t.jeu + '</strong> — ' + t.creneau + ' (' + statut + ')</p>';
+      if (t.statut_table === 'validé') {
+        sections += buildCalendarLinks(t.creneau, t.jeu + ' (MJ)', 'table');
+      }
+    });
+  }
+
+  // --- Section Joueur ---
+  var perso = inscriptions.filter(function(i) { return !i.nom_accompagnant || i.nom_accompagnant.trim() === ''; });
+  if (perso.length > 0) {
+    sections += '<h3 style="color:' + success + ';font-size:16px;margin:16px 0 8px">🧑 Mes tables joueur</h3>';
+    perso.forEach(function(i) {
+      var statut = i.statut === 'inscrit' ? '✅ Inscrit·e' : '⏳ En attente';
+      sections += '<p style="color:' + textCol + ';margin:0 0 4px">• <strong>' + i.jeu + '</strong> — ' + i.creneau + ' (' + statut + ')</p>';
+      if (i.statut === 'inscrit') {
+        sections += buildCalendarLinks(i.creneau, i.jeu, 'table');
+      }
+    });
+  }
+
+  // --- Section Accompagnants ---
+  var accs = inscriptions.filter(function(i) { return i.nom_accompagnant && i.nom_accompagnant.trim() !== ''; });
+  if (accs.length > 0) {
+    sections += '<h3 style="color:' + accent + ';font-size:16px;margin:16px 0 8px">👤 Accompagnants</h3>';
+    accs.forEach(function(i) {
+      var statut = i.statut === 'inscrit' ? '✅' : '⏳';
+      sections += '<p style="color:' + textCol + ';margin:0 0 4px">• ' + i.nom_accompagnant + ' → <strong>' + i.jeu + '</strong> — ' + i.creneau + ' ' + statut + '</p>';
+    });
+  }
+
+  // --- Section Bénévolat ---
+  if (benevoles.length > 0) {
+    sections += '<h3 style="color:#2B7FB5;font-size:16px;margin:16px 0 8px">🤝 Bénévolat</h3>';
+    benevoles.forEach(function(b) {
+      sections += '<p style="color:' + textCol + ';margin:0 0 4px">• <strong>' + b.creneau + '</strong></p>';
+      sections += buildCalendarLinks(b.creneau, 'Bénévolat', 'benevole');
+    });
+  }
+
+  // Envoyer l'email
+  var siteUrl = cfg('lien_inscription', '');
+  sendEmail(email, '📋 Récap de vos inscriptions — Sous l\'Œil de Mélusine', buildEmailHtml({
+    titreBloc: '📋 Récapitulatif de vos inscriptions',
+    couleurTitre: accent,
+    champs: [],
+    paragraphe: sections
+      + '<p style="color:' + muted + ';font-size:13px;margin-top:20px">Ce récap est envoyé automatiquement après chaque modification. '
+      + (siteUrl ? 'Gérez vos inscriptions sur <a href="' + siteUrl + '" style="color:' + accent + '">' + siteUrl + '</a>.' : '')
+      + '</p>',
+    pied: 'À bientôt à la convention ! 🐉'
+  }));
 }
