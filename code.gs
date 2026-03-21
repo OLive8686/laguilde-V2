@@ -569,13 +569,17 @@ function cfg(key, defaultValue) {
  * @returns {string} Le HTML complet de l'email
  */
 function buildEmailHtml(options) {
-  // Couleurs lues depuis la config, avec valeurs par défaut
-  var bg       = cfg('email_bg', '#0D2B2B');
-  var cardBg   = cfg('email_card_bg', '#22223A');
-  var accent   = cfg('email_accent', '#D4A843');
-  var textCol  = cfg('email_text', '#FDF8F0');
-  var muted    = cfg('email_muted', '#7A9999');
-  var light    = cfg('email_light', '#BCC8C8');
+  // Détecter le thème du site pour aligner les couleurs par défaut des emails
+  var theme = cfg('theme', 'dark').toLowerCase().trim();
+  var isClair = (theme === 'clair');
+
+  // Couleurs lues depuis la config, avec valeurs par défaut adaptées au thème
+  var bg       = cfg('email_bg',       isClair ? '#F5EFE5' : '#0D2B2B');
+  var cardBg   = cfg('email_card_bg',  isClair ? '#FFFFFF' : '#22223A');
+  var accent   = cfg('email_accent',   isClair ? '#D4A030' : '#D4A843');
+  var textCol  = cfg('email_text',     isClair ? '#1A2A3A' : '#FDF8F0');
+  var muted    = cfg('email_muted',    isClair ? '#6A8899' : '#7A9999');
+  var light    = cfg('email_light',    isClair ? '#4A6070' : '#BCC8C8');
 
   // Construction des lignes de champs (Pseudo, Table, Créneau...)
   var champsHtml = '';
@@ -2271,7 +2275,7 @@ function sendRecapEmail(email) {
 
   // --- Section Bénévolat ---
   if (benevoles.length > 0) {
-    sections += '<h3 style="color:#2B7FB5;font-size:16px;margin:16px 0 8px">🤝 Bénévolat</h3>';
+    sections += '<h3 style="color:' + cfg('email_accent', '#D4A843') + ';font-size:16px;margin:16px 0 8px">🤝 Bénévolat</h3>';
     benevoles.forEach(function(b) {
       sections += '<p style="color:' + textCol + ';margin:0 0 4px">• <strong>' + b.creneau + '</strong></p>';
       sections += buildCalendarLinks(b.creneau, 'Bénévolat', 'benevole');
