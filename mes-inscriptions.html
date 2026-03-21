@@ -80,6 +80,11 @@
         </div>
     </section>
 
+    <!-- Bouton récap email (visible si connecté) -->
+    <div id="recapBtnSection" style="display:none;text-align:center;padding:20px 24px 0">
+        <button class="btn btn-outline" onclick="envoyerRecap()" id="recapBtn">Recevoir un récap par email</button>
+    </div>
+
     <!-- ============================================================= -->
     <!-- SECTION 1 : Mes inscriptions JDR (tables en tant que joueur)  -->
     <!-- ============================================================= -->
@@ -197,6 +202,27 @@ window.onPageInit = async function() {
     updateDashboardView();
 };
 
+/**
+ * Envoie un récap par email à l'utilisateur connecté.
+ */
+async function envoyerRecap() {
+    var user = APP.currentUser;
+    if (!user) { toast('Connectez-vous d\'abord', 'error'); return; }
+    var btn = document.getElementById('recapBtn');
+    btn.disabled = true;
+    btn.textContent = 'Envoi en cours...';
+    try {
+        var r = await callAPIPost({ action: 'send_recap', email: user.email });
+        toast(r.message, 'success');
+    } catch(e) {
+        toast(e.message || 'Erreur lors de l\'envoi', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Recevoir un récap par email';
+    }
+}
+window.envoyerRecap = envoyerRecap;
+
 // ── Affichage conditionnel selon l'etat de connexion ────────────────────────
 
 /**
@@ -218,6 +244,7 @@ function updateDashboardView() {
     document.getElementById('sectionMesJdr').style.display = user ? 'block' : 'none';
     document.getElementById('sectionAccompagnants').style.display = user ? 'block' : 'none';
     document.getElementById('sectionBenevoles').style.display = user ? 'block' : 'none';
+    document.getElementById('recapBtnSection').style.display = user ? 'block' : 'none';
 
     // Section MJ — visible uniquement si role mj ou admin
     document.getElementById('sectionPropositionsMj').style.display =

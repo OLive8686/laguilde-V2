@@ -838,6 +838,10 @@ function doPost(e) {
       case 'annuler_benevole':
         return jsonResponse(annulerBenevole(data));
 
+      // --- Récap email (à la demande) ---
+      case 'send_recap':
+        return jsonResponse(sendRecapOnDemand(data));
+
       // --- MJ (propositions de tables) ---
       case 'proposer_table':
         return jsonResponse(proposerTable(data));
@@ -1155,7 +1159,6 @@ function inscrire(params) {
       ? nomAccompagnant + ' (accompagnant de ' + nom + ')'
       : nom;
     sendEmailConfirmation(email, nomEmail, jeu, creneau, statut);
-    scheduleRecap(email);
 
     // Calculer les places restantes après cette inscription
     var placesRestantes = Math.max(0, maxPlaces - inscritsCount - (statut === 'inscrit' ? 1 : 0));
@@ -1250,7 +1253,6 @@ function annuler(params) {
     // Email d'annulation au parent
     var nomAnnule = nomAccompagnant ? nomAccompagnant + ' (accompagnant)' : '';
     sendEmailAnnulation(email, nomAnnule, jeu, creneau);
-    scheduleRecap(email);
 
     // Si c'était un "inscrit" (pas en attente), promouvoir le premier en liste d'attente
     if (wasInscrit) {
@@ -2098,7 +2100,6 @@ function inscrireBenevole(params) {
     // Écrire l'inscription bénévole
     var sheet = getSheet('benevoles');
     sheet.appendRow([new Date().toISOString(), nom, email, creneau, 'inscrit']);
-    scheduleRecap(email);
 
     return { ok: true, message: 'Inscription bénévole confirmée pour ' + creneau + ' !' };
   });
@@ -2128,7 +2129,6 @@ function annulerBenevole(params) {
           && data[i][creneauCol].toString().trim() === creneau
           && data[i][statutCol] === 'inscrit') {
         sheet.getRange(i + 1, statutCol + 1).setValue('annulé');
-        scheduleRecap(email);
         return { ok: true, message: 'Inscription bénévole annulée pour ' + creneau + '.' };
       }
     }
@@ -2174,91 +2174,25 @@ function keepAlive() {
 }
 
 
-// ─── Email récap différé (debounce 10 min) ──────────────────────────────────
-// Après chaque modification (inscription, annulation, bénévolat), un trigger
-// est programmé pour envoyer un récap complet 10 min plus tard.
-// Si une nouvelle modification arrive avant, le timer est réinitialisé.
+// ─── Email récap ────────────────────────────────────────────────────────────
+// Deux modes :
+//   A. À la demande : l'utilisateur clique "Recevoir un récap" sur Mes inscriptions
+//   D. Pré-convention : trigger quotidien qui envoie un récap à J-7 et J-1
 // Le récap inclut : tables JDR, bénévolat, tables MJ + liens agenda.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Programme l'envoi d'un email récap dans 10 minutes.
- * Si un trigger existe déjà pour cet email, il est annulé et recréé (debounce).
- * L'email cible est stocké dans les Script Properties car le contexte
- * est perdu entre l'appel actuel et l'exécution du trigger.
- *
- * @param {string} email - L'adresse email de l'utilisateur à récapituler
+ * Endpoint POST : envoie un récap à la demande pour l'utilisateur connecté.
+ * Appelé depuis la page "Mes inscriptions" via callAPIPost.
+ * @param {Object} params - { email }
+ * @returns {Object} { ok, message } ou { error }
  */
-function scheduleRecap(email) {
-  if (!email) return;
-  email = email.toLowerCase().trim();
+function sendRecapOnDemand(params) {
+  var email = (params.email || '').toLowerCase().trim();
+  if (!email || !isValidEmail(email)) return { error: 'Email invalide' };
 
-  var props = PropertiesService.getScriptProperties();
-
-  // Lire la liste des récaps en attente (JSON : { email: triggerId, ... })
-  var pending = {};
-  try { pending = JSON.parse(props.getProperty('RECAP_PENDING') || '{}'); } catch(e) { pending = {}; }
-
-  // Annuler le trigger précédent pour cet email (debounce)
-  if (pending[email]) {
-    try {
-      var triggers = ScriptApp.getProjectTriggers();
-      for (var i = 0; i < triggers.length; i++) {
-        if (triggers[i].getUniqueId() === pending[email]) {
-          ScriptApp.deleteTrigger(triggers[i]);
-          break;
-        }
-      }
-    } catch(e) { /* silencieux si le trigger n'existe plus */ }
-  }
-
-  // Créer un nouveau trigger dans 10 minutes
-  var trigger = ScriptApp.newTrigger('processRecapTrigger')
-    .timeBased()
-    .after(10 * 60 * 1000) // 10 minutes en millisecondes
-    .create();
-
-  // Sauvegarder l'association email → triggerId
-  pending[email] = trigger.getUniqueId();
-  props.setProperty('RECAP_PENDING', JSON.stringify(pending));
-
-  // Sauvegarder aussi l'email associé à ce trigger (pour le retrouver à l'exécution)
-  props.setProperty('RECAP_TRIGGER_' + trigger.getUniqueId(), email);
-}
-
-/**
- * Fonction appelée par le trigger différé. Retrouve l'email associé
- * au trigger et envoie le récap.
- * @param {Object} e - L'événement trigger (contient triggerUid)
- */
-function processRecapTrigger(e) {
-  var props = PropertiesService.getScriptProperties();
-  var triggerId = e.triggerUid;
-
-  // Retrouver l'email associé à ce trigger
-  var email = props.getProperty('RECAP_TRIGGER_' + triggerId);
-  if (!email) return;
-
-  // Nettoyer les properties
-  props.deleteProperty('RECAP_TRIGGER_' + triggerId);
-  var pending = {};
-  try { pending = JSON.parse(props.getProperty('RECAP_PENDING') || '{}'); } catch(err) { pending = {}; }
-  delete pending[email];
-  props.setProperty('RECAP_PENDING', JSON.stringify(pending));
-
-  // Supprimer le trigger lui-même
-  try {
-    var triggers = ScriptApp.getProjectTriggers();
-    for (var i = 0; i < triggers.length; i++) {
-      if (triggers[i].getUniqueId() === triggerId) {
-        ScriptApp.deleteTrigger(triggers[i]);
-        break;
-      }
-    }
-  } catch(err) { /* silencieux */ }
-
-  // Envoyer le récap
   sendRecapEmail(email);
+  return { ok: true, message: 'Récap envoyé à ' + email + ' !' };
 }
 
 /**
@@ -2351,9 +2285,61 @@ function sendRecapEmail(email) {
     couleurTitre: accent,
     champs: [],
     paragraphe: sections
-      + '<p style="color:' + muted + ';font-size:13px;margin-top:20px">Ce récap est envoyé automatiquement après chaque modification. '
+      + '<p style="color:' + muted + ';font-size:13px;margin-top:20px">'
       + (siteUrl ? 'Gérez vos inscriptions sur <a href="' + siteUrl + '" style="color:' + accent + '">' + siteUrl + '</a>.' : '')
       + '</p>',
     pied: 'À bientôt à la convention ! 🐉'
   }));
+}
+
+/**
+ * Récap pré-convention : envoie un email récap à TOUS les inscrits à J-7 et J-1.
+ * À configurer comme trigger quotidien dans Apps Script :
+ *   Fonction : sendRecapPreConvention | Événement : Basé sur le temps | Tous les jours | 8h-9h
+ *
+ * Le script vérifie si aujourd'hui est J-7 ou J-1 par rapport à la date du samedi.
+ * Si oui, il envoie un récap à chaque email unique ayant au moins une inscription active.
+ */
+function sendRecapPreConvention() {
+  var dateSamedi = cfg('date_samedi', '2026-05-16');
+
+  // Calculer J-7 et J-1
+  var convention = new Date(dateSamedi + 'T00:00:00');
+  var today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  var diffDays = Math.round((convention - today) / (1000 * 60 * 60 * 24));
+
+  // Envoyer uniquement à J-7 ou J-1
+  if (diffDays !== 7 && diffDays !== 1) return;
+
+  // Collecter tous les emails uniques avec au moins une inscription active
+  var emails = {};
+
+  var inscriptions = readSheet('inscriptions');
+  inscriptions.forEach(function(i) {
+    if (i.statut === 'inscrit' || i.statut === 'attente') {
+      emails[i.email.toLowerCase().trim()] = true;
+    }
+  });
+
+  var benevoles = readSheet('benevoles');
+  benevoles.forEach(function(b) {
+    if (b.statut === 'inscrit') {
+      emails[b.email.toLowerCase().trim()] = true;
+    }
+  });
+
+  var programme = readSheet('programme');
+  programme.forEach(function(p) {
+    if (p.email_mj && p.statut_table !== 'refusé') {
+      emails[(p.email_mj || '').toLowerCase().trim()] = true;
+    }
+  });
+
+  // Envoyer un récap à chacun
+  var emailList = Object.keys(emails).filter(function(e) { return e && e.includes('@'); });
+  emailList.forEach(function(email) {
+    sendRecapEmail(email);
+  });
 }
