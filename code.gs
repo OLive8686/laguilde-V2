@@ -2333,11 +2333,13 @@ function sendRecapEmail(email) {
   // Si rien du tout, ne pas envoyer
   if (inscriptions.length === 0 && benevoles.length === 0 && tablesMJ.length === 0) return;
 
-  // Construire le contenu du récap
-  var accent = cfg('email_accent', '#D4A843');
+  // Construire le contenu du récap — couleurs adaptées au thème (comme buildEmailHtml)
+  var theme = cfg('theme', 'dark').toLowerCase().trim();
+  var isClair = (theme === 'clair');
+  var accent = cfg('email_accent', isClair ? '#D4A030' : '#D4A843');
   var success = cfg('email_success', '#4A8B5E');
-  var muted = cfg('email_muted', '#7A9999');
-  var textCol = cfg('email_text', '#FDF8F0');
+  var muted = cfg('email_muted', isClair ? '#6A8899' : '#7A9999');
+  var textCol = cfg('email_text', isClair ? '#1A2A3A' : '#FDF8F0');
 
   var sections = '';
 
