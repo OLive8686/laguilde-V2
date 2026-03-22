@@ -1195,10 +1195,13 @@ function doGet(e) {
         var restData = getFromCacheOrSheet('cache_restauration', function() { return readSheet('restauration'); });
         var animData = getFromCacheOrSheet('cache_animations', function() { return readSheet('animations'); });
 
-        // 2. Données dynamiques — lues UNE SEULE FOIS chacune
-        var allProgramme = readSheet('programme');
-        var allInscriptions = readSheet('inscriptions');
-        var allBenevoles = readSheet('benevoles');
+        // 2. Données dynamiques — cachées 30s côté serveur
+        // Acceptable car une inscription met rarement à jour en <30s.
+        // L'utilisateur qui vient de s'inscrire voit le résultat immédiat
+        // grâce au retour de l'action POST (pas via get_all_public).
+        var allProgramme = getFromCacheOrSheet('cache_programme', function() { return readSheet('programme'); }, 30);
+        var allInscriptions = getFromCacheOrSheet('cache_inscriptions', function() { return readSheet('inscriptions'); }, 30);
+        var allBenevoles = getFromCacheOrSheet('cache_benevoles', function() { return readSheet('benevoles'); }, 30);
 
         // 3. Calcul du programme avec places (réutilise allProgramme + allInscriptions)
         var programmePublic = allProgramme.filter(function(p) {

@@ -782,6 +782,14 @@ function prefetchAllPages() {
 
 document.addEventListener('DOMContentLoaded', initApp);
 
+// ── Service Worker ──────────────────────────────────────────────────────────
+// Enregistre le SW pour cacher les pages et assets du site.
+// Le SW intercepte les requêtes et sert depuis le cache local → navigation
+// quasi-instantanée entre les pages, même hors ligne.
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(function() {});
+}
+
 // ── Exports window ──────────────────────────────────────────────────────────
 // Nécessaires pour les handlers onclick dans le HTML
 
