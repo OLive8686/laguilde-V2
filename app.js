@@ -748,6 +748,36 @@ async function initApp() {
     initCommonUI();
     // Appeler l'init spécifique de la page si définie
     if (window.onPageInit) await window.onPageInit();
+
+    // Précharger toutes les pages du site en arrière-plan (fire and forget).
+    // Met les HTML + CSS + JS en cache navigateur pour une navigation quasi-instantanée.
+    // Exécuté après le rendu de la page courante pour ne pas ralentir le premier affichage.
+    prefetchAllPages();
+}
+
+/**
+ * Précharge toutes les pages et ressources du site en arrière-plan.
+ * Utilise fetch() avec priorité basse pour ne pas impacter le chargement en cours.
+ * Les fichiers sont mis en cache HTTP du navigateur → les navigations suivantes
+ * chargeront depuis le cache local au lieu de faire un aller-retour réseau.
+ */
+function prefetchAllPages() {
+    // Attendre 1 seconde après le rendu pour ne pas concurrencer le contenu visible
+    setTimeout(function() {
+        var pages = ['index.html', 'programme.html', 'infos.html', 'benevoles.html', 'mes-inscriptions.html', 'espace-mj.html', 'aide.html', 'styles.css', 'app.js?v=2'];
+        var current = location.pathname.split('/').pop() || 'index.html';
+        pages.forEach(function(page) {
+            // Ne pas re-fetcher la page actuelle
+            if (page === current) return;
+            try {
+                // Utiliser <link rel="prefetch"> si supporté (priorité basse native)
+                var link = document.createElement('link');
+                link.rel = 'prefetch';
+                link.href = page;
+                document.head.appendChild(link);
+            } catch(e) { /* silencieux */ }
+        });
+    }, 1500);
 }
 
 document.addEventListener('DOMContentLoaded', initApp);

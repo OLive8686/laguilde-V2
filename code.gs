@@ -752,8 +752,20 @@ function getAllRoles(params) {
  * @param {string} tabName - Le nom de l'onglet à ouvrir
  * @returns {GoogleAppsScript.Spreadsheet.Sheet} L'objet Sheet
  */
+// Cache de l'objet Spreadsheet — ouvert UNE SEULE FOIS par requête HTTP.
+// Chaque appel à SpreadsheetApp.openById() coûte ~100-200ms.
+// En cachant l'objet, on économise ~1-2s sur get_all_public (qui lit ~10 onglets).
+var _ssCache = null;
+
+function getSpreadsheet() {
+  if (!_ssCache) {
+    _ssCache = SpreadsheetApp.openById(getProp('SHEET_ID'));
+  }
+  return _ssCache;
+}
+
 function getSheet(tabName) {
-  var ss = SpreadsheetApp.openById(getProp('SHEET_ID'));
+  var ss = getSpreadsheet();
   var sheet = ss.getSheetByName(tabName);
 
   if (!sheet) {
@@ -1170,33 +1182,86 @@ function doGet(e) {
       // Si un email est fourni, inclut aussi les données privées de l'utilisateur.
       // Réduit le nombre d'appels API de 5 à 1 par page.
       case 'get_all_public':
+        // ── OPTIMISATION : chaque onglet est lu UNE SEULE FOIS ──
+        // Avant : readSheet('inscriptions') x2, readSheet('programme') x2, etc.
+        // Après : chaque readSheet() est appelé 1 fois, les données sont réutilisées.
+
+        // 1. Données statiques (cachées côté serveur, 5 min TTL)
+        var cfgData = getFromCacheOrSheet('cache_config', function() {
+          var r = readSheet('config'); var c = {};
+          r.forEach(function(row) { if (row.cle) c[row.cle.trim()] = (row.valeur || '').trim(); });
+          return c;
+        });
+        var restData = getFromCacheOrSheet('cache_restauration', function() { return readSheet('restauration'); });
+        var animData = getFromCacheOrSheet('cache_animations', function() { return readSheet('animations'); });
+
+        // 2. Données dynamiques — lues UNE SEULE FOIS chacune
+        var allProgramme = readSheet('programme');
+        var allInscriptions = readSheet('inscriptions');
+        var allBenevoles = readSheet('benevoles');
+
+        // 3. Calcul du programme avec places (réutilise allProgramme + allInscriptions)
+        var programmePublic = allProgramme.filter(function(p) {
+          return !p.statut_table || p.statut_table === 'validé';
+        });
+        var inscCounts = {};
+        allInscriptions.forEach(function(ins) {
+          if (ins.statut === 'inscrit') {
+            var key = ins.creneau + '|||' + ins.jeu;
+            inscCounts[key] = (inscCounts[key] || 0) + 1;
+          }
+        });
+        programmePublic.forEach(function(p) {
+          var key = p.creneau + '|||' + p.jeu;
+          var maxPlaces = parseInt(p.places) || 0;
+          var placesWeb = p.places_web ? parseInt(p.places_web) : maxPlaces;
+          var inscrits = inscCounts[key] || 0;
+          p.places_restantes = Math.max(0, maxPlaces - inscrits);
+          p.places_web_restantes = Math.max(0, placesWeb - inscrits);
+          p.inscrits = inscrits;
+          p.complet_web = p.places_web_restantes <= 0;
+          p.complet = p.places_restantes <= 0;
+          p.has_quota = (p.places_web && parseInt(p.places_web) < maxPlaces);
+        });
+
+        // 4. Créneaux bénévoles (réutilise allBenevoles)
+        var creneauxBen = readSheet('creneaux_benevoles');
+        var benCounts = {};
+        var benNoms = {};
+        allBenevoles.forEach(function(b) {
+          if (b.statut === 'inscrit') {
+            benCounts[b.creneau] = (benCounts[b.creneau] || 0) + 1;
+            if (!benNoms[b.creneau]) benNoms[b.creneau] = [];
+            benNoms[b.creneau].push(b.nom || '');
+          }
+        });
+        creneauxBen.forEach(function(c) {
+          var maxP = parseInt(c.places) || 0;
+          var ins = benCounts[c.creneau] || 0;
+          c.inscrits = ins;
+          c.places_restantes = Math.max(0, maxP - ins);
+          c.complet = c.places_restantes <= 0;
+          c.noms_inscrits = benNoms[c.creneau] || [];
+        });
+
+        // 5. Inscriptions publiques (réutilise allInscriptions)
+        var inscPubliques = allInscriptions
+          .filter(function(i) { return i.statut === 'inscrit' || i.statut === 'attente'; })
+          .map(function(i) { return { nom: i.nom, creneau: i.creneau, jeu: i.jeu, statut: i.statut, type_inscrit: i.type_inscrit || 'principal', nom_accompagnant: i.nom_accompagnant || '' }; });
+
         var result = {
           ok: true,
-          // Données statiques : cachées côté serveur (CacheService, 5 min TTL)
-          // Réduit le temps de lecture de ~200ms/onglet à ~5ms si en cache
-          config: getFromCacheOrSheet('cache_config', function() {
-            var r = readSheet('config'); var c = {};
-            r.forEach(function(row) { if (row.cle) c[row.cle.trim()] = (row.valeur || '').trim(); });
-            return c;
-          }),
-          restauration: getFromCacheOrSheet('cache_restauration', function() { return readSheet('restauration'); }),
-          animations: getFromCacheOrSheet('cache_animations', function() { return readSheet('animations'); }),
-          // Données dynamiques : PAS cachées (changent à chaque inscription)
-          programme: getProgrammeAvecPlaces().programme,
-          creneaux_benevoles: (function() { return getPostesBenevoles().creneaux; })(),
-          // Inscriptions publiques (pseudos par table — pas d'emails)
-          inscriptions_publiques: (function() {
-            var ins = readSheet('inscriptions');
-            return ins.filter(function(i) { return i.statut === 'inscrit' || i.statut === 'attente'; })
-              .map(function(i) { return { nom: i.nom, creneau: i.creneau, jeu: i.jeu, statut: i.statut, type_inscrit: i.type_inscrit || 'principal', nom_accompagnant: i.nom_accompagnant || '' }; });
-          })()
+          config: cfgData,
+          restauration: restData,
+          animations: animData,
+          programme: programmePublic,
+          creneaux_benevoles: creneauxBen,
+          inscriptions_publiques: inscPubliques
         };
 
-        // Si un email est fourni → ajouter les données privées de l'utilisateur
-        // (inscriptions, accompagnants, bénévolat, propositions MJ, rôle)
+        // 6. Données privées utilisateur (réutilise les mêmes tableaux)
         var userEmail = (e.parameter.email || '').toLowerCase().trim();
         if (userEmail && isValidEmail(userEmail)) {
-          var allInscriptions = readSheet('inscriptions');
           result.mes_inscriptions = allInscriptions.filter(function(i) {
             return i.email.toLowerCase().trim() === userEmail
               && (i.statut === 'inscrit' || i.statut === 'attente');
@@ -1211,14 +1276,12 @@ function doGet(e) {
             return { nom_accompagnant: a.nom_accompagnant, date_ajout: a.date_ajout };
           });
 
-          var allBenevoles = readSheet('benevoles');
           result.mes_benevoles = allBenevoles.filter(function(b) {
             return b.email.toLowerCase().trim() === userEmail && b.statut === 'inscrit';
           }).map(function(b) {
             return { creneau: b.creneau, nom: b.nom, type_inscrit: b.type_inscrit || 'principal', nom_accompagnant: b.nom_accompagnant || '' };
           });
 
-          var allProgramme = readSheet('programme');
           result.mes_propositions = allProgramme.filter(function(p) {
             return (p.email_mj || '').toLowerCase().trim() === userEmail;
           }).map(function(p) {
@@ -2753,7 +2816,7 @@ function getPropositionsEnAttente(params) {
  */
 function keepAlive() {
   // Lecture minimale pour garder le script chaud
-  SpreadsheetApp.openById(getProp('SHEET_ID')).getSheetByName('config');
+  getSpreadsheet().getSheetByName('config');
 }
 
 
