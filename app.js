@@ -18,7 +18,9 @@
 // 📌 CONFIGURATION
 // =============================================================================
 const SHEET_ID = '1x_XBv6Y6nih-SevBIE6KRGmg9eDoSGyNpi9VwFHcHjM';
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby01lYf4lSk5Du1Bx1eJp1W5vXyhH-sFL_DbtY5PPBSYA5veBJiLQnNbFvubxN8TIZq/exec';
+// Proxy Cloudflare Worker → cache les réponses GAS au niveau mondial (~50ms au lieu de ~7s)
+// L'URL GAS originale est configurée dans le Worker (worker.js)
+const SCRIPT_URL = 'https://melusineapi.olivier-gramain.workers.dev';
 const GOOGLE_CLIENT_ID = '274189183408-qgjihd7cg6k6tbb4gomeq44gbarih723.apps.googleusercontent.com';
 const DISCORD_CLIENT_ID = '1477424032532922530';
 // =============================================================================

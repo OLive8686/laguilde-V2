@@ -16,12 +16,12 @@
 //   Changer CACHE_VERSION force la recréation du cache.
 // =============================================================================
 
-var CACHE_VERSION = 'melusine-v5';
+var CACHE_VERSION = 'melusine-v6';
 
 // Ressources à pré-cacher (uniquement CSS/JS, pas les HTML)
 var STATIC_ASSETS = [
   'styles.css',
-  'app.js?v=3'
+  'app.js?v=4'
 ];
 
 // ── Installation : pré-cacher CSS/JS ────────────────────────────────────────
