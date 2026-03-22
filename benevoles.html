@@ -94,6 +94,16 @@
     </div>
 </nav>
 
+<!-- MODAL CHOIX ACCOMPAGNANT BENEVOLE -->
+<div class="modal-overlay" id="choixBenevoleModal">
+    <div class="modal">
+        <button class="modal-close" onclick="closeChoixBenevoleModal()">✕</button>
+        <h3>Pour qui ?</h3>
+        <p id="choixBenevoleCreneau" style="font-size:15px;color:var(--text-muted);text-align:center;margin-bottom:20px"></p>
+        <div id="choixBenevoleOptions" class="auth-options"></div>
+    </div>
+</div>
+
 <!-- CONTENU -->
 <div style="padding-top:90px">
 
@@ -245,17 +255,72 @@ async function loadMesBenevoles() {
             return;
         }
         grid.innerHTML = r.benevoles.map(function(b) {
+            var label = b.nom_accompagnant
+                ? 'Bénévole — ' + escHtml(b.creneau) + ' <span style="color:var(--text-muted);font-size:13px">(' + escHtml(b.nom_accompagnant) + ')</span>'
+                : 'Bénévole — ' + escHtml(b.creneau);
+            var annulerArgs = b.nom_accompagnant
+                ? '\'' + esc(b.creneau) + '\',\'' + esc(b.nom_accompagnant) + '\''
+                : '\'' + esc(b.creneau) + '\'';
             return '<div class="mes-inscriptions">'
-                + '<div class="mi-info"><h4>Bénévole — ' + escHtml(b.creneau) + '</h4></div>'
-                + '<button class="btn btn-small btn-red" onclick="annulerBenevole(\'' + esc(b.creneau) + '\')">Annuler</button>'
+                + '<div class="mi-info"><h4>' + label + '</h4></div>'
+                + '<button class="btn btn-small btn-red" onclick="annulerBenevole(' + annulerArgs + ')">Annuler</button>'
                 + '</div>';
         }).join('');
     } catch(e) { console.warn('Erreur chargement bénévoles:', e); }
 }
 
+// ── Modal "Pour qui ?" ──────────────────────────────────────────────────────
+
+/**
+ * Affiche la modal de choix : s'inscrire soi-même ou un accompagnant comme bénévole.
+ * @param {string} creneau - Le créneau bénévole
+ */
+function showChoixBenevoleModal(creneau) {
+    document.getElementById('choixBenevoleCreneau').textContent = 'Créneau : ' + creneau;
+
+    // Bouton pour s'inscrire soi-même
+    var options = '<button class="auth-btn" onclick="doInscrireBenevole(\'' + esc(creneau) + '\'); closeChoixBenevoleModal()">'
+        + '<span class="auth-btn-icon">🧑</span>'
+        + '<div><div class="auth-btn-text">' + escHtml(APP.currentUser.nom) + ' (moi)</div><div class="auth-btn-sub">Inscription personnelle</div></div>'
+        + '</button>';
+
+    // Un bouton par accompagnant
+    APP.accompagnants.forEach(function(a) {
+        options += '<button class="auth-btn" onclick="doInscrireBenevoleAccompagnant(\'' + esc(creneau) + '\',\'' + esc(a.nom_accompagnant) + '\'); closeChoixBenevoleModal()">'
+            + '<span class="auth-btn-icon">👤</span>'
+            + '<div><div class="auth-btn-text">' + escHtml(a.nom_accompagnant) + '</div><div class="auth-btn-sub">Accompagnant</div></div>'
+            + '</button>';
+    });
+
+    document.getElementById('choixBenevoleOptions').innerHTML = options;
+    document.getElementById('choixBenevoleModal').classList.add('active');
+}
+
+function closeChoixBenevoleModal() {
+    document.getElementById('choixBenevoleModal').classList.remove('active');
+}
+
 // ── Actions ─────────────────────────────────────────────────────────────────
 
-async function inscrireBenevole(creneau) {
+/**
+ * Gère le clic sur "S'inscrire" d'un créneau bénévole.
+ * Si l'utilisateur a des accompagnants → ouvre le modal "Pour qui ?".
+ * Sinon → inscrit directement.
+ */
+function inscrireBenevole(creneau) {
+    var user = APP.currentUser;
+    if (!user) { openAuthModal(); return; }
+    if (APP.accompagnants && APP.accompagnants.length > 0) {
+        showChoixBenevoleModal(creneau);
+    } else {
+        doInscrireBenevole(creneau);
+    }
+}
+
+/**
+ * Inscrit le joueur principal comme bénévole.
+ */
+async function doInscrireBenevole(creneau) {
     var user = APP.currentUser;
     if (!user) { openAuthModal(); return; }
     try {
@@ -271,15 +336,41 @@ async function inscrireBenevole(creneau) {
     } catch(e) { toast(e.message, 'error'); }
 }
 
-async function annulerBenevole(creneau) {
+/**
+ * Inscrit un accompagnant comme bénévole.
+ */
+async function doInscrireBenevoleAccompagnant(creneau, nomAccompagnant) {
+    var user = APP.currentUser;
+    if (!user) { openAuthModal(); return; }
+    try {
+        var r = await callAPIPost({
+            action: 'inscrire_benevole',
+            nom: user.nom,
+            email: user.email,
+            creneau: creneau,
+            type_inscrit: 'accompagnant',
+            nom_accompagnant: nomAccompagnant
+        });
+        toast(r.message, 'success');
+        loadCreneauxBenevoles();
+        loadMesBenevoles();
+    } catch(e) { toast(e.message, 'error'); }
+}
+
+/**
+ * Annule une inscription bénévole (principal ou accompagnant).
+ */
+async function annulerBenevole(creneau, nomAccompagnant) {
     var user = APP.currentUser;
     if (!user) return;
     try {
-        var r = await callAPIPost({
+        var params = {
             action: 'annuler_benevole',
             email: user.email,
             creneau: creneau
-        });
+        };
+        if (nomAccompagnant) params.nom_accompagnant = nomAccompagnant;
+        var r = await callAPIPost(params);
         toast(r.message, 'success');
         loadCreneauxBenevoles();
         loadMesBenevoles();
@@ -288,7 +379,11 @@ async function annulerBenevole(creneau) {
 
 // ── Exports ─────────────────────────────────────────────────────────────────
 window.inscrireBenevole = inscrireBenevole;
+window.doInscrireBenevole = doInscrireBenevole;
+window.doInscrireBenevoleAccompagnant = doInscrireBenevoleAccompagnant;
 window.annulerBenevole = annulerBenevole;
+window.showChoixBenevoleModal = showChoixBenevoleModal;
+window.closeChoixBenevoleModal = closeChoixBenevoleModal;
 
 })();
 </script>

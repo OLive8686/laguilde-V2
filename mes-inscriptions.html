@@ -499,9 +499,15 @@ async function loadMesBenevoles() {
         }
 
         grid.innerHTML = r.benevoles.map(function(b) {
+            var label = b.nom_accompagnant
+                ? 'B&eacute;n&eacute;vole &mdash; ' + escHtml(b.creneau) + ' <span style="color:var(--text-muted);font-size:13px">(' + escHtml(b.nom_accompagnant) + ')</span>'
+                : 'B&eacute;n&eacute;vole &mdash; ' + escHtml(b.creneau);
+            var annulerArgs = b.nom_accompagnant
+                ? '\'' + esc(b.creneau) + '\',\'' + esc(b.nom_accompagnant) + '\''
+                : '\'' + esc(b.creneau) + '\'';
             return '<div class="mes-inscriptions">'
-                + '<div class="mi-info"><h4>B&eacute;n&eacute;vole &mdash; ' + escHtml(b.creneau) + '</h4></div>'
-                + '<button class="btn btn-small btn-red" onclick="annulerBenevole(\'' + esc(b.creneau) + '\')">Annuler</button>'
+                + '<div class="mi-info"><h4>' + label + '</h4></div>'
+                + '<button class="btn btn-small btn-red" onclick="annulerBenevole(' + annulerArgs + ')">Annuler</button>'
                 + '</div>';
         }).join('');
     } catch(e) {
@@ -511,18 +517,21 @@ async function loadMesBenevoles() {
 }
 
 /**
- * Annule une inscription benevole.
+ * Annule une inscription benevole (principal ou accompagnant).
  * @param {string} creneau - Le creneau benevole a annuler
+ * @param {string} nomAccompagnant - Nom de l'accompagnant (optionnel)
  */
-async function annulerBenevole(creneau) {
+async function annulerBenevole(creneau, nomAccompagnant) {
     var user = APP.currentUser;
     if (!user) return;
     try {
-        var r = await callAPIPost({
+        var params = {
             action: 'annuler_benevole',
             email: user.email,
             creneau: creneau
-        });
+        };
+        if (nomAccompagnant) params.nom_accompagnant = nomAccompagnant;
+        var r = await callAPIPost(params);
         toast(r.message, 'success');
         loadMesBenevoles();
     } catch(e) { toast(e.message, 'error'); }

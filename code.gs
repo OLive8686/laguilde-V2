@@ -780,8 +780,8 @@ function getSheet(tabName) {
     }
 
     if (tabName === 'benevoles') {
-      sheet.appendRow(['timestamp', 'nom', 'email', 'creneau', 'statut']);
-      sheet.getRange(1, 1, 1, 5).setFontWeight('bold');
+      sheet.appendRow(['timestamp', 'nom', 'email', 'creneau', 'statut', 'type_inscrit', 'nom_accompagnant']);
+      sheet.getRange(1, 1, 1, 7).setFontWeight('bold');
     }
 
     if (tabName === 'creneaux_benevoles') {
@@ -821,6 +821,21 @@ function getSheet(tabName) {
         sheet.getRange(1, nextCol).setValue(col);
         sheet.getRange(1, nextCol).setFontWeight('bold');
         roleHeaders.push(col); // pour les itérations suivantes
+      }
+    });
+  }
+
+  // Migration : ajoute les colonnes accompagnants à l'onglet benevoles
+  // (type_inscrit, nom_accompagnant) pour permettre l'inscription des accompagnants.
+  if (tabName === 'benevoles' && sheet.getLastColumn() > 0) {
+    var benHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var newBenCols = ['type_inscrit', 'nom_accompagnant'];
+    newBenCols.forEach(function(col) {
+      if (benHeaders.indexOf(col) === -1) {
+        var nextCol = sheet.getLastColumn() + 1;
+        sheet.getRange(1, nextCol).setValue(col);
+        sheet.getRange(1, nextCol).setFontWeight('bold');
+        benHeaders.push(col);
       }
     });
   }
@@ -1200,7 +1215,7 @@ function doGet(e) {
           result.mes_benevoles = allBenevoles.filter(function(b) {
             return b.email.toLowerCase().trim() === userEmail && b.statut === 'inscrit';
           }).map(function(b) {
-            return { creneau: b.creneau, nom: b.nom };
+            return { creneau: b.creneau, nom: b.nom, type_inscrit: b.type_inscrit || 'principal', nom_accompagnant: b.nom_accompagnant || '' };
           });
 
           var allProgramme = readSheet('programme');
@@ -1942,6 +1957,24 @@ function removeAccompagnant(params) {
     }
   }
 
+  // 2b. Annuler aussi les inscriptions bénévoles de cet accompagnant
+  var sheetBen = getSheet('benevoles');
+  var dataBen = sheetBen.getDataRange().getValues();
+  var headersBen = dataBen[0].map(function(h) { return h.toString().trim(); });
+  var benEmailCol = headersBen.indexOf('email');
+  var benStatutCol = headersBen.indexOf('statut');
+  var benNomAccCol = headersBen.indexOf('nom_accompagnant');
+
+  for (var k = 1; k < dataBen.length; k++) {
+    if (dataBen[k][benEmailCol].toString().toLowerCase().trim() === email
+        && benNomAccCol >= 0
+        && (dataBen[k][benNomAccCol] || '').toString().trim().toLowerCase() === nomAccompagnant.toLowerCase()
+        && dataBen[k][benStatutCol] === 'inscrit') {
+      sheetBen.getRange(k + 1, benStatutCol + 1).setValue('annulé');
+      annulees++;
+    }
+  }
+
   // 3. Promouvoir les premiers en attente pour chaque table libérée
   promotionsNeeded.forEach(function(p) {
     promouvoirPremierEnAttente(p.creneau, p.jeu);
@@ -2519,26 +2552,34 @@ function getMesBenevoles(params) {
   var miens = benevoles.filter(function(b) {
     return b.email.toLowerCase().trim() === email && b.statut === 'inscrit';
   }).map(function(b) {
-    return { creneau: b.creneau, nom: b.nom };
+    return {
+      creneau: b.creneau,
+      nom: b.nom,
+      type_inscrit: b.type_inscrit || 'principal',
+      nom_accompagnant: b.nom_accompagnant || ''
+    };
   });
 
   return { ok: true, benevoles: miens };
 }
 
 /**
- * Inscrit un utilisateur comme bénévole sur un créneau.
+ * Inscrit un utilisateur ou un accompagnant comme bénévole sur un créneau.
  * Vérifications :
  *   1. Créneau existant et places disponibles
- *   2. Pas déjà bénévole sur ce créneau
+ *   2. Pas déjà bénévole sur ce créneau (même personne)
  *   3. Pas inscrit à une table JDR sur le même créneau (anti-chevauchement)
+ *   4. Si accompagnant : vérifie qu'il existe dans l'onglet accompagnants
  *
- * @param {Object} params - { nom, email, creneau }
+ * @param {Object} params - { nom, email, creneau, type_inscrit (optionnel), nom_accompagnant (optionnel) }
  * @returns {Object} { ok, message } ou { error }
  */
 function inscrireBenevole(params) {
   var nom = (params.nom || '').trim();
   var email = (params.email || '').toLowerCase().trim();
   var creneau = (params.creneau || '').trim();
+  var typeInscrit = (params.type_inscrit || 'principal').trim();
+  var nomAccompagnant = (params.nom_accompagnant || '').trim();
 
   if (!nom) return { error: 'Le nom est requis' };
   if (!email) return { error: "L'email est requis" };
@@ -2546,6 +2587,17 @@ function inscrireBenevole(params) {
   if (!creneau) return { error: 'Créneau requis' };
 
   return withLock(function() {
+    // Si accompagnant, vérifier qu'il existe dans la liste du parent
+    if (typeInscrit === 'accompagnant') {
+      if (!nomAccompagnant) return { error: 'Nom de l\'accompagnant requis' };
+      var accompagnants = readSheet('accompagnants');
+      var estValide = accompagnants.some(function(a) {
+        return a.email_parent.toLowerCase().trim() === email
+          && a.nom_accompagnant.trim().toLowerCase() === nomAccompagnant.toLowerCase();
+      });
+      if (!estValide) return { error: 'Accompagnant non trouvé. Ajoutez-le d\'abord.' };
+    }
+
     // Vérifier que le créneau existe
     var creneauxDispo = readSheet('creneaux_benevoles');
     var creneauInfo = creneauxDispo.find(function(c) { return c.creneau.trim() === creneau; });
@@ -2553,13 +2605,25 @@ function inscrireBenevole(params) {
 
     var benevoles = readSheet('benevoles');
 
+    // Helper : matcher la même "personne" (principal ou accompagnant précis)
+    var personneMatch = function(b) {
+      if (typeInscrit === 'accompagnant') {
+        return b.email.toLowerCase().trim() === email
+          && (b.nom_accompagnant || '').trim().toLowerCase() === nomAccompagnant.toLowerCase();
+      } else {
+        return b.email.toLowerCase().trim() === email
+          && (!b.nom_accompagnant || b.nom_accompagnant.trim() === '');
+      }
+    };
+
     // Anti-doublon : déjà bénévole sur ce créneau ?
     var dejaBenevole = benevoles.some(function(b) {
-      return b.email.toLowerCase().trim() === email
-        && b.creneau.trim() === creneau
-        && b.statut === 'inscrit';
+      return personneMatch(b) && b.creneau.trim() === creneau && b.statut === 'inscrit';
     });
-    if (dejaBenevole) return { error: 'Vous êtes déjà bénévole sur ce créneau.' };
+    if (dejaBenevole) {
+      var qui = typeInscrit === 'accompagnant' ? nomAccompagnant + ' est' : 'Vous êtes';
+      return { error: qui + ' déjà bénévole sur ce créneau.' };
+    }
 
     // Places disponibles ?
     var maxPlaces = parseInt(creneauInfo.places) || 0;
@@ -2568,57 +2632,87 @@ function inscrireBenevole(params) {
     }).length;
     if (inscritsCount >= maxPlaces) return { error: 'Ce créneau bénévole est complet.' };
 
-    // Anti-chevauchement : pas inscrit à une table JDR sur le même créneau ?
+    // Anti-chevauchement JDR : pas inscrit à une table JDR sur le même créneau
     var inscriptions = readSheet('inscriptions');
     var inscritJDR = inscriptions.some(function(i) {
-      return i.email.toLowerCase().trim() === email
-        && i.creneau.trim() === creneau
-        && (i.statut === 'inscrit' || i.statut === 'attente')
-        && (!i.nom_accompagnant || i.nom_accompagnant.trim() === '');
+      if (typeInscrit === 'accompagnant') {
+        return i.email.toLowerCase().trim() === email
+          && (i.nom_accompagnant || '').trim().toLowerCase() === nomAccompagnant.toLowerCase()
+          && i.creneau.trim() === creneau
+          && (i.statut === 'inscrit' || i.statut === 'attente');
+      } else {
+        return i.email.toLowerCase().trim() === email
+          && i.creneau.trim() === creneau
+          && (i.statut === 'inscrit' || i.statut === 'attente')
+          && (!i.nom_accompagnant || i.nom_accompagnant.trim() === '');
+      }
     });
     if (inscritJDR) {
-      return { error: 'Vous êtes déjà inscrit·e à une table JDR sur ce créneau. Annulez d\'abord votre inscription.' };
+      var qui2 = typeInscrit === 'accompagnant' ? nomAccompagnant + ' est' : 'Vous êtes';
+      return { error: qui2 + ' déjà inscrit·e à une table JDR sur ce créneau. Annulez d\'abord.' };
     }
 
-    // Anti-chevauchement MJ : pas MJ d'une table sur le même créneau
-    var mjTable = getMJTableOnCreneau(email, creneau);
-    if (mjTable) {
-      return { error: 'Vous êtes MJ sur ce créneau (' + mjTable + '). Vous ne pouvez pas être bénévole en même temps.' };
+    // Anti-chevauchement MJ : seulement pour le principal (les accompagnants ne sont pas MJ)
+    if (typeInscrit !== 'accompagnant') {
+      var mjTable = getMJTableOnCreneau(email, creneau);
+      if (mjTable) {
+        return { error: 'Vous êtes MJ sur ce créneau (' + mjTable + '). Vous ne pouvez pas être bénévole en même temps.' };
+      }
     }
 
-    // Écrire l'inscription bénévole
+    // Nom affiché : l'accompagnant si c'en est un, sinon le joueur
+    var nomAffiche = typeInscrit === 'accompagnant' ? nomAccompagnant : nom;
+
+    // Écrire l'inscription bénévole (7 colonnes)
     var sheet = getSheet('benevoles');
-    sheet.appendRow([new Date().toISOString(), nom, email, creneau, 'inscrit']);
+    sheet.appendRow([new Date().toISOString(), nomAffiche, email, creneau, 'inscrit', typeInscrit, nomAccompagnant]);
 
-    return { ok: true, message: 'Inscription bénévole confirmée pour ' + creneau + ' !' };
+    var msgNom = typeInscrit === 'accompagnant' ? nomAccompagnant : 'Vous';
+    return { ok: true, message: msgNom + ' — inscription bénévole confirmée pour ' + creneau + ' !' };
   });
 }
 
 /**
- * Annule une inscription bénévole.
- * @param {Object} params - { email, creneau }
+ * Annule une inscription bénévole (principal ou accompagnant).
+ * @param {Object} params - { email, creneau, nom_accompagnant (optionnel) }
  * @returns {Object} { ok, message } ou { error }
  */
 function annulerBenevole(params) {
   var email = (params.email || '').toLowerCase().trim();
   var creneau = (params.creneau || '').trim();
+  var nomAccompagnant = (params.nom_accompagnant || '').trim();
 
   if (!email || !creneau) return { error: 'Paramètres manquants' };
 
   return withLock(function() {
     var sheet = getSheet('benevoles');
     var data = sheet.getDataRange().getValues();
-    var headers = data[0];
+    var headers = data[0].map(function(h) { return h.toString().trim(); });
     var emailCol = headers.indexOf('email');
     var creneauCol = headers.indexOf('creneau');
     var statutCol = headers.indexOf('statut');
+    var nomAccCol = headers.indexOf('nom_accompagnant');
 
     for (var i = 1; i < data.length; i++) {
-      if (data[i][emailCol].toString().toLowerCase().trim() === email
-          && data[i][creneauCol].toString().trim() === creneau
-          && data[i][statutCol] === 'inscrit') {
+      var rowEmail = data[i][emailCol].toString().toLowerCase().trim();
+      var rowCreneau = data[i][creneauCol].toString().trim();
+      var rowStatut = (data[i][statutCol] || '').toString();
+      var rowNomAcc = nomAccCol >= 0 ? (data[i][nomAccCol] || '').toString().trim() : '';
+
+      // Matcher la bonne personne
+      var personneMatch;
+      if (nomAccompagnant) {
+        personneMatch = (rowNomAcc.toLowerCase() === nomAccompagnant.toLowerCase());
+      } else {
+        personneMatch = (rowNomAcc === '');
+      }
+
+      if (rowEmail === email && rowCreneau === creneau && personneMatch && rowStatut === 'inscrit') {
         sheet.getRange(i + 1, statutCol + 1).setValue('annulé');
-        return { ok: true, message: 'Inscription bénévole annulée pour ' + creneau + '.' };
+        var msg = nomAccompagnant
+          ? 'Inscription bénévole de ' + nomAccompagnant + ' annulée pour ' + creneau + '.'
+          : 'Inscription bénévole annulée pour ' + creneau + '.';
+        return { ok: true, message: msg };
       }
     }
 
@@ -2761,11 +2855,22 @@ function sendRecapEmail(email) {
   }
 
   // --- Section Bénévolat ---
-  if (benevoles.length > 0) {
+  // Séparer les bénévolats personnels et ceux des accompagnants
+  var benPerso = benevoles.filter(function(b) { return !b.nom_accompagnant || b.nom_accompagnant.trim() === ''; });
+  var benAcc = benevoles.filter(function(b) { return b.nom_accompagnant && b.nom_accompagnant.trim() !== ''; });
+
+  if (benPerso.length > 0) {
     sections += '<h3 style="color:' + cfg('email_accent', '#D4A843') + ';font-size:16px;margin:16px 0 8px">🤝 Bénévolat</h3>';
-    benevoles.forEach(function(b) {
+    benPerso.forEach(function(b) {
       sections += '<p style="color:' + textCol + ';margin:0 0 4px">• <strong>' + b.creneau + '</strong></p>';
       sections += buildCalendarLinks(b.creneau, 'Bénévolat', 'benevole');
+    });
+  }
+
+  if (benAcc.length > 0) {
+    sections += '<h3 style="color:' + accent + ';font-size:16px;margin:16px 0 8px">🤝 Bénévolat accompagnants</h3>';
+    benAcc.forEach(function(b) {
+      sections += '<p style="color:' + textCol + ';margin:0 0 4px">• ' + b.nom_accompagnant + ' → <strong>' + b.creneau + '</strong></p>';
     });
   }
 
