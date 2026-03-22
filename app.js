@@ -119,21 +119,36 @@ async function _fetchSheetFresh(tab) {
  * Utilise le cache stale-while-revalidate (5 min).
  * @returns {Object} Données publiques + privées si connecté
  */
+// Promesse en cours pour dédupliquer les appels simultanés à fetchAllPublic().
+// Si loadTheme() et onPageInit() appellent tous les deux fetchAllPublic(),
+// un seul appel réseau est fait — le second attend le résultat du premier.
+var _fetchAllPublicInFlight = null;
+
 async function fetchAllPublic() {
     var cached = cacheGet('all_public');
 
     if (cached && (Date.now() - cached.ts < CACHE_TTL)) {
-        // Refresh en arrière-plan (fire and forget)
+        // Refresh en arrière-plan (fire and forget) — sans dédupliquer
         _fetchAllPublicFresh().then(function(data) { if (data) cacheSet('all_public', data); });
         return cached.data;
     }
 
-    var fresh = await _fetchAllPublicFresh();
-    if (fresh) {
-        cacheSet('all_public', fresh);
-        return fresh;
-    }
-    return cached ? cached.data : null;
+    // Dédupliquer : si un appel est déjà en cours, réutiliser sa promesse
+    if (_fetchAllPublicInFlight) return _fetchAllPublicInFlight;
+
+    _fetchAllPublicInFlight = _fetchAllPublicFresh().then(function(fresh) {
+        _fetchAllPublicInFlight = null;
+        if (fresh) {
+            cacheSet('all_public', fresh);
+            return fresh;
+        }
+        return cached ? cached.data : null;
+    }).catch(function() {
+        _fetchAllPublicInFlight = null;
+        return cached ? cached.data : null;
+    });
+
+    return _fetchAllPublicInFlight;
 }
 
 async function _fetchAllPublicFresh() {
