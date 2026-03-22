@@ -391,6 +391,7 @@ async function annulerJdr(creneau, jeu, nomAccompagnant) {
         var r = await callAPIPost(params);
         toast(r.message, 'success');
         loadMesInscriptionsJdr();
+        loadAccompagnants(); // Rafra&icirc;chir aussi la section accompagnants
     } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -447,13 +448,19 @@ async function loadAccompagnants() {
 
                 var detailsHtml = '';
                 if (jdrAcc.length > 0 || benAcc.length > 0) {
-                    detailsHtml = '<div style="margin-top:8px;font-size:13px;color:var(--text-muted);line-height:1.8">';
+                    detailsHtml = '<div style="margin-top:8px;font-size:13px;color:var(--text-muted);line-height:2.2">';
                     jdrAcc.forEach(function(i) {
                         var badge = i.statut === 'inscrit' ? '<span class="badge badge-inscrit" style="font-size:11px">Inscrit</span>' : '<span class="badge badge-attente" style="font-size:11px">Attente</span>';
-                        detailsHtml += '<div>&#127922; ' + escHtml(i.jeu) + ' &mdash; ' + escHtml(i.creneau) + ' ' + badge + '</div>';
+                        detailsHtml += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
+                            + '<span>&#127922; ' + escHtml(i.jeu) + ' &mdash; ' + escHtml(i.creneau) + ' ' + badge + '</span>'
+                            + '<button class="btn btn-small btn-red" style="font-size:11px;padding:4px 10px" onclick="annulerJdr(\'' + esc(i.creneau) + '\',\'' + esc(i.jeu) + '\',\'' + esc(nom) + '\')">Annuler</button>'
+                            + '</div>';
                     });
                     benAcc.forEach(function(b) {
-                        detailsHtml += '<div>&#129309; B&eacute;n&eacute;vole &mdash; ' + escHtml(b.creneau) + '</div>';
+                        detailsHtml += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
+                            + '<span>&#129309; B&eacute;n&eacute;vole &mdash; ' + escHtml(b.creneau) + '</span>'
+                            + '<button class="btn btn-small btn-red" style="font-size:11px;padding:4px 10px" onclick="annulerBenevole(\'' + esc(b.creneau) + '\',\'' + esc(nom) + '\')">Annuler</button>'
+                            + '</div>';
                     });
                     detailsHtml += '</div>';
                 } else {
@@ -575,6 +582,7 @@ async function annulerBenevole(creneau, nomAccompagnant) {
         var r = await callAPIPost(params);
         toast(r.message, 'success');
         loadMesBenevoles();
+        loadAccompagnants(); // Rafra&icirc;chir aussi la section accompagnants
     } catch(e) { toast(e.message, 'error'); }
 }
 
