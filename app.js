@@ -550,6 +550,18 @@ function initCommonUI() {
     var choixModal = document.getElementById('choixModal');
     if (choixModal) choixModal.addEventListener('click', e => { if (e.target===e.currentTarget) closeChoixModal(); });
 
+    // Hover intent : pré-chauffer GAS au survol des boutons d'inscription
+    // Envoie un ping léger pour que le script soit "chaud" quand l'utilisateur clique
+    var _pingDone = false;
+    document.addEventListener('mouseover', function(e) {
+        if (_pingDone) return;
+        var btn = e.target.closest('.btn-green, .btn-gold, .btn-primary');
+        if (btn && SCRIPT_URL) {
+            _pingDone = true;
+            fetch(SCRIPT_URL + '?action=ping').catch(function() {});
+        }
+    });
+
     // Scroll animations
     var obs = new IntersectionObserver(entries => {
         entries.forEach((e,i) => {

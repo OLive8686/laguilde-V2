@@ -96,6 +96,40 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+/**
+ * Cache côté serveur (CacheService) pour les données statiques.
+ * Évite de relire la Sheet à chaque requête pour les onglets qui changent peu
+ * (config, restauration, animations). TTL par défaut : 5 minutes.
+ * Les onglets dynamiques (inscriptions, benevoles) ne sont PAS cachés ici.
+ *
+ * @param {string} key - Clé unique pour le cache
+ * @param {Function} readFn - Fonction qui lit les données fraîches
+ * @param {number} ttl - Durée de vie en secondes (défaut: 300 = 5 min)
+ * @returns {*} Les données (depuis le cache ou fraîches)
+ */
+function getFromCacheOrSheet(key, readFn, ttl) {
+  if (ttl === undefined) ttl = 300;
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get(key);
+  if (cached) {
+    try { return JSON.parse(cached); } catch(e) { /* cache corrompu — relire */ }
+  }
+  var data = readFn();
+  try {
+    // CacheService a une limite de 100KB par clé — si les données sont trop grosses,
+    // on ne cache pas (silencieux, pas d'erreur)
+    var json = JSON.stringify(data);
+    if (json.length < 90000) cache.put(key, json, ttl);
+  } catch(e) { /* silencieux */ }
+  return data;
+}
+
+/**
+ * Ping minimal — utilisé par le hover intent côté frontend
+ * pour pré-chauffer le script GAS avant un clic.
+ */
+function ping() { return { ok: true }; }
+
 
 // ─── Liens agenda (Google Calendar + .ics) ──────────────────────────────────
 // Ajoutés dans les emails de confirmation pour permettre aux joueurs
@@ -756,10 +790,17 @@ function doGet(e) {
       case 'get_all_public':
         var result = {
           ok: true,
-          config: (function() { var r = readSheet('config'); var c = {}; r.forEach(function(row) { if (row.cle) c[row.cle.trim()] = (row.valeur || '').trim(); }); return c; })(),
+          // Données statiques : cachées côté serveur (CacheService, 5 min TTL)
+          // Réduit le temps de lecture de ~200ms/onglet à ~5ms si en cache
+          config: getFromCacheOrSheet('cache_config', function() {
+            var r = readSheet('config'); var c = {};
+            r.forEach(function(row) { if (row.cle) c[row.cle.trim()] = (row.valeur || '').trim(); });
+            return c;
+          }),
+          restauration: getFromCacheOrSheet('cache_restauration', function() { return readSheet('restauration'); }),
+          animations: getFromCacheOrSheet('cache_animations', function() { return readSheet('animations'); }),
+          // Données dynamiques : PAS cachées (changent à chaque inscription)
           programme: getProgrammeAvecPlaces().programme,
-          restauration: readSheet('restauration'),
-          animations: readSheet('animations'),
           creneaux_benevoles: (function() { return getPostesBenevoles().creneaux; })(),
           // Inscriptions publiques (pseudos par table — pas d'emails)
           inscriptions_publiques: (function() {
@@ -844,6 +885,10 @@ function doGet(e) {
 
       case 'discord_callback':
         return discordCallback(e);
+
+      // Ping léger pour pré-chauffer le script (hover intent)
+      case 'ping':
+        return jsonResponse(ping());
 
       default:
         return jsonResponse({ ok: true, message: 'API Mélusine active' });
