@@ -143,6 +143,9 @@
 (function() {
 'use strict';
 
+// Variable partagée : engagements du principal par créneau (pour le modal "Pour qui ?")
+var _engagements = {};
+
 // ── Callbacks app.js ────────────────────────────────────────────────────────
 window.onUserLogin = function() { updateBenevoleView(); };
 window.onUserLogout = function() { updateBenevoleView(); };
@@ -185,8 +188,10 @@ async function loadCreneauxBenevoles(allData) {
             return;
         }
 
-        // Engagements de l'utilisateur (déjà dans allData, 0 appels supplémentaires)
-        var engagements = {};
+        // Engagements de l'utilisateur principal (déjà dans allData, 0 appels supplémentaires)
+        // Stocké dans _engagements pour être accessible par le modal "Pour qui ?"
+        _engagements = {};
+        var engagements = _engagements;
         var user = APP.currentUser;
         if (user && allData) {
             // Inscriptions JDR
@@ -201,6 +206,12 @@ async function loadCreneauxBenevoles(allData) {
                     engagements[p.creneau] = 'MJ : ' + p.jeu;
                 }
             });
+            // Bénévolat déjà inscrit (principal uniquement)
+            (allData.mes_benevoles || []).forEach(function(b) {
+                if (!b.nom_accompagnant || b.nom_accompagnant.trim() === '') {
+                    engagements[b.creneau] = 'Bénévole';
+                }
+            });
         }
 
         grid.innerHTML = creneaux.map(function(c) {
@@ -211,13 +222,19 @@ async function loadCreneauxBenevoles(allData) {
             var statusTxt = full ? 'Complet (' + ins + '/' + max + ')' : rest + ' place' + (rest > 1 ? 's' : '') + ' sur ' + max;
             var badgeCls = full ? 'badge-complet' : 'badge-dispo';
 
-            // Vérifier si l'utilisateur est déjà engagé sur ce créneau
+            // Vérifier si l'utilisateur principal est déjà engagé sur ce créneau
             var engagement = engagements[c.creneau];
+            var hasAccompagnants = APP.accompagnants && APP.accompagnants.length > 0;
             var btn;
-            if (engagement) {
-                btn = '<span class="badge badge-attente" title="' + escHtml(engagement) + '">Déjà pris (' + escHtml(engagement) + ')</span>';
-            } else if (full) {
+            if (full) {
                 btn = '<span class="badge badge-complet">Complet</span>';
+            } else if (engagement && !hasAccompagnants) {
+                // Principal engagé et pas d'accompagnants → badge grisé
+                btn = '<span class="badge badge-attente" title="' + escHtml(engagement) + '">Déjà pris (' + escHtml(engagement) + ')</span>';
+            } else if (engagement && hasAccompagnants) {
+                // Principal engagé MAIS a des accompagnants → bouton pour inscrire un accompagnant
+                btn = '<span class="badge badge-attente" style="font-size:11px;margin-bottom:6px" title="' + escHtml(engagement) + '">Vous : ' + escHtml(engagement) + '</span>'
+                    + '<button class="btn btn-small btn-green" onclick="inscrireBenevole(\'' + esc(c.creneau) + '\')">Inscrire un accompagnant</button>';
             } else {
                 btn = '<button class="btn btn-small btn-green" onclick="inscrireBenevole(\'' + esc(c.creneau) + '\')">S\'inscrire</button>';
             }
@@ -228,7 +245,8 @@ async function loadCreneauxBenevoles(allData) {
                 inscritsHtml = '<div style="margin-top:8px;font-size:13px;color:var(--text-muted)">👥 ' + c.noms_inscrits.map(function(n) { return escHtml(n); }).join(', ') + '</div>';
             }
 
-            return '<div class="creneau"' + (engagement ? ' style="opacity:0.6"' : '') + '>'
+            var dimmed = engagement && !hasAccompagnants;
+            return '<div class="creneau"' + (dimmed ? ' style="opacity:0.6"' : '') + '>'
                 + '<div class="creneau-time">' + escHtml(c.creneau) + '</div>'
                 + '<div class="creneau-info">'
                 + '<h4>Bénévolat</h4>'
@@ -278,11 +296,21 @@ async function loadMesBenevoles() {
 function showChoixBenevoleModal(creneau) {
     document.getElementById('choixBenevoleCreneau').textContent = 'Créneau : ' + creneau;
 
-    // Bouton pour s'inscrire soi-même
-    var options = '<button class="auth-btn" onclick="doInscrireBenevole(\'' + esc(creneau) + '\'); closeChoixBenevoleModal()">'
-        + '<span class="auth-btn-icon">🧑</span>'
-        + '<div><div class="auth-btn-text">' + escHtml(APP.currentUser.nom) + ' (moi)</div><div class="auth-btn-sub">Inscription personnelle</div></div>'
-        + '</button>';
+    // Récupérer les engagements du principal sur ce créneau
+    // (MJ, joueur JDR, déjà bénévole)
+    var engagement = _engagements ? _engagements[creneau] : null;
+
+    var options = '';
+
+    // Bouton "moi" seulement si le principal n'est pas déjà engagé
+    if (!engagement) {
+        options += '<button class="auth-btn" onclick="doInscrireBenevole(\'' + esc(creneau) + '\'); closeChoixBenevoleModal()">'
+            + '<span class="auth-btn-icon">🧑</span>'
+            + '<div><div class="auth-btn-text">' + escHtml(APP.currentUser.nom) + ' (moi)</div><div class="auth-btn-sub">Inscription personnelle</div></div>'
+            + '</button>';
+    } else {
+        options += '<div style="text-align:center;color:var(--text-muted);font-size:13px;margin-bottom:12px">Vous : ' + escHtml(engagement) + '</div>';
+    }
 
     // Un bouton par accompagnant
     APP.accompagnants.forEach(function(a) {
