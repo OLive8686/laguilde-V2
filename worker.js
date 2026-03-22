@@ -40,18 +40,30 @@ const CACHE_TTL = {
 };
 
 // ── Headers CORS ──
-// Autorise les requêtes depuis GitHub Pages et localhost (dev)
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
+// Restreint aux origines autorisées (GitHub Pages du projet)
+// Sécurité : empêche un site tiers d'appeler l'API au nom d'un visiteur
+const ALLOWED_ORIGINS = [
+  'https://olive8686.github.io',
+  'http://localhost:8080',
+  'http://127.0.0.1:8080',
+];
+
+function getCorsHeaders(request) {
+  var origin = request.headers.get('Origin') || '';
+  var allowedOrigin = ALLOWED_ORIGINS.indexOf(origin) !== -1 ? origin : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Vary': 'Origin',
+  };
+}
 
 export default {
   async fetch(request, env, ctx) {
     // Gérer les requêtes preflight CORS (OPTIONS)
     if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: CORS_HEADERS });
+      return new Response(null, { status: 204, headers: getCorsHeaders(request) });
     }
 
     // ── POST : passe directement à GAS (pas de cache) ──
@@ -69,13 +81,13 @@ export default {
           status: 200,
           headers: {
             'Content-Type': 'application/json',
-            ...CORS_HEADERS,
+            ...getCorsHeaders(request),
           },
         });
       } catch (err) {
         return new Response(JSON.stringify({ error: 'Erreur proxy POST' }), {
           status: 500,
-          headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+          headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
         });
       }
     }
@@ -112,7 +124,7 @@ export default {
         headers: {
           'Content-Type': 'application/json',
           'X-Cache': 'HIT',
-          ...CORS_HEADERS,
+          ...getCorsHeaders(request),
         },
       });
     }
@@ -129,7 +141,7 @@ export default {
           'Content-Type': 'application/json',
           'Cache-Control': 's-maxage=' + ttl,
           'X-Cache': 'MISS',
-          ...CORS_HEADERS,
+          ...getCorsHeaders(request),
         },
       });
 
@@ -140,13 +152,14 @@ export default {
     } catch (err) {
       return new Response(JSON.stringify({ error: 'Erreur proxy GET' }), {
         status: 500,
-        headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+        headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
       });
     }
   },
 };
 
 // ── Proxy direct vers GAS (sans cache) ──
+// request est passé pour extraire l'Origin et générer les headers CORS
 async function proxyToGAS(url, request) {
   try {
     const gasUrl = new URL(GAS_URL);
@@ -159,13 +172,13 @@ async function proxyToGAS(url, request) {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        ...CORS_HEADERS,
+        ...getCorsHeaders(request),
       },
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: 'Erreur proxy' }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+      headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) },
     });
   }
 }

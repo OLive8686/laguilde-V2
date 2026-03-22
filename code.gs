@@ -476,6 +476,7 @@ function registerEmail(params) {
 
   // Validations
   if (!nom || nom.length < 2) return { error: 'Le pseudo doit contenir au moins 2 caractères.' };
+  if (nom.length > 50) return { error: 'Pseudo trop long (50 caractères max).' };
   if (!email || !isValidEmail(email)) return { error: 'Adresse email invalide.' };
   if (!password || password.length < 6) return { error: 'Le mot de passe doit contenir au moins 6 caractères.' };
   if (password.length > 100) return { error: 'Mot de passe trop long (100 caractères max).' };
@@ -695,15 +696,28 @@ function resetPassword(params) {
 
 
 /**
+ * Vérifie que l'appelant est admin (mot de passe + rôle dans la Sheet).
+ * Utilisé par tous les endpoints admin pour centraliser la vérification.
+ * @param {Object} params - Doit contenir { password, admin_email (optionnel) }
+ * @returns {string|null} Message d'erreur, ou null si OK
+ */
+function checkAdminAuth(params) {
+  var password = (params.password || '').trim();
+  if (password !== getProp('ADMIN_PASSWORD')) return 'Mot de passe incorrect';
+  // Si l'email admin est fourni, vérifier que c'est bien un admin dans la Sheet
+  var adminEmail = (params.admin_email || '').toLowerCase().trim();
+  if (adminEmail && !hasRole(adminEmail, 'admin')) return 'Accès réservé aux administrateurs';
+  return null;
+}
+
+/**
  * Change le rôle d'un utilisateur (admin uniquement).
  * @param {Object} params - { password, email, role }
  * @returns {Object} { ok, message } ou { error }
  */
 function setRole(params) {
-  var password = (params.password || '').trim();
-  if (password !== getProp('ADMIN_PASSWORD')) {
-    return { error: 'Mot de passe incorrect' };
-  }
+  var authError = checkAdminAuth(params);
+  if (authError) return { error: authError };
 
   var targetEmail = (params.email || '').toLowerCase().trim();
   var newRole = (params.role || '').trim().toLowerCase();
@@ -735,12 +749,20 @@ function setRole(params) {
  * @returns {Object} { ok, users: [...] }
  */
 function getAllRoles(params) {
-  var password = (params.password || '').trim();
-  if (password !== getProp('ADMIN_PASSWORD')) {
-    return { error: 'Mot de passe incorrect' };
-  }
+  var authError = checkAdminAuth(params);
+  if (authError) return { error: authError };
 
-  var users = readSheet('roles');
+  // Filtrer les colonnes sensibles (password_hash, reset_token, reset_expiry)
+  // pour ne pas exposer les données d'authentification à l'admin
+  var users = readSheet('roles').map(function(u) {
+    return {
+      email: u.email,
+      nom: u.nom,
+      role: u.role,
+      date_inscription: u.date_inscription,
+      auth_type: u.auth_type || ''
+    };
+  });
   return { ok: true, users: users };
 }
 
@@ -1280,7 +1302,7 @@ function doGet(e) {
             return { nom: i.nom, creneau: i.creneau, jeu: i.jeu, statut: i.statut, type_inscrit: i.type_inscrit || 'principal', nom_accompagnant: i.nom_accompagnant || '' };
           });
 
-          var allAcc = readSheet('accompagnants');
+          var allAcc = getFromCacheOrSheet('cache_accompagnants', function() { return readSheet('accompagnants'); }, 30);
           result.mes_accompagnants = allAcc.filter(function(a) {
             return a.email_parent.toLowerCase().trim() === userEmail;
           }).map(function(a) {
@@ -1340,10 +1362,7 @@ function doGet(e) {
       case 'check_email':
         return jsonResponse(checkEmail(e.parameter));
 
-      // --- Discord OAuth (lecture + redirect) ---
-      case 'discord_exchange':
-        return jsonResponse(discordExchange(e.parameter));
-
+      // --- Discord OAuth (redirect legacy uniquement) ---
       case 'discord_callback':
         return discordCallback(e);
 
@@ -1355,6 +1374,7 @@ function doGet(e) {
         return jsonResponse({ ok: true, message: 'API Mélusine active' });
     }
   } catch (err) {
+    console.log('doGet error: ' + (err.message || err) + ' | action=' + action);
     return jsonResponse({ error: 'Une erreur est survenue. Réessayez.' });
   }
 }
@@ -1384,6 +1404,10 @@ function doPost(e) {
         return jsonResponse(forgotPassword(data));
       case 'reset_password':
         return jsonResponse(resetPassword(data));
+
+      // --- Discord OAuth (POST — le code OAuth est sensible, ne pas passer en GET) ---
+      case 'discord_exchange':
+        return jsonResponse(discordExchange(data));
 
       // --- Inscription / Annulation (POST obligatoire — anti-CSRF) ---
       case 'inscrire':
@@ -1435,6 +1459,7 @@ function doPost(e) {
         return jsonResponse({ error: 'Action inconnue' });
     }
   } catch (err) {
+    console.log('doPost error: ' + (err.message || err) + ' | action=' + (data ? data.action : '?'));
     return jsonResponse({ error: 'Une erreur est survenue. Réessayez.' });
   }
 }
@@ -2144,10 +2169,8 @@ function discordCallback(e) {
  * @returns {Object} { ok, inscriptions, stats, total_inscrits, total_attente }
  */
 function getAdminData(params) {
-  var password = (params.password || '').trim();
-  if (password !== getProp('ADMIN_PASSWORD')) {
-    return { error: 'Mot de passe incorrect' };
-  }
+  var authError = checkAdminAuth(params);
+  if (authError) return { error: authError };
 
   // Lecture directe de la Sheet pour avoir les vrais numéros de ligne
   // (readSheet() ne retourne pas les index → impossible de cibler une ligne)
@@ -2211,10 +2234,8 @@ function getAdminData(params) {
  * @returns {Object} { ok, message } ou { error }
  */
 function adminPromouvoir(params) {
-  var password = (params.password || '').trim();
-  if (password !== getProp('ADMIN_PASSWORD')) {
-    return { error: 'Mot de passe incorrect' };
-  }
+  var authError = checkAdminAuth(params);
+  if (authError) return { error: authError };
 
   var rowIndex = parseInt(params.row) || 0;
   if (rowIndex < 2) return { error: 'Ligne invalide' };
@@ -2266,10 +2287,8 @@ function adminPromouvoir(params) {
  * @returns {Object} { ok, message } ou { error }
  */
 function adminSupprimer(params) {
-  var password = (params.password || '').trim();
-  if (password !== getProp('ADMIN_PASSWORD')) {
-    return { error: 'Mot de passe incorrect' };
-  }
+  var authError = checkAdminAuth(params);
+  if (authError) return { error: authError };
 
   var rowIndex = parseInt(params.row) || 0;
   if (rowIndex < 2) return { error: 'Ligne invalide' };
@@ -2453,10 +2472,8 @@ function getMesPropositions(params) {
  * @returns {Object} { ok, message } ou { error }
  */
 function adminValiderTable(params) {
-  var password = (params.password || '').trim();
-  if (password !== getProp('ADMIN_PASSWORD')) {
-    return { error: 'Mot de passe incorrect' };
-  }
+  var authError = checkAdminAuth(params);
+  if (authError) return { error: authError };
 
   return _changeStatutTable(params, 'validé');
 }
@@ -2468,10 +2485,8 @@ function adminValiderTable(params) {
  * @returns {Object} { ok, message } ou { error }
  */
 function adminRefuserTable(params) {
-  var password = (params.password || '').trim();
-  if (password !== getProp('ADMIN_PASSWORD')) {
-    return { error: 'Mot de passe incorrect' };
-  }
+  var authError = checkAdminAuth(params);
+  if (authError) return { error: authError };
 
   return _changeStatutTable(params, 'refusé');
 }
@@ -2800,10 +2815,8 @@ function annulerBenevole(params) {
  * L'admin peut voir toutes les propositions et les valider/refuser.
  */
 function getPropositionsEnAttente(params) {
-  var password = (params.password || '').trim();
-  if (password !== getProp('ADMIN_PASSWORD')) {
-    return { error: 'Mot de passe incorrect' };
-  }
+  var authError = checkAdminAuth(params);
+  if (authError) return { error: authError };
 
   var programme = readSheet('programme');
   var enAttente = programme.filter(function(p) {
@@ -2848,7 +2861,15 @@ function sendRecapOnDemand(params) {
   var email = (params.email || '').toLowerCase().trim();
   if (!email || !isValidEmail(email)) return { error: 'Email invalide' };
 
+  // Rate limiting : 1 récap par email par heure (anti-spam)
+  var cache = CacheService.getScriptCache();
+  var rateLimitKey = 'recap_sent_' + email;
+  if (cache.get(rateLimitKey)) {
+    return { error: 'Un récap a déjà été envoyé récemment. Réessayez dans 1 heure.' };
+  }
+
   sendRecapEmail(email);
+  cache.put(rateLimitKey, '1', 3600); // bloqué pendant 1 heure
   return { ok: true, message: 'Récap envoyé à ' + email + ' !' };
 }
 
@@ -3019,7 +3040,8 @@ function sendRecapPreConvention() {
 
 function clearCache() {
   CacheService.getScriptCache().removeAll([
-    'config', 'programme', 'restauration', 'animations'
+    'cache_config', 'cache_programme', 'cache_restauration', 'cache_animations',
+    'cache_inscriptions', 'cache_benevoles', 'cache_accompagnants'
   ]);
   Logger.log('Cache vidé avec succès');
 }
