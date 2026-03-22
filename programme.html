@@ -448,7 +448,22 @@ function renderProgramme(items) {
     var grid = document.getElementById('programmeGrid');
     var tabsEl = document.getElementById('programmeTabs');
 
-    // Extraire les créneaux uniques pour les onglets de filtre
+    // Fonction de tri chronologique des créneaux
+    // Ordre : Samedi < Dimanche, puis par heure de début
+    function creneauSortKey(creneau) {
+        var c = (creneau || '').toLowerCase();
+        var jour = c.indexOf('dimanche') !== -1 ? 1 : 0; // samedi=0, dimanche=1
+        var match = c.match(/(\d{1,2})h/);
+        var heure = match ? parseInt(match[1]) : 99;
+        return jour * 100 + heure;
+    }
+
+    // Trier les items par créneau chronologique
+    items.sort(function(a, b) {
+        return creneauSortKey(a.creneau) - creneauSortKey(b.creneau);
+    });
+
+    // Extraire les créneaux uniques pour les onglets de filtre (déjà dans l'ordre grâce au tri)
     var creneaux = [];
     var creneauxSet = {};
     items.forEach(function(i) {
