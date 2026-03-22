@@ -259,7 +259,7 @@ function showChoixModal(creneau, jeu) {
 
     // Bouton pour s'inscrire soi-même
     var options = `
-        <button class="auth-btn" onclick="doInscrire('${esc(creneau)}','${esc(jeu)}'); closeChoixModal()">
+        <button class="auth-btn" onclick="this.classList.add('btn-loading');doInscrire('${esc(creneau)}','${esc(jeu)}',this); closeChoixModal()">
             <span class="auth-btn-icon">🧑</span>
             <div><div class="auth-btn-text">${escHtml(APP.currentUser.nom)} (moi)</div><div class="auth-btn-sub">Inscription personnelle</div></div>
         </button>`;
@@ -292,10 +292,12 @@ function handleInscrire(creneau, jeu) {
         openAuthModal(creneau, jeu);
         return;
     }
+    // Capturer le bouton cliqué pour le feedback visuel
+    var clickedBtn = event && event.target ? event.target.closest('button') : null;
     if (APP.accompagnants && APP.accompagnants.length > 0) {
         showChoixModal(creneau, jeu);
     } else {
-        doInscrire(creneau, jeu);
+        doInscrire(creneau, jeu, clickedBtn);
     }
 }
 
@@ -305,11 +307,8 @@ function handleInscrire(creneau, jeu) {
  * @param {string} creneau - Le créneau horaire
  * @param {string} jeu - Le nom du jeu
  */
-async function doInscrire(creneau, jeu) {
+async function doInscrire(creneau, jeu, btn) {
     if (!APP.SCRIPT_URL) { toast('Backend non configuré', 'info'); return; }
-
-    // Feedback immédiat : animation pulse + spinner sur le bouton
-    var btn = event && event.target ? event.target.closest('button') : null;
     if (btn) {
         btn.classList.add('btn-click-pulse');
         setTimeout(function() {

@@ -338,21 +338,20 @@ function closeChoixBenevoleModal() {
 function inscrireBenevole(creneau) {
     var user = APP.currentUser;
     if (!user) { openAuthModal(); return; }
+    var clickedBtn = event && event.target ? event.target.closest('button') : null;
     if (APP.accompagnants && APP.accompagnants.length > 0) {
         showChoixBenevoleModal(creneau);
     } else {
-        doInscrireBenevole(creneau);
+        doInscrireBenevole(creneau, clickedBtn);
     }
 }
 
 /**
  * Inscrit le joueur principal comme bénévole.
  */
-async function doInscrireBenevole(creneau) {
+async function doInscrireBenevole(creneau, btn) {
     var user = APP.currentUser;
     if (!user) { openAuthModal(); return; }
-    // Feedback immédiat : pulse + spinner
-    var btn = event && event.target ? event.target.closest('button') : null;
     if (btn) {
         btn.classList.add('btn-click-pulse');
         setTimeout(function() { btn.disabled = true; btn.classList.add('btn-loading'); btn.dataset.originalText = btn.textContent; }, 200);
