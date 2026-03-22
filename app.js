@@ -152,6 +152,11 @@ async function _fetchAllPublicFresh() {
                 currentRole = result.role;
                 localStorage.setItem('melusine_role', currentRole);
             }
+            // Stocker les accompagnants si retournés (pour les modals "Pour qui ?")
+            if (result.mes_accompagnants) {
+                accompagnants = result.mes_accompagnants;
+                localStorage.setItem('melusine_accompagnants', JSON.stringify(accompagnants));
+            }
             return result;
         }
     } catch(e) { /* silencieux */ }
