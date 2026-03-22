@@ -106,22 +106,21 @@ window.onUserLogin = function() { updateBenevoleView(); };
 window.onUserLogout = function() { updateBenevoleView(); };
 
 window.onPageInit = async function() {
-    // Essayer de récupérer les créneaux bénévoles depuis le cache groupé
+    // UN SEUL appel API charge tout (créneaux + données utilisateur)
     var allData = await fetchAllPublic();
-    updateBenevoleView(allData ? allData.creneaux_benevoles : null);
+    updateBenevoleView(allData);
 };
 
 // ── Affichage conditionnel ──────────────────────────────────────────────────
 
-function updateBenevoleView(cachedCreneaux) {
+function updateBenevoleView(allData) {
     var user = APP.currentUser;
     document.getElementById('benevoleLoginPrompt').style.display = !user ? 'block' : 'none';
     document.getElementById('mesBenevoles').style.display = user ? 'block' : 'none';
-    // Les créneaux sont toujours visibles (même non connecté = consultation)
     document.getElementById('benevoleCreneaux').style.display = 'block';
 
-    // Charger les créneaux (depuis cache si dispo, sinon appel API)
-    loadCreneauxBenevoles(cachedCreneaux);
+    // Charger les créneaux + engagements depuis allData (0 appels supplémentaires)
+    loadCreneauxBenevoles(allData);
     if (user) {
         loadMesBenevoles();
     }
@@ -129,46 +128,40 @@ function updateBenevoleView(cachedCreneaux) {
 
 // ── Créneaux disponibles ────────────────────────────────────────────────────
 
-async function loadCreneauxBenevoles(cachedCreneaux) {
+async function loadCreneauxBenevoles(allData) {
     try {
-        // Utiliser les données en cache si fournies, sinon appel API
-        var r = cachedCreneaux
-            ? { creneaux: cachedCreneaux }
-            : await callAPI({ action: 'get_postes_benevoles' });
+        // Utiliser les données du endpoint groupé (0 appels supplémentaires)
+        var creneaux = (allData && allData.creneaux_benevoles) ? allData.creneaux_benevoles : null;
+        if (!creneaux) {
+            // Fallback si pas de données groupées
+            var r = await callAPI({ action: 'get_postes_benevoles' });
+            creneaux = r.creneaux;
+        }
         var grid = document.getElementById('benevoleGrid');
-        if (!r.creneaux || r.creneaux.length === 0) {
+        if (!creneaux || creneaux.length === 0) {
             grid.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:16px;padding:40px 0">Aucun créneau bénévole disponible pour le moment.</p>';
             return;
         }
 
-        // Charger les engagements de l'utilisateur connecté (joueur + MJ)
-        // pour griser les créneaux où il est déjà pris
-        var engagements = {}; // { creneau: 'raison' }
+        // Engagements de l'utilisateur (déjà dans allData, 0 appels supplémentaires)
+        var engagements = {};
         var user = APP.currentUser;
-        if (user) {
-            try {
-                // Inscriptions JDR
-                var mesIns = await callAPI({ action: 'get_mes_inscriptions', email: user.email });
-                if (mesIns.inscriptions) {
-                    mesIns.inscriptions.forEach(function(i) {
-                        if (!i.nom_accompagnant || i.nom_accompagnant.trim() === '') {
-                            engagements[i.creneau] = 'Joueur : ' + i.jeu;
-                        }
-                    });
+        if (user && allData) {
+            // Inscriptions JDR
+            (allData.mes_inscriptions || []).forEach(function(i) {
+                if (!i.nom_accompagnant || i.nom_accompagnant.trim() === '') {
+                    engagements[i.creneau] = 'Joueur : ' + i.jeu;
                 }
-                // Tables MJ
-                var mesProp = await callAPI({ action: 'get_mes_propositions', email: user.email });
-                if (mesProp.propositions) {
-                    mesProp.propositions.forEach(function(p) {
-                        if (p.statut_table !== 'refusé') {
-                            engagements[p.creneau] = 'MJ : ' + p.jeu;
-                        }
-                    });
+            });
+            // Tables MJ
+            (allData.mes_propositions || []).forEach(function(p) {
+                if (p.statut_table !== 'refusé') {
+                    engagements[p.creneau] = 'MJ : ' + p.jeu;
                 }
-            } catch(e) { /* silencieux — on affiche quand même les créneaux */ }
+            });
         }
 
-        grid.innerHTML = r.creneaux.map(function(c) {
+        grid.innerHTML = creneaux.map(function(c) {
             var rest = parseInt(c.places_restantes) || 0;
             var max = parseInt(c.places) || 0;
             var ins = parseInt(c.inscrits) || 0;

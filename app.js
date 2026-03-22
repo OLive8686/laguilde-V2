@@ -112,16 +112,18 @@ async function _fetchSheetFresh(tab) {
 }
 
 /**
- * Charge TOUTES les données publiques en un seul appel API.
- * Réduit le cold start de 4 requêtes à 1 seule.
- * Utilise le cache stale-while-revalidate.
- * @returns {Object} { config, programme, restauration, animations, creneaux_benevoles }
+ * Charge TOUTES les données en un seul appel API.
+ * Si l'utilisateur est connecté, inclut aussi ses données privées
+ * (inscriptions, accompagnants, bénévolat, propositions MJ, rôle).
+ * Réduit le nombre d'appels de 5 à 1 par page.
+ * Utilise le cache stale-while-revalidate (5 min).
+ * @returns {Object} Données publiques + privées si connecté
  */
 async function fetchAllPublic() {
     var cached = cacheGet('all_public');
 
     if (cached && (Date.now() - cached.ts < CACHE_TTL)) {
-        // Refresh en arrière-plan
+        // Refresh en arrière-plan (fire and forget)
         _fetchAllPublicFresh().then(function(data) { if (data) cacheSet('all_public', data); });
         return cached.data;
     }
@@ -137,8 +139,21 @@ async function fetchAllPublic() {
 async function _fetchAllPublicFresh() {
     if (!SCRIPT_URL) return null;
     try {
-        var result = await callAPI({ action: 'get_all_public' });
-        if (result.ok) return result;
+        // Si connecté, passer l'email pour récupérer les données utilisateur en même temps
+        var params = { action: 'get_all_public' };
+        if (currentUser && currentUser.email) {
+            params.email = currentUser.email;
+            params.nom = currentUser.nom || '';
+        }
+        var result = await callAPI(params);
+        if (result.ok) {
+            // Si le rôle est retourné, le stocker
+            if (result.role) {
+                currentRole = result.role;
+                localStorage.setItem('melusine_role', currentRole);
+            }
+            return result;
+        }
     } catch(e) { /* silencieux */ }
     return null;
 }
@@ -577,10 +592,10 @@ async function initApp() {
     checkAuthCallback();
     updateNavUser();
 
-    // Charger thème + rôle en parallèle (pas de dépendance entre eux)
-    var promises = [loadTheme()];
-    if (currentUser) promises.push(fetchRole());
-    await Promise.all(promises);
+    // Un seul appel API charge tout : thème + données publiques + données utilisateur + rôle.
+    // fetchAllPublic() passe l'email si connecté → le backend retourne le rôle en bonus.
+    // Plus besoin d'appeler fetchRole() séparément.
+    await loadTheme();
 
     updateNavForRole();
     initCommonUI();

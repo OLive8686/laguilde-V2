@@ -200,7 +200,9 @@ window.onUserLogout = function() {
  * Init de la page — appele par app.js au chargement (DOMContentLoaded).
  */
 window.onPageInit = async function() {
-    updateDashboardView();
+    // Pré-charger les données depuis le cache groupé (allData contient tout)
+    var allData = await fetchAllPublic();
+    updateDashboardView(allData);
 };
 
 /**

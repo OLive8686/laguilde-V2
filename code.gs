@@ -750,17 +750,62 @@ function doGet(e) {
 
       // --- Lectures publiques (GET uniquement) ---
 
-      // Endpoint groupé : retourne config + programme + restauration + animations
-      // en un seul appel. Divise le temps de chargement initial par 4.
+      // Endpoint groupé : retourne TOUTES les données en un seul appel.
+      // Si un email est fourni, inclut aussi les données privées de l'utilisateur.
+      // Réduit le nombre d'appels API de 5 à 1 par page.
       case 'get_all_public':
-        return jsonResponse({
+        var result = {
           ok: true,
           config: (function() { var r = readSheet('config'); var c = {}; r.forEach(function(row) { if (row.cle) c[row.cle.trim()] = (row.valeur || '').trim(); }); return c; })(),
           programme: getProgrammeAvecPlaces().programme,
           restauration: readSheet('restauration'),
           animations: readSheet('animations'),
-          creneaux_benevoles: (function() { return getPostesBenevoles().creneaux; })()
-        });
+          creneaux_benevoles: (function() { return getPostesBenevoles().creneaux; })(),
+          // Inscriptions publiques (pseudos par table — pas d'emails)
+          inscriptions_publiques: (function() {
+            var ins = readSheet('inscriptions');
+            return ins.filter(function(i) { return i.statut === 'inscrit' || i.statut === 'attente'; })
+              .map(function(i) { return { nom: i.nom, creneau: i.creneau, jeu: i.jeu, statut: i.statut, type_inscrit: i.type_inscrit || 'principal', nom_accompagnant: i.nom_accompagnant || '' }; });
+          })()
+        };
+
+        // Si un email est fourni → ajouter les données privées de l'utilisateur
+        // (inscriptions, accompagnants, bénévolat, propositions MJ, rôle)
+        var userEmail = (e.parameter.email || '').toLowerCase().trim();
+        if (userEmail && isValidEmail(userEmail)) {
+          var allInscriptions = readSheet('inscriptions');
+          result.mes_inscriptions = allInscriptions.filter(function(i) {
+            return i.email.toLowerCase().trim() === userEmail
+              && (i.statut === 'inscrit' || i.statut === 'attente');
+          }).map(function(i) {
+            return { nom: i.nom, creneau: i.creneau, jeu: i.jeu, statut: i.statut, type_inscrit: i.type_inscrit || 'principal', nom_accompagnant: i.nom_accompagnant || '' };
+          });
+
+          var allAcc = readSheet('accompagnants');
+          result.mes_accompagnants = allAcc.filter(function(a) {
+            return a.email_parent.toLowerCase().trim() === userEmail;
+          }).map(function(a) {
+            return { nom_accompagnant: a.nom_accompagnant, date_ajout: a.date_ajout };
+          });
+
+          var allBenevoles = readSheet('benevoles');
+          result.mes_benevoles = allBenevoles.filter(function(b) {
+            return b.email.toLowerCase().trim() === userEmail && b.statut === 'inscrit';
+          }).map(function(b) {
+            return { creneau: b.creneau, nom: b.nom };
+          });
+
+          var allProgramme = readSheet('programme');
+          result.mes_propositions = allProgramme.filter(function(p) {
+            return (p.email_mj || '').toLowerCase().trim() === userEmail;
+          }).map(function(p) {
+            return { jeu: p.jeu, mj: p.mj, systeme: p.systeme || '', description: p.description || '', creneau: p.creneau, places: p.places, statut_table: p.statut_table || 'validé' };
+          });
+
+          result.role = getOrCreateRole(userEmail, e.parameter.nom || '');
+        }
+
+        return jsonResponse(result);
 
       case 'get_programme':
         return jsonResponse(getProgrammeAvecPlaces());

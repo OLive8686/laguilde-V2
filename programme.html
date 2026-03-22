@@ -169,22 +169,20 @@ var _allInscriptions = []; // inscriptions publiques (pseudos par table)
 var _mesInscriptions = []; // inscriptions de l'utilisateur connecté
 
 window.onPageInit = async function() {
-    // Charger les données en parallèle
+    // UN SEUL appel API charge tout (public + utilisateur si connecté)
     var allData = await fetchAllPublic();
 
-    // Charger les inscriptions publiques (pseudos par table)
-    try {
-        var insData = await callAPI({ action: 'get_inscriptions' });
-        _allInscriptions = insData.inscriptions || [];
-    } catch(e) { _allInscriptions = []; }
+    // Inscriptions publiques (pseudos par table) — déjà dans allData
+    _allInscriptions = (allData && allData.inscriptions_publiques) ? allData.inscriptions_publiques : [];
 
-    // Charger les inscriptions de l'utilisateur connecté
-    if (APP.currentUser) {
-        try {
-            var mesData = await callAPI({ action: 'get_mes_inscriptions', email: APP.currentUser.email });
-            _mesInscriptions = mesData.inscriptions || [];
-        } catch(e) { _mesInscriptions = []; }
-        loadAccompagnants();
+    // Inscriptions de l'utilisateur connecté — déjà dans allData
+    if (APP.currentUser && allData) {
+        _mesInscriptions = allData.mes_inscriptions || [];
+        // Accompagnants déjà chargés dans allData
+        if (allData.mes_accompagnants) {
+            APP.accompagnants = allData.mes_accompagnants;
+            localStorage.setItem('melusine_accompagnants', JSON.stringify(allData.mes_accompagnants));
+        }
     }
 
     if (allData && allData.programme) {
