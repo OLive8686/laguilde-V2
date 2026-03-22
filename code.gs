@@ -1028,6 +1028,14 @@ function buildEmailHtml(options) {
     + '</div>'
     + (options.paragraphe ? '<p style="color:' + light + ';font-size:14px;line-height:1.6">' + options.paragraphe + '</p>' : '')
     + (options.pied ? '<p style="color:' + muted + ';font-size:12px;margin-top:24px">' + options.pied + '</p>' : '')
+    // Lien vers le site ajouté automatiquement dans tous les emails
+    + (function() {
+        var siteUrl = cfg('lien_inscription', '');
+        if (!siteUrl) return '';
+        return '<p style="color:' + muted + ';font-size:12px;margin-top:16px;text-align:center;border-top:1px solid ' + muted + '33;padding-top:16px">'
+          + '<a href="' + siteUrl + '" style="color:' + accent + ';text-decoration:none">' + siteUrl + '</a>'
+          + '</p>';
+      })()
     + '</div></div>';
 }
 
