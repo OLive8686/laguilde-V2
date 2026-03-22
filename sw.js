@@ -1,45 +1,35 @@
 // =============================================================================
 // SERVICE WORKER — Sous l'Œil de Mélusine
 // =============================================================================
-// Stratégie : "Stale-While-Revalidate" pour les pages et assets du site,
-// "Network-First" pour les appels API (données fraîches prioritaires).
+// Stratégie :
+//   - Pages HTML : Network-First (toujours fraîches, cache en fallback offline)
+//   - CSS/JS : Stale-While-Revalidate (rapide + mise à jour en arrière-plan)
+//   - API (script.google.com) : Network-First avec fallback cache
 //
-// FONCTIONNEMENT :
-//   1. À l'installation, met en cache toutes les pages et ressources statiques.
-//   2. Pour les requêtes vers le site : sert depuis le cache immédiatement,
-//      puis met à jour le cache en arrière-plan (navigation quasi-instantanée).
-//   3. Pour les requêtes API (script.google.com) : tente le réseau d'abord,
-//      fallback sur le cache si hors ligne (30s de TTL implicite).
+// POURQUOI Network-First pour les HTML ?
+// Les pages HTML contiennent les références versionnées (app.js?v=X).
+// Si on cache le HTML, une mise à jour de version ne sera visible qu'au 2e
+// chargement, ce qui cause des bugs (ancien + nouveau JS en parallèle).
+// Les HTML sont petits (~5KB) donc le coût réseau est négligeable.
 //
 // MISE À JOUR :
-//   Changer CACHE_VERSION force la recréation du cache au prochain chargement.
-//   Les anciennes versions sont supprimées automatiquement.
+//   Changer CACHE_VERSION force la recréation du cache.
 // =============================================================================
 
-var CACHE_VERSION = 'melusine-v4';
+var CACHE_VERSION = 'melusine-v5';
 
-// Ressources à mettre en cache dès l'installation
+// Ressources à pré-cacher (uniquement CSS/JS, pas les HTML)
 var STATIC_ASSETS = [
-  './',
-  'index.html',
-  'programme.html',
-  'infos.html',
-  'benevoles.html',
-  'mes-inscriptions.html',
-  'espace-mj.html',
-  'aide.html',
   'styles.css',
-  'app.js?v=3',
-  'admin.html'
+  'app.js?v=3'
 ];
 
-// ── Installation : pré-cacher toutes les ressources statiques ───────────────
+// ── Installation : pré-cacher CSS/JS ────────────────────────────────────────
 self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(CACHE_VERSION).then(function(cache) {
       return cache.addAll(STATIC_ASSETS);
     }).then(function() {
-      // Activer immédiatement sans attendre la fermeture des onglets
       return self.skipWaiting();
     })
   );
@@ -54,7 +44,6 @@ self.addEventListener('activate', function(event) {
             .map(function(key) { return caches.delete(key); })
       );
     }).then(function() {
-      // Prendre le contrôle de tous les onglets immédiatement
       return self.clients.claim();
     })
   );
@@ -64,42 +53,20 @@ self.addEventListener('activate', function(event) {
 self.addEventListener('fetch', function(event) {
   var url = new URL(event.request.url);
 
-  // Ignorer les requêtes non-GET (POST = écritures, ne pas cacher)
   if (event.request.method !== 'GET') return;
 
-  // Ignorer les requêtes vers d'autres domaines (Google Fonts, etc.)
-  // sauf script.google.com (API backend)
   var isAPI = url.hostname === 'script.google.com';
   var isSameSite = url.origin === self.location.origin;
 
   if (!isSameSite && !isAPI) return;
 
-  // ── Requêtes API : Network-First avec fallback cache ──
-  // On essaie le réseau d'abord (données fraîches), cache en backup si offline
-  if (isAPI) {
+  // ── Pages HTML : Network-First ──
+  // Toujours servir le HTML frais du réseau (contient les refs versionnées).
+  // Fallback cache uniquement si hors ligne.
+  var isHTML = isSameSite && (url.pathname.endsWith('.html') || url.pathname.endsWith('/'));
+  if (isHTML) {
     event.respondWith(
       fetch(event.request).then(function(response) {
-        // Cloner et cacher la réponse pour le mode offline
-        var clone = response.clone();
-        caches.open(CACHE_VERSION).then(function(cache) {
-          cache.put(event.request, clone);
-        });
-        return response;
-      }).catch(function() {
-        // Hors ligne → servir depuis le cache
-        return caches.match(event.request);
-      })
-    );
-    return;
-  }
-
-  // ── Ressources du site : Stale-While-Revalidate ──
-  // Sert depuis le cache immédiatement (rapide), puis met à jour en arrière-plan
-  event.respondWith(
-    caches.match(event.request).then(function(cached) {
-      // Lancer le fetch réseau en arrière-plan pour mettre à jour le cache
-      var fetchPromise = fetch(event.request).then(function(response) {
-        // Ne cacher que les réponses valides
         if (response && response.status === 200) {
           var clone = response.clone();
           caches.open(CACHE_VERSION).then(function(cache) {
@@ -108,10 +75,42 @@ self.addEventListener('fetch', function(event) {
         }
         return response;
       }).catch(function() {
-        // Réseau échoué → on a déjà retourné le cache, rien à faire
-      });
+        return caches.match(event.request);
+      })
+    );
+    return;
+  }
 
-      // Retourner le cache immédiatement s'il existe, sinon attendre le réseau
+  // ── API : Network-First avec fallback cache ──
+  if (isAPI) {
+    event.respondWith(
+      fetch(event.request).then(function(response) {
+        var clone = response.clone();
+        caches.open(CACHE_VERSION).then(function(cache) {
+          cache.put(event.request, clone);
+        });
+        return response;
+      }).catch(function() {
+        return caches.match(event.request);
+      })
+    );
+    return;
+  }
+
+  // ── CSS/JS/assets : Stale-While-Revalidate ──
+  // Sert le cache immédiatement, met à jour en arrière-plan.
+  event.respondWith(
+    caches.match(event.request).then(function(cached) {
+      var fetchPromise = fetch(event.request).then(function(response) {
+        if (response && response.status === 200) {
+          var clone = response.clone();
+          caches.open(CACHE_VERSION).then(function(cache) {
+            cache.put(event.request, clone);
+          });
+        }
+        return response;
+      }).catch(function() {});
+
       return cached || fetchPromise;
     })
   );
