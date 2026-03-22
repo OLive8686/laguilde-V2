@@ -418,13 +418,54 @@ async function loadAccompagnants() {
         if (accompagnantsList.length === 0) {
             grid.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:16px">Aucun accompagnant pour le moment.</p>';
         } else {
+            // Charger les inscriptions JDR et b&eacute;n&eacute;voles pour enrichir l'affichage
+            var insJdr = [];
+            var insBen = [];
+            try {
+                var rJdr = await callAPI({ action: 'get_mes_inscriptions', email: user.email });
+                insJdr = (rJdr.inscriptions || []).filter(function(i) {
+                    return i.type_inscrit === 'accompagnant' && (i.statut === 'inscrit' || i.statut === 'attente');
+                });
+            } catch(e) {}
+            try {
+                var rBen = await callAPI({ action: 'get_mes_benevoles', email: user.email });
+                insBen = (rBen.benevoles || []).filter(function(b) {
+                    return b.nom_accompagnant && b.nom_accompagnant.trim() !== '';
+                });
+            } catch(e) {}
+
             grid.innerHTML = accompagnantsList.map(function(a) {
-                return '<div class="mes-inscriptions accompagnant-card">'
-                    + '<div class="mi-info">'
-                    + '<h4 class="accompagnant-name">' + escHtml(a.nom_accompagnant) + '</h4>'
-                    + '<p class="mi-sub">Accompagnant</p>'
+                var nom = a.nom_accompagnant;
+                // Trouver les inscriptions JDR de cet accompagnant
+                var jdrAcc = insJdr.filter(function(i) {
+                    return (i.nom_accompagnant || '').toLowerCase() === nom.toLowerCase();
+                });
+                // Trouver les inscriptions b&eacute;n&eacute;voles de cet accompagnant
+                var benAcc = insBen.filter(function(b) {
+                    return (b.nom_accompagnant || '').toLowerCase() === nom.toLowerCase();
+                });
+
+                var detailsHtml = '';
+                if (jdrAcc.length > 0 || benAcc.length > 0) {
+                    detailsHtml = '<div style="margin-top:8px;font-size:13px;color:var(--text-muted);line-height:1.8">';
+                    jdrAcc.forEach(function(i) {
+                        var badge = i.statut === 'inscrit' ? '<span class="badge badge-inscrit" style="font-size:11px">Inscrit</span>' : '<span class="badge badge-attente" style="font-size:11px">Attente</span>';
+                        detailsHtml += '<div>&#127922; ' + escHtml(i.jeu) + ' &mdash; ' + escHtml(i.creneau) + ' ' + badge + '</div>';
+                    });
+                    benAcc.forEach(function(b) {
+                        detailsHtml += '<div>&#129309; B&eacute;n&eacute;vole &mdash; ' + escHtml(b.creneau) + '</div>';
+                    });
+                    detailsHtml += '</div>';
+                } else {
+                    detailsHtml = '<p class="mi-sub" style="color:var(--text-muted);font-size:13px">Aucune inscription</p>';
+                }
+
+                return '<div class="mes-inscriptions accompagnant-card" style="flex-direction:column;align-items:stretch">'
+                    + '<div style="display:flex;justify-content:space-between;align-items:center">'
+                    + '<h4 class="accompagnant-name">' + escHtml(nom) + '</h4>'
+                    + '<button class="btn btn-small btn-red" onclick="supprimerAccompagnant(\'' + esc(nom) + '\')">Supprimer</button>'
                     + '</div>'
-                    + '<button class="btn btn-small btn-red" onclick="supprimerAccompagnant(\'' + esc(a.nom_accompagnant) + '\')">Supprimer</button>'
+                    + detailsHtml
                     + '</div>';
             }).join('');
         }
