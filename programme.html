@@ -308,13 +308,15 @@ function handleInscrire(creneau, jeu) {
 async function doInscrire(creneau, jeu) {
     if (!APP.SCRIPT_URL) { toast('Backend non configuré', 'info'); return; }
 
-    // Feedback immédiat : remplacer le bouton par un indicateur de chargement
+    // Feedback immédiat : animation pulse + spinner sur le bouton
     var btn = event && event.target ? event.target.closest('button') : null;
     if (btn) {
-        btn.disabled = true;
-        btn.dataset.originalText = btn.textContent;
-        btn.textContent = 'Inscription...';
-        btn.style.opacity = '0.6';
+        btn.classList.add('btn-click-pulse');
+        setTimeout(function() {
+            btn.disabled = true;
+            btn.classList.add('btn-loading');
+            btn.dataset.originalText = btn.textContent;
+        }, 200);
     }
 
     try {
@@ -335,8 +337,8 @@ async function doInscrire(creneau, jeu) {
         // Restaurer le bouton en cas d'erreur
         if (btn) {
             btn.disabled = false;
+            btn.classList.remove('btn-loading', 'btn-click-pulse');
             btn.textContent = btn.dataset.originalText || 'S\'inscrire';
-            btn.style.opacity = '';
         }
     }
 }

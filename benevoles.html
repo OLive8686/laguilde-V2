@@ -351,9 +351,12 @@ function inscrireBenevole(creneau) {
 async function doInscrireBenevole(creneau) {
     var user = APP.currentUser;
     if (!user) { openAuthModal(); return; }
-    // Feedback immédiat
+    // Feedback immédiat : pulse + spinner
     var btn = event && event.target ? event.target.closest('button') : null;
-    if (btn) { btn.disabled = true; btn.textContent = 'Inscription...'; btn.style.opacity = '0.6'; }
+    if (btn) {
+        btn.classList.add('btn-click-pulse');
+        setTimeout(function() { btn.disabled = true; btn.classList.add('btn-loading'); btn.dataset.originalText = btn.textContent; }, 200);
+    }
     try {
         var r = await callAPIPost({
             action: 'inscrire_benevole',
@@ -366,7 +369,7 @@ async function doInscrireBenevole(creneau) {
         loadMesBenevoles();
     } catch(e) {
         toast(e.message, 'error');
-        if (btn) { btn.disabled = false; btn.textContent = 'S\'inscrire'; btn.style.opacity = ''; }
+        if (btn) { btn.disabled = false; btn.classList.remove('btn-loading', 'btn-click-pulse'); btn.textContent = btn.dataset.originalText || 'S\'inscrire'; }
     }
 }
 
