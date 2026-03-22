@@ -351,6 +351,9 @@ function inscrireBenevole(creneau) {
 async function doInscrireBenevole(creneau) {
     var user = APP.currentUser;
     if (!user) { openAuthModal(); return; }
+    // Feedback immédiat
+    var btn = event && event.target ? event.target.closest('button') : null;
+    if (btn) { btn.disabled = true; btn.textContent = 'Inscription...'; btn.style.opacity = '0.6'; }
     try {
         var r = await callAPIPost({
             action: 'inscrire_benevole',
@@ -361,7 +364,10 @@ async function doInscrireBenevole(creneau) {
         toast(r.message, 'success');
         loadCreneauxBenevoles();
         loadMesBenevoles();
-    } catch(e) { toast(e.message, 'error'); }
+    } catch(e) {
+        toast(e.message, 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'S\'inscrire'; btn.style.opacity = ''; }
+    }
 }
 
 /**
@@ -370,6 +376,7 @@ async function doInscrireBenevole(creneau) {
 async function doInscrireBenevoleAccompagnant(creneau, nomAccompagnant) {
     var user = APP.currentUser;
     if (!user) { openAuthModal(); return; }
+    toast('Inscription de ' + nomAccompagnant + ' en cours...', 'info');
     try {
         var r = await callAPIPost({
             action: 'inscrire_benevole',

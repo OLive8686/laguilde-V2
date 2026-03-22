@@ -307,6 +307,16 @@ function handleInscrire(creneau, jeu) {
  */
 async function doInscrire(creneau, jeu) {
     if (!APP.SCRIPT_URL) { toast('Backend non configuré', 'info'); return; }
+
+    // Feedback immédiat : remplacer le bouton par un indicateur de chargement
+    var btn = event && event.target ? event.target.closest('button') : null;
+    if (btn) {
+        btn.disabled = true;
+        btn.dataset.originalText = btn.textContent;
+        btn.textContent = 'Inscription...';
+        btn.style.opacity = '0.6';
+    }
+
     try {
         var u = APP.currentUser;
         var r = await callAPIPost({
@@ -322,6 +332,12 @@ async function doInscrire(creneau, jeu) {
         await reloadInscriptionsAndRefresh();
     } catch(e) {
         toast(e.message, 'error');
+        // Restaurer le bouton en cas d'erreur
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = btn.dataset.originalText || 'S\'inscrire';
+            btn.style.opacity = '';
+        }
     }
 }
 
@@ -334,6 +350,8 @@ async function doInscrire(creneau, jeu) {
  */
 async function doInscrireAccompagnant(creneau, jeu, nomAccompagnant) {
     if (!APP.SCRIPT_URL) { toast('Backend non configuré', 'info'); return; }
+    // Feedback immédiat via toast léger
+    toast('Inscription de ' + nomAccompagnant + ' en cours...', 'info');
     try {
         var u = APP.currentUser;
         var r = await callAPIPost({
