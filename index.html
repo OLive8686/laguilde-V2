@@ -145,7 +145,7 @@
 <footer class="footer"><div class="footer-inner"><div><div class="footer-brand">Sous l'Œil de Mélusine</div><div class="footer-sub">Organisé par La Guilde · Foyer du Porteau · Poitiers</div></div><div class="footer-right">16 & 17 mai 2026</div></div></footer>
 <button class="scroll-top" id="scrollTop" aria-label="Retour en haut">↑</button>
 
-<script src="app.js?v=2"></script>
+<script src="app.js?v=3"></script>
 <script>
 // =============================================================================
 // PAGE D'ACCUEIL — Affiche le hero, les cartes de navigation et les infos rapides
@@ -163,21 +163,19 @@ window.onPageInit = async function() {
     if (config) renderConfig(config);
 
     // Compteur global : inscrits + tables + bénévoles
+    // Utilise les données déjà présentes dans allData (0 appel API supplémentaire)
     if (allData) {
-        try {
-            var insData = await callAPI({ action: 'get_inscriptions' });
-            var nbInscrits = (insData.inscriptions || []).filter(function(i) { return i.statut === 'inscrit'; }).length;
-            var nbTables = (allData.programme || []).length;
-            var nbBenevoles = 0;
-            (allData.creneaux_benevoles || []).forEach(function(c) { nbBenevoles += parseInt(c.inscrits) || 0; });
+        var nbInscrits = (allData.inscriptions_publiques || []).filter(function(i) { return i.statut === 'inscrit'; }).length;
+        var nbTables = (allData.programme || []).length;
+        var nbBenevoles = 0;
+        (allData.creneaux_benevoles || []).forEach(function(c) { nbBenevoles += parseInt(c.inscrits) || 0; });
 
-            if (nbInscrits > 0 || nbTables > 0 || nbBenevoles > 0) {
-                document.getElementById('statInscrits').textContent = nbInscrits;
-                document.getElementById('statTables').textContent = nbTables;
-                document.getElementById('statBenevoles').textContent = nbBenevoles;
-                document.getElementById('globalStats').style.display = 'block';
-            }
-        } catch(e) { /* silencieux */ }
+        if (nbInscrits > 0 || nbTables > 0 || nbBenevoles > 0) {
+            document.getElementById('statInscrits').textContent = nbInscrits;
+            document.getElementById('statTables').textContent = nbTables;
+            document.getElementById('statBenevoles').textContent = nbBenevoles;
+            document.getElementById('globalStats').style.display = 'block';
+        }
     }
 };
 

@@ -16,7 +16,7 @@
 //   Les anciennes versions sont supprimées automatiquement.
 // =============================================================================
 
-var CACHE_VERSION = 'melusine-v3';
+var CACHE_VERSION = 'melusine-v4';
 
 // Ressources à mettre en cache dès l'installation
 var STATIC_ASSETS = [
@@ -29,7 +29,7 @@ var STATIC_ASSETS = [
   'espace-mj.html',
   'aide.html',
   'styles.css',
-  'app.js?v=2',
+  'app.js?v=3',
   'admin.html'
 ];
 
