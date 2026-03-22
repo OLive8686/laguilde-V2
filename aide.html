@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aide — Sous l'Œil de Mélusine</title>
+    <meta name="description" content="Guide d'inscription à la convention Sous l'Œil de Mélusine.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400&family=Lora:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="https://sousloeildemelusine.fr/wp-content/uploads/2023/02/cropped-cropped-logo_guilde.png">
+    <script>var t=localStorage.getItem('melusine_theme');if(t)document.documentElement.setAttribute('data-theme',t);</script>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Styles spécifiques à la page d'aide */
+        .aide-section { max-width: 720px; margin: 0 auto; padding: 0 20px; }
+        .aide-step { background: var(--card-bg, rgba(255,255,255,0.04)); border-radius: 12px; padding: 24px; margin-bottom: 20px; border-left: 4px solid var(--gold); }
+        .aide-step h3 { font-family: var(--font-heading); font-size: 17px; color: var(--gold); margin: 0 0 10px; }
+        .aide-step p { font-family: var(--font-body); font-size: 15px; color: var(--text-light); line-height: 1.7; margin: 0 0 8px; }
+        .aide-step .aide-note { font-size: 13px; color: var(--text-muted); font-style: italic; }
+        .aide-num { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: var(--gold); color: var(--bg-dark, #0D2B2B); font-family: var(--font-heading); font-size: 14px; font-weight: 700; margin-right: 10px; flex-shrink: 0; }
+        .aide-step h3 { display: flex; align-items: center; }
+        .aide-faq { margin-top: 32px; }
+        .aide-faq details { background: var(--card-bg, rgba(255,255,255,0.04)); border-radius: 10px; margin-bottom: 12px; padding: 0; }
+        .aide-faq summary { font-family: var(--font-heading); font-size: 15px; color: var(--cream); padding: 16px 20px; cursor: pointer; letter-spacing: 0.3px; list-style: none; }
+        .aide-faq summary::before { content: '▸ '; color: var(--gold); }
+        .aide-faq details[open] summary::before { content: '▾ '; }
+        .aide-faq details[open] summary { border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .aide-faq .aide-answer { padding: 16px 20px; font-size: 15px; color: var(--text-light); line-height: 1.7; }
+        .aide-back { text-align: center; margin: 32px 0; }
+    </style>
+</head>
+<body>
+
+<!-- Barre de retour simple (pas de nav complète) -->
+<div style="position:fixed;top:0;left:0;right:0;z-index:100;background:var(--bg-dark, #0D2B2B);border-bottom:1px solid rgba(255,255,255,0.06);padding:14px 24px;display:flex;align-items:center;justify-content:space-between">
+    <a href="programme.html" style="color:var(--gold);font-family:var(--font-heading);font-size:14px;text-decoration:none;letter-spacing:0.5px">&larr; Retour au programme</a>
+    <span style="font-family:var(--font-heading);font-size:14px;color:var(--text-muted);letter-spacing:1px">Aide</span>
+</div>
+
+<div style="padding-top:70px">
+
+    <section class="section section-dark">
+        <div class="aide-section">
+
+            <div class="section-header" style="text-align:center;margin-bottom:32px">
+                <p class="section-label">Guide</p>
+                <h2 class="section-title">Comment s'inscrire ?</h2>
+                <div class="section-sep"></div>
+            </div>
+
+            <!-- Étape 1 -->
+            <div class="aide-step">
+                <h3><span class="aide-num">1</span> Créer un compte</h3>
+                <p>Cliquez sur <strong>Se connecter</strong> en haut à droite. Trois options :</p>
+                <p>&bull; <strong>Google</strong> ou <strong>Discord</strong> — connexion en un clic avec votre compte existant.</p>
+                <p>&bull; <strong>Pseudo & email</strong> — créez un compte avec un mot de passe. Cliquez "Créer un compte", remplissez le formulaire, c'est parti !</p>
+                <p class="aide-note">Votre pseudo est le nom qui apparaîtra sur les listes d'inscription. Vous pouvez le modifier à tout moment en cliquant sur votre nom dans le menu.</p>
+            </div>
+
+            <!-- Étape 2 -->
+            <div class="aide-step">
+                <h3><span class="aide-num">2</span> Consulter le programme</h3>
+                <p>Allez sur la page <a href="programme.html" style="color:var(--gold)">Programme</a>. Les tables sont organisées par créneau horaire.</p>
+                <p>Pour chaque table, vous voyez : le nom du jeu, le MJ, le système, une description, et le nombre de places disponibles.</p>
+                <p class="aide-note">Les créneaux sont : Samedi matin, Samedi après-midi, Samedi soir, Dimanche matin, Dimanche après-midi.</p>
+            </div>
+
+            <!-- Étape 3 -->
+            <div class="aide-step">
+                <h3><span class="aide-num">3</span> S'inscrire à une table</h3>
+                <p>Cliquez le bouton vert <strong>S'inscrire</strong> sur la table qui vous intéresse.</p>
+                <p>&bull; S'il reste des places → vous êtes <strong>inscrit·e</strong> directement.</p>
+                <p>&bull; Si la table est complète → vous êtes placé·e en <strong>liste d'attente</strong>. Si quelqu'un annule, vous serez automatiquement promu·e et recevrez un email.</p>
+                <p class="aide-note">Vous ne pouvez vous inscrire qu'à une seule table par créneau. Pour changer, annulez d'abord votre inscription actuelle.</p>
+            </div>
+
+            <!-- Étape 4 -->
+            <div class="aide-step">
+                <h3><span class="aide-num">4</span> Ajouter des accompagnants</h3>
+                <p>Vous venez avec des enfants ou des proches ? Rendez-vous sur <a href="mes-inscriptions.html" style="color:var(--gold)">Mes inscriptions</a>.</p>
+                <p>Dans la section <strong>Accompagnants</strong>, ajoutez leurs noms (jusqu'à 3). Ensuite, quand vous cliquez "S'inscrire" sur une table, un choix vous sera proposé : <strong>"Pour moi"</strong> ou <strong>"Pour [nom de l'accompagnant]"</strong>.</p>
+                <p class="aide-note">Chaque accompagnant peut être inscrit à des tables différentes. L'anti-doublon s'applique aussi : un accompagnant ne peut être inscrit qu'à une table par créneau.</p>
+            </div>
+
+            <!-- Étape 5 -->
+            <div class="aide-step">
+                <h3><span class="aide-num">5</span> Devenir bénévole</h3>
+                <p>La convention a besoin de bénévoles ! Rendez-vous sur <a href="benevoles.html" style="color:var(--gold)">Bénévoles</a> pour voir les créneaux disponibles.</p>
+                <p>Vous pouvez aussi inscrire vos accompagnants comme bénévoles.</p>
+                <p class="aide-note">Attention : vous ne pouvez pas être bénévole et joueur sur le même créneau.</p>
+            </div>
+
+            <!-- Étape 6 -->
+            <div class="aide-step">
+                <h3><span class="aide-num">6</span> Proposer une table (MJ)</h3>
+                <p>Vous voulez maîtriser une partie ? Sur la page <a href="programme.html" style="color:var(--gold)">Programme</a>, cliquez <strong>"Proposer une table (MJ)"</strong>.</p>
+                <p>Remplissez le formulaire (jeu, système, créneau, nombre de places, description). Votre proposition sera validée par les organisateurs, puis apparaîtra dans le programme.</p>
+                <p class="aide-note">Tout le monde peut proposer une table, pas besoin d'être MJ au départ. Vous obtiendrez le statut MJ dès qu'une de vos tables est validée.</p>
+            </div>
+
+            <!-- Étape 7 -->
+            <div class="aide-step">
+                <h3><span class="aide-num">7</span> Gérer ses inscriptions</h3>
+                <p>La page <a href="mes-inscriptions.html" style="color:var(--gold)">Mes inscriptions</a> récapitule tout : tables de jeu, accompagnants, bénévolat, tables MJ.</p>
+                <p>Vous pouvez y annuler une inscription, ajouter/supprimer un accompagnant, et demander un <strong>récapitulatif par email</strong>.</p>
+            </div>
+
+            <!-- FAQ -->
+            <div class="aide-faq">
+                <div class="section-header" style="text-align:center;margin-bottom:24px">
+                    <h2 class="section-title" style="font-size:22px">Questions fréquentes</h2>
+                    <div class="section-sep"></div>
+                </div>
+
+                <details>
+                    <summary>J'ai oublié mon mot de passe</summary>
+                    <div class="aide-answer">Cliquez "Se connecter" → "Pseudo & email" → "Mot de passe oublié ?". Un email avec un lien de réinitialisation vous sera envoyé (valable 1 heure).</div>
+                </details>
+
+                <details>
+                    <summary>Puis-je changer de table après m'être inscrit·e ?</summary>
+                    <div class="aide-answer">Oui ! Annulez d'abord votre inscription actuelle (sur "Mes inscriptions" ou sur la page Programme), puis inscrivez-vous à une autre table sur le même créneau.</div>
+                </details>
+
+                <details>
+                    <summary>Que se passe-t-il si je suis en liste d'attente ?</summary>
+                    <div class="aide-answer">Si quelqu'un annule son inscription, le premier en liste d'attente est automatiquement promu et reçoit un email de confirmation. Pas besoin de surveiller !</div>
+                </details>
+
+                <details>
+                    <summary>Puis-je être joueur et bénévole ?</summary>
+                    <div class="aide-answer">Oui, mais pas sur le même créneau. Si vous êtes inscrit·e à une table sur un créneau, vous ne pourrez pas vous inscrire comme bénévole sur ce même créneau (et inversement).</div>
+                </details>
+
+                <details>
+                    <summary>Combien d'accompagnants puis-je ajouter ?</summary>
+                    <div class="aide-answer">Jusqu'à 3 accompagnants par compte. Chacun peut être inscrit à des tables et créneaux bénévoles différents. Supprimer un accompagnant annule automatiquement toutes ses inscriptions.</div>
+                </details>
+
+                <details>
+                    <summary>L'entrée est-elle gratuite ?</summary>
+                    <div class="aide-answer">Oui, l'entrée à la convention est gratuite et ouverte à tous. L'inscription en ligne permet de réserver votre place aux tables.</div>
+                </details>
+
+                <details>
+                    <summary>J'ai un problème technique</summary>
+                    <div class="aide-answer">Contactez-nous par email à <strong>contact@sousloeildemelusine.fr</strong> ou via nos réseaux sociaux. Nous vous aiderons !</div>
+                </details>
+            </div>
+
+            <!-- Bouton retour -->
+            <div class="aide-back">
+                <a href="programme.html" class="btn btn-primary">Retour au programme</a>
+            </div>
+
+        </div>
+    </section>
+
+</div>
+
+<!-- FOOTER -->
+<footer class="footer"><div class="footer-inner"><div><div class="footer-brand">Sous l'Œil de Mélusine</div><div class="footer-sub">Organisé par La Guilde · Foyer du Porteau · Poitiers</div></div><div class="footer-right">16 & 17 mai 2026</div></div></footer>
+
+</body>
+</html>
