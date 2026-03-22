@@ -786,7 +786,7 @@ async function initApp() {
 function prefetchAllPages() {
     // Attendre 1 seconde après le rendu pour ne pas concurrencer le contenu visible
     setTimeout(function() {
-        var pages = ['index.html', 'programme.html', 'infos.html', 'benevoles.html', 'mes-inscriptions.html', 'espace-mj.html', 'aide.html', 'styles.css', 'app.js?v=4'];
+        var pages = ['index.html', 'programme.html', 'infos.html', 'benevoles.html', 'mes-inscriptions.html', 'espace-mj.html', 'aide.html', 'styles.css', 'app.js?v=5'];
         var current = location.pathname.split('/').pop() || 'index.html';
         pages.forEach(function(page) {
             // Ne pas re-fetcher la page actuelle
