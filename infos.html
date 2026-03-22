@@ -33,12 +33,42 @@
             <button class="auth-btn" onclick="showEmailForm()"><span class="auth-btn-icon">✉️</span><div><div class="auth-btn-text">Pseudo & email</div><div class="auth-btn-sub">Sans compte</div></div></button>
         </div>
         <div id="emailForm" class="auth-form">
-            <label>Pseudo / Nom</label>
-            <input type="text" id="inputNom" placeholder="Votre pseudo ou prénom">
             <label>Email</label>
             <input type="email" id="inputEmail" placeholder="votre@email.com">
-            <button class="btn btn-primary" style="width:100%" onclick="loginEmail()">Valider</button>
-            <p style="margin-top:12px;font-size:14px;color:var(--text-muted);cursor:pointer" onclick="showAuthOptions()">← Retour</p>
+            <label>Mot de passe</label>
+            <input type="password" id="inputPassword" placeholder="Votre mot de passe" onkeydown="if(event.key==='Enter')loginEmail()">
+            <button class="btn btn-primary" style="width:100%" onclick="loginEmail()">Se connecter</button>
+            <p style="margin-top:10px;font-size:13px;color:var(--accent);cursor:pointer;text-align:center" onclick="showForgotForm()">Mot de passe oublié ?</p>
+            <p style="margin-top:8px;font-size:14px;color:var(--text-muted);text-align:center">Pas encore de compte ? <span style="color:var(--accent);cursor:pointer" onclick="showRegisterForm()">Créer un compte</span></p>
+            <p style="margin-top:8px;font-size:14px;color:var(--text-muted);cursor:pointer;text-align:center" onclick="showAuthOptions()">← Retour</p>
+        </div>
+        <div id="registerForm" class="auth-form">
+            <label>Pseudo / Nom</label>
+            <input type="text" id="inputRegNom" placeholder="Votre pseudo ou prénom">
+            <label>Email</label>
+            <input type="email" id="inputRegEmail" placeholder="votre@email.com">
+            <label>Mot de passe (6 caractères min.)</label>
+            <input type="password" id="inputRegPassword" placeholder="Choisissez un mot de passe">
+            <label>Confirmer le mot de passe</label>
+            <input type="password" id="inputRegConfirm" placeholder="Retapez le mot de passe" onkeydown="if(event.key==='Enter')registerEmail()">
+            <button class="btn btn-primary" style="width:100%" onclick="registerEmail()">Créer mon compte</button>
+            <p style="margin-top:8px;font-size:14px;color:var(--text-muted);text-align:center">Déjà un compte ? <span style="color:var(--accent);cursor:pointer" onclick="showEmailForm()">Se connecter</span></p>
+            <p style="margin-top:8px;font-size:14px;color:var(--text-muted);cursor:pointer;text-align:center" onclick="showAuthOptions()">← Retour</p>
+        </div>
+        <div id="forgotForm" class="auth-form">
+            <p style="font-size:15px;color:var(--text-light);text-align:center;margin-bottom:16px">Entrez votre email pour recevoir un lien de réinitialisation :</p>
+            <label>Email</label>
+            <input type="email" id="inputForgotEmail" placeholder="votre@email.com" onkeydown="if(event.key==='Enter')sendForgotPassword()">
+            <button class="btn btn-primary" style="width:100%" onclick="sendForgotPassword()">Envoyer le lien</button>
+            <p style="margin-top:12px;font-size:14px;color:var(--text-muted);cursor:pointer;text-align:center" onclick="showEmailForm()">← Retour à la connexion</p>
+        </div>
+        <div id="resetForm" class="auth-form">
+            <p style="font-size:15px;color:var(--text-light);text-align:center;margin-bottom:16px">Choisissez votre nouveau mot de passe :</p>
+            <label>Nouveau mot de passe (6 caractères min.)</label>
+            <input type="password" id="inputResetPassword" placeholder="Nouveau mot de passe">
+            <label>Confirmer</label>
+            <input type="password" id="inputResetConfirm" placeholder="Retapez le mot de passe" onkeydown="if(event.key==='Enter')submitResetPassword()">
+            <button class="btn btn-primary" style="width:100%" onclick="submitResetPassword()">Réinitialiser</button>
         </div>
         <div id="pseudoForm" class="auth-form">
             <p id="pseudoHint" style="font-size:15px;color:var(--text-light);text-align:center;margin-bottom:16px">Choisissez votre pseudo :</p>

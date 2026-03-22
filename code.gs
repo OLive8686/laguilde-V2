@@ -311,8 +311,10 @@ function getOrCreateRole(email, nom) {
   }
 
   // Utilisateur inconnu → créer avec le rôle "joueur"
+  // Les colonnes supplémentaires (auth_type, password_hash, etc.) restent vides
+  // car ce chemin est emprunté par les SSO (Google/Discord) qui n'ont pas de mot de passe.
   if (sheetRole === null) {
-    sheet.appendRow([email, (nom || '').trim(), 'joueur', new Date().toISOString()]);
+    sheet.appendRow([email, (nom || '').trim(), 'joueur', new Date().toISOString(), '', '', '', '']);
     sheetRole = 'joueur';
   }
 
@@ -342,6 +344,355 @@ function hasRole(email, roleMinimum) {
   if (roleMinimum === 'mj') return role === 'mj' || role === 'admin';
   return true; // "joueur" → tout le monde
 }
+
+// ─── Authentification par mot de passe ─────────────────────────────────────
+// Ces fonctions gèrent l'inscription et la connexion par pseudo/email/mot de passe.
+// Le mot de passe est hashé en SHA-256 avec un salt aléatoire unique par utilisateur.
+// Format stocké dans la colonne password_hash : "salt:hash" (hex).
+//
+// POURQUOI SHA-256 et pas bcrypt ?
+// Google Apps Script n'a pas de librairie bcrypt native.
+// SHA-256 + salt aléatoire est acceptable pour ce contexte :
+//   - ~200 utilisateurs d'une convention JDR locale
+//   - Pas de données bancaires ou ultra-sensibles
+//   - Si le projet grandit, migrer vers un vrai service d'auth (Firebase Auth, etc.)
+//
+// PROTECTION BRUTE FORCE :
+// On utilise CacheService pour compter les échecs de connexion par email.
+// Après 5 échecs en 15 minutes, le compte est temporairement bloqué.
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * Génère un salt aléatoire de 16 caractères hexadécimaux.
+ * Utilise Utilities.getUuid() comme source d'aléa (suffisant pour du salting).
+ * @returns {string} Le salt en hexadécimal (16 chars)
+ */
+function generateSalt() {
+  // getUuid() génère un UUID v4 aléatoire — on en prend les 16 premiers caractères sans tirets
+  return Utilities.getUuid().replace(/-/g, '').substring(0, 16);
+}
+
+/**
+ * Hashe un mot de passe avec un salt en SHA-256.
+ * @param {string} password - Le mot de passe en clair
+ * @param {string} salt - Le salt aléatoire
+ * @returns {string} Le hash en hexadécimal
+ */
+function hashPassword(password, salt) {
+  // On concatène salt + password avant le hash pour empêcher les rainbow tables
+  var input = salt + password;
+  var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, input, Utilities.Charset.UTF_8);
+  // Convertir le tableau d'octets signés en chaîne hexadécimale
+  return digest.map(function(byte) {
+    // Les bytes sont signés en GAS (-128 à 127), il faut les convertir en 0-255
+    var v = (byte < 0) ? byte + 256 : byte;
+    return ('0' + v.toString(16)).slice(-2);
+  }).join('');
+}
+
+/**
+ * Vérifie un mot de passe contre un hash stocké au format "salt:hash".
+ * @param {string} password - Le mot de passe en clair à vérifier
+ * @param {string} storedHash - Le hash stocké au format "salt:hash"
+ * @returns {boolean} true si le mot de passe correspond
+ */
+function verifyPassword(password, storedHash) {
+  if (!storedHash || storedHash.indexOf(':') === -1) return false;
+  var parts = storedHash.split(':');
+  var salt = parts[0];
+  var hash = parts[1];
+  return hashPassword(password, salt) === hash;
+}
+
+/**
+ * Vérifie le rate limiting pour un email donné.
+ * Bloque après 5 tentatives échouées en 15 minutes.
+ * @param {string} email - L'email à vérifier
+ * @returns {boolean} true si le compte est bloqué (trop de tentatives)
+ */
+function isLoginBlocked(email) {
+  var cache = CacheService.getScriptCache();
+  var key = 'login_fail_' + email;
+  var count = parseInt(cache.get(key) || '0');
+  return count >= 5;
+}
+
+/**
+ * Incrémente le compteur d'échecs de connexion pour un email.
+ * Le compteur expire après 15 minutes (900 secondes).
+ * @param {string} email - L'email qui a échoué
+ */
+function recordLoginFailure(email) {
+  var cache = CacheService.getScriptCache();
+  var key = 'login_fail_' + email;
+  var count = parseInt(cache.get(key) || '0') + 1;
+  cache.put(key, count.toString(), 900); // expire après 15 min
+}
+
+/**
+ * Réinitialise le compteur d'échecs après une connexion réussie.
+ * @param {string} email - L'email qui s'est connecté avec succès
+ */
+function clearLoginFailures(email) {
+  var cache = CacheService.getScriptCache();
+  cache.remove('login_fail_' + email);
+}
+
+/**
+ * Vérifie si un email existe déjà dans l'onglet roles.
+ * Retourne le type de compte (email, google, discord) ou null si inexistant.
+ * Utilisé par le frontend pour savoir s'il faut afficher "Inscription" ou "Connexion".
+ * @param {Object} params - { email: string }
+ * @returns {Object} { ok, exists, auth_type, nom }
+ */
+function checkEmail(params) {
+  var email = (params.email || '').toLowerCase().trim();
+  if (!email || !isValidEmail(email)) return { ok: true, exists: false };
+
+  var data = readSheet('roles');
+  for (var i = 0; i < data.length; i++) {
+    if ((data[i].email || '').toLowerCase().trim() === email) {
+      return {
+        ok: true,
+        exists: true,
+        auth_type: (data[i].auth_type || '').trim() || 'legacy',
+        nom: (data[i].nom || '').trim()
+      };
+    }
+  }
+  return { ok: true, exists: false };
+}
+
+/**
+ * Inscrit un nouvel utilisateur avec pseudo + email + mot de passe.
+ * Vérifie que l'email n'est pas déjà pris, puis stocke le hash.
+ * @param {Object} params - { nom, email, password }
+ * @returns {Object} { ok, message, nom, role } ou { error }
+ */
+function registerEmail(params) {
+  var nom = (params.nom || '').trim();
+  var email = (params.email || '').toLowerCase().trim();
+  var password = (params.password || '');
+
+  // Validations
+  if (!nom || nom.length < 2) return { error: 'Le pseudo doit contenir au moins 2 caractères.' };
+  if (!email || !isValidEmail(email)) return { error: 'Adresse email invalide.' };
+  if (!password || password.length < 6) return { error: 'Le mot de passe doit contenir au moins 6 caractères.' };
+  if (password.length > 100) return { error: 'Mot de passe trop long (100 caractères max).' };
+
+  return withLock(function() {
+    // Vérifier que l'email n'est pas déjà utilisé
+    var sheet = getSheet('roles');
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0].map(function(h) { return h.toString().trim(); });
+    var emailCol = headers.indexOf('email');
+
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][emailCol] && data[i][emailCol].toString().toLowerCase().trim() === email) {
+        return { error: 'Un compte existe déjà avec cet email. Connectez-vous ou utilisez "Mot de passe oublié".' };
+      }
+    }
+
+    // Créer le hash du mot de passe
+    var salt = generateSalt();
+    var hash = salt + ':' + hashPassword(password, salt);
+
+    // Ajouter la ligne dans roles
+    // Colonnes : email, nom, role, date_inscription, auth_type, password_hash, reset_token, reset_expiry
+    sheet.appendRow([email, nom, 'joueur', new Date().toISOString(), 'email', hash, '', '']);
+
+    return { ok: true, message: 'Compte créé avec succès !', nom: nom, role: 'joueur' };
+  });
+}
+
+/**
+ * Connecte un utilisateur avec email + mot de passe.
+ * Vérifie le hash, gère le rate limiting.
+ * @param {Object} params - { email, password }
+ * @returns {Object} { ok, nom, email, role } ou { error }
+ */
+function loginEmailBackend(params) {
+  var email = (params.email || '').toLowerCase().trim();
+  var password = (params.password || '');
+
+  if (!email || !isValidEmail(email)) return { error: 'Adresse email invalide.' };
+  if (!password) return { error: 'Mot de passe requis.' };
+
+  // Protection brute force
+  if (isLoginBlocked(email)) {
+    return { error: 'Trop de tentatives. Réessayez dans 15 minutes.' };
+  }
+
+  var sheet = getSheet('roles');
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0].map(function(h) { return h.toString().trim(); });
+  var emailCol = headers.indexOf('email');
+  var nomCol = headers.indexOf('nom');
+  var authTypeCol = headers.indexOf('auth_type');
+  var hashCol = headers.indexOf('password_hash');
+
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][emailCol] && data[i][emailCol].toString().toLowerCase().trim() === email) {
+      var authType = (data[i][authTypeCol] || '').toString().trim();
+
+      // Compte SSO (Google/Discord) → pas de mot de passe stocké
+      if (authType === 'google' || authType === 'discord') {
+        return { error: 'Ce compte utilise la connexion ' + authType.charAt(0).toUpperCase() + authType.slice(1) + '. Utilisez le bouton correspondant.' };
+      }
+
+      // Compte legacy (créé avant l'ajout des mots de passe) → pas de hash
+      var storedHash = (data[i][hashCol] || '').toString().trim();
+      if (!storedHash) {
+        return { error: 'Ce compte n\'a pas de mot de passe. Utilisez "Mot de passe oublié" pour en créer un.' };
+      }
+
+      // Vérifier le mot de passe
+      if (!verifyPassword(password, storedHash)) {
+        recordLoginFailure(email);
+        return { error: 'Mot de passe incorrect.' };
+      }
+
+      // Succès — réinitialiser le compteur d'échecs
+      clearLoginFailures(email);
+
+      var nom = (data[i][nomCol] || '').toString().trim();
+      var role = getOrCreateRole(email, nom);
+      return { ok: true, nom: nom, email: email, role: role };
+    }
+  }
+
+  // Email non trouvé — message volontairement vague (sécurité)
+  // pour ne pas révéler si un email est inscrit ou non
+  recordLoginFailure(email);
+  return { error: 'Email ou mot de passe incorrect.' };
+}
+
+/**
+ * Envoie un email de réinitialisation de mot de passe.
+ * Génère un token aléatoire, le stocke dans le Sheet, et envoie un lien.
+ * Le token expire après 1 heure.
+ * @param {Object} params - { email }
+ * @returns {Object} { ok, message } (toujours succès, même si l'email n'existe pas — sécurité)
+ */
+function forgotPassword(params) {
+  var email = (params.email || '').toLowerCase().trim();
+  if (!email || !isValidEmail(email)) return { error: 'Adresse email invalide.' };
+
+  // Message générique dans tous les cas (ne pas révéler si l'email existe)
+  var genericMsg = 'Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.';
+
+  var sheet = getSheet('roles');
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0].map(function(h) { return h.toString().trim(); });
+  var emailCol = headers.indexOf('email');
+  var authTypeCol = headers.indexOf('auth_type');
+  var tokenCol = headers.indexOf('reset_token');
+  var expiryCol = headers.indexOf('reset_expiry');
+
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][emailCol] && data[i][emailCol].toString().toLowerCase().trim() === email) {
+      var authType = (data[i][authTypeCol] || '').toString().trim();
+
+      // Compte SSO → pas de reset possible (ils n'ont pas de mot de passe chez nous)
+      if (authType === 'google' || authType === 'discord') {
+        return { ok: true, message: genericMsg };
+      }
+
+      // Générer le token et sa date d'expiration (1 heure)
+      var token = Utilities.getUuid();
+      var expiry = new Date(Date.now() + 3600000).toISOString(); // +1h
+
+      // Stocker dans le Sheet (row = i+1 car les arrays sont 0-indexed)
+      sheet.getRange(i + 1, tokenCol + 1).setValue(token);
+      sheet.getRange(i + 1, expiryCol + 1).setValue(expiry);
+
+      // Construire le lien de réinitialisation
+      var siteUrl = cfg('lien_inscription', '');
+      var resetLink = siteUrl + (siteUrl.includes('?') ? '&' : '?') + 'reset_token=' + token;
+
+      // Envoyer l'email
+      var successColor = cfg('email_success', '#4A8B5E');
+      var htmlBody = buildEmailHtml({
+        titreBloc: 'Réinitialisation du mot de passe',
+        couleurTitre: successColor,
+        champs: [],
+        paragraphe: '<p>Vous avez demandé à réinitialiser votre mot de passe pour la convention <strong>Sous l\'Œil de Mélusine</strong>.</p>'
+          + '<p style="margin:20px 0"><a href="' + resetLink + '" style="background:' + successColor + ';color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">Réinitialiser mon mot de passe</a></p>'
+          + '<p style="font-size:12px">Ce lien est valable 1 heure. Si vous n\'avez pas fait cette demande, ignorez cet email.</p>',
+        pied: 'Sous l\'Œil de Mélusine — Convention JDR · Poitiers'
+      });
+
+      sendEmail(email, '🔑 Réinitialisation mot de passe — Mélusine', htmlBody);
+
+      return { ok: true, message: genericMsg };
+    }
+  }
+
+  // Email non trouvé → même message (ne pas révéler)
+  return { ok: true, message: genericMsg };
+}
+
+/**
+ * Réinitialise le mot de passe avec un token valide.
+ * Vérifie le token, sa date d'expiration, puis met à jour le hash.
+ * @param {Object} params - { token, password }
+ * @returns {Object} { ok, message, email, nom, role } ou { error }
+ */
+function resetPassword(params) {
+  var token = (params.token || '').trim();
+  var password = (params.password || '');
+
+  if (!token) return { error: 'Token de réinitialisation manquant.' };
+  if (!password || password.length < 6) return { error: 'Le mot de passe doit contenir au moins 6 caractères.' };
+  if (password.length > 100) return { error: 'Mot de passe trop long (100 caractères max).' };
+
+  return withLock(function() {
+    var sheet = getSheet('roles');
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0].map(function(h) { return h.toString().trim(); });
+    var emailCol = headers.indexOf('email');
+    var nomCol = headers.indexOf('nom');
+    var authTypeCol = headers.indexOf('auth_type');
+    var hashCol = headers.indexOf('password_hash');
+    var tokenCol = headers.indexOf('reset_token');
+    var expiryCol = headers.indexOf('reset_expiry');
+
+    for (var i = 1; i < data.length; i++) {
+      var storedToken = (data[i][tokenCol] || '').toString().trim();
+      if (storedToken && storedToken === token) {
+        // Vérifier l'expiration
+        var expiry = data[i][expiryCol] ? new Date(data[i][expiryCol]).getTime() : 0;
+        if (Date.now() > expiry) {
+          // Nettoyer le token expiré
+          sheet.getRange(i + 1, tokenCol + 1).setValue('');
+          sheet.getRange(i + 1, expiryCol + 1).setValue('');
+          return { error: 'Ce lien a expiré. Demandez un nouveau lien de réinitialisation.' };
+        }
+
+        // Créer le nouveau hash
+        var salt = generateSalt();
+        var hash = salt + ':' + hashPassword(password, salt);
+
+        // Mettre à jour le hash et marquer comme compte "email" (pour les comptes legacy)
+        sheet.getRange(i + 1, hashCol + 1).setValue(hash);
+        sheet.getRange(i + 1, authTypeCol + 1).setValue('email');
+
+        // Nettoyer le token
+        sheet.getRange(i + 1, tokenCol + 1).setValue('');
+        sheet.getRange(i + 1, expiryCol + 1).setValue('');
+
+        var email = (data[i][emailCol] || '').toString().toLowerCase().trim();
+        var nom = (data[i][nomCol] || '').toString().trim();
+        var role = getOrCreateRole(email, nom);
+
+        return { ok: true, message: 'Mot de passe mis à jour ! Vous êtes connecté·e.', email: email, nom: nom, role: role };
+      }
+    }
+
+    return { error: 'Token invalide ou expiré. Demandez un nouveau lien.' };
+  });
+}
+
 
 /**
  * Change le rôle d'un utilisateur (admin uniquement).
@@ -424,8 +775,8 @@ function getSheet(tabName) {
     }
 
     if (tabName === 'roles') {
-      sheet.appendRow(['email', 'nom', 'role', 'date_inscription']);
-      sheet.getRange(1, 1, 1, 4).setFontWeight('bold');
+      sheet.appendRow(['email', 'nom', 'role', 'date_inscription', 'auth_type', 'password_hash', 'reset_token', 'reset_expiry']);
+      sheet.getRange(1, 1, 1, 8).setFontWeight('bold');
     }
 
     if (tabName === 'benevoles') {
@@ -456,6 +807,22 @@ function getSheet(tabName) {
       sheet.getRange(1, nextCol + 1).setValue('nom_accompagnant');
       sheet.getRange(1, nextCol + 1).setFontWeight('bold');
     }
+  }
+
+  // Migration : ajoute les colonnes d'authentification à l'onglet roles
+  // (auth_type, password_hash, reset_token, reset_expiry)
+  // Les comptes existants (SSO ou anciens) auront ces colonnes vides → pas affectés.
+  if (tabName === 'roles' && sheet.getLastColumn() > 0) {
+    var roleHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var newRoleCols = ['auth_type', 'password_hash', 'reset_token', 'reset_expiry'];
+    newRoleCols.forEach(function(col) {
+      if (roleHeaders.indexOf(col) === -1) {
+        var nextCol = sheet.getLastColumn() + 1;
+        sheet.getRange(1, nextCol).setValue(col);
+        sheet.getRange(1, nextCol).setFontWeight('bold');
+        roleHeaders.push(col); // pour les itérations suivantes
+      }
+    });
   }
 
   // Migration : ajoute la colonne statut_table à l'onglet programme
@@ -879,6 +1246,11 @@ function doGet(e) {
         var roleNom = (e.parameter.nom || '').trim();
         return jsonResponse({ ok: true, role: getOrCreateRole(roleEmail, roleNom) });
 
+      // --- Vérification email (pour le formulaire de connexion) ---
+      // Retourne si un compte existe et son type d'auth (email, google, discord, legacy)
+      case 'check_email':
+        return jsonResponse(checkEmail(e.parameter));
+
       // --- Discord OAuth (lecture + redirect) ---
       case 'discord_exchange':
         return jsonResponse(discordExchange(e.parameter));
@@ -914,6 +1286,16 @@ function doPost(e) {
 
   try {
     switch (data.action) {
+      // --- Authentification par mot de passe (POST obligatoire — données sensibles) ---
+      case 'register':
+        return jsonResponse(registerEmail(data));
+      case 'login_email':
+        return jsonResponse(loginEmailBackend(data));
+      case 'forgot_password':
+        return jsonResponse(forgotPassword(data));
+      case 'reset_password':
+        return jsonResponse(resetPassword(data));
+
       // --- Inscription / Annulation (POST obligatoire — anti-CSRF) ---
       case 'inscrire':
         return jsonResponse(inscrire(data));
@@ -2451,4 +2833,14 @@ function sendRecapPreConvention() {
   emailList.forEach(function(email) {
     sendRecapEmail(email);
   });
+}
+// ============================================================
+// UTILITAIRES — à lancer manuellement depuis l'éditeur GAS
+// ============================================================
+
+function clearCache() {
+  CacheService.getScriptCache().removeAll([
+    'config', 'programme', 'restauration', 'animations'
+  ]);
+  Logger.log('Cache vidé avec succès');
 }

@@ -343,26 +343,65 @@ function closeAuthModal() {
     if (modal) modal.classList.remove('active');
 }
 
-function showAuthOptions() {
-    document.getElementById('authOptions').style.display='flex';
+/**
+ * Cache tous les formulaires du modal auth.
+ * Appelé avant d'afficher un formulaire spécifique.
+ */
+function hideAllAuthForms() {
+    document.getElementById('authOptions').style.display='none';
     document.getElementById('emailForm').classList.remove('active');
+    document.getElementById('registerForm').classList.remove('active');
     document.getElementById('pseudoForm').classList.remove('active');
-    // Cacher le conteneur du bouton Google si présent
+    document.getElementById('forgotForm').classList.remove('active');
+    document.getElementById('resetForm').classList.remove('active');
     var googleBtn = document.getElementById('googleBtnContainer');
     if (googleBtn) googleBtn.style.display = 'none';
 }
 
+function showAuthOptions() {
+    hideAllAuthForms();
+    document.getElementById('authOptions').style.display='flex';
+}
+
+/**
+ * Affiche le formulaire de connexion (email + mot de passe).
+ */
 function showEmailForm() {
-    document.getElementById('authOptions').style.display='none';
+    hideAllAuthForms();
     document.getElementById('emailForm').classList.add('active');
-    document.getElementById('pseudoForm').classList.remove('active');
-    document.getElementById('inputNom').focus();
+    document.getElementById('inputEmail').focus();
+}
+
+/**
+ * Affiche le formulaire d'inscription (pseudo + email + mot de passe + confirmation).
+ */
+function showRegisterForm() {
+    hideAllAuthForms();
+    document.getElementById('registerForm').classList.add('active');
+    document.getElementById('inputRegNom').focus();
+}
+
+/**
+ * Affiche le formulaire "mot de passe oublié" (saisie email).
+ */
+function showForgotForm() {
+    hideAllAuthForms();
+    document.getElementById('forgotForm').classList.add('active');
+    document.getElementById('inputForgotEmail').focus();
+}
+
+/**
+ * Affiche le formulaire de réinitialisation de mot de passe (après clic sur le lien email).
+ */
+function showResetForm() {
+    hideAllAuthForms();
+    document.getElementById('resetForm').classList.add('active');
+    document.getElementById('inputResetPassword').focus();
 }
 
 function showPseudoForm(ssoUser) {
     pendingSSOUser = ssoUser;
-    document.getElementById('authOptions').style.display='none';
-    document.getElementById('emailForm').classList.remove('active');
+    hideAllAuthForms();
     document.getElementById('pseudoForm').classList.add('active');
     document.getElementById('inputPseudo').value = ssoUser.nom;
     document.getElementById('inputPseudo').focus();
@@ -412,8 +451,8 @@ function loadGoogleScript() {
 function loginGoogle() {
     if (!GOOGLE_CLIENT_ID) { toast('SSO Google non configuré — utilisez pseudo/email', 'info'); showEmailForm(); return; }
 
-    // Masquer les options d'auth et afficher un conteneur pour le bouton Google
-    document.getElementById('authOptions').style.display = 'none';
+    // Masquer tous les formulaires et afficher le conteneur Google
+    hideAllAuthForms();
     var container = document.getElementById('googleBtnContainer');
     if (!container) {
         container = document.createElement('div');
@@ -456,17 +495,114 @@ function loginDiscord() {
     window.location.href = 'https://discord.com/api/oauth2/authorize?client_id=' + DISCORD_CLIENT_ID + '&redirect_uri=' + redirectUri + '&response_type=code&scope=identify%20email';
 }
 
-function loginEmail() {
-    const nom = document.getElementById('inputNom').value.trim();
-    const email = document.getElementById('inputEmail').value.trim();
-    if (!nom) { toast('Entrez votre pseudo', 'error'); return; }
+/**
+ * Connexion par email + mot de passe.
+ * Envoie les identifiants en POST au backend pour vérification.
+ * En cas de succès, appelle setUser() comme pour les SSO.
+ */
+async function loginEmail() {
+    var email = document.getElementById('inputEmail').value.trim();
+    var password = document.getElementById('inputPassword').value;
     if (!email || !email.includes('@')) { toast('Email invalide', 'error'); return; }
-    setUser({ nom, email, auth_type:'email', auth_id:'' });
-    toast(`Bienvenue ${nom} !`, 'success');
+    if (!password) { toast('Entrez votre mot de passe', 'error'); return; }
+
+    try {
+        var r = await callAPIPost({ action: 'login_email', email: email, password: password });
+        if (r.ok) {
+            setUser({ nom: r.nom, email: r.email, auth_type: 'email', auth_id: '' });
+            toast('Bienvenue ' + r.nom + ' !', 'success');
+        }
+    } catch(e) {
+        toast(e.message, 'error');
+    }
+}
+
+/**
+ * Inscription par pseudo + email + mot de passe.
+ * Crée un nouveau compte côté backend, puis connecte l'utilisateur.
+ */
+async function registerEmail() {
+    var nom = document.getElementById('inputRegNom').value.trim();
+    var email = document.getElementById('inputRegEmail').value.trim();
+    var password = document.getElementById('inputRegPassword').value;
+    var confirm = document.getElementById('inputRegConfirm').value;
+
+    if (!nom || nom.length < 2) { toast('Le pseudo doit contenir au moins 2 caractères', 'error'); return; }
+    if (!email || !email.includes('@')) { toast('Email invalide', 'error'); return; }
+    if (!password || password.length < 6) { toast('Le mot de passe doit contenir au moins 6 caractères', 'error'); return; }
+    if (password !== confirm) { toast('Les mots de passe ne correspondent pas', 'error'); return; }
+
+    try {
+        var r = await callAPIPost({ action: 'register', nom: nom, email: email, password: password });
+        if (r.ok) {
+            setUser({ nom: r.nom, email: email, auth_type: 'email', auth_id: '' });
+            toast('Compte créé ! Bienvenue ' + r.nom + ' !', 'success');
+        }
+    } catch(e) {
+        toast(e.message, 'error');
+    }
+}
+
+/**
+ * Envoie un email de réinitialisation de mot de passe.
+ * Le backend répond toujours "succès" (ne révèle pas si l'email existe).
+ */
+async function sendForgotPassword() {
+    var email = document.getElementById('inputForgotEmail').value.trim();
+    if (!email || !email.includes('@')) { toast('Entrez une adresse email valide', 'error'); return; }
+
+    try {
+        var r = await callAPIPost({ action: 'forgot_password', email: email });
+        toast(r.message || 'Si un compte existe, un email a été envoyé.', 'success');
+        // Revenir au formulaire de connexion après 2 secondes
+        setTimeout(function() { showEmailForm(); }, 2000);
+    } catch(e) {
+        toast(e.message, 'error');
+    }
+}
+
+/**
+ * Réinitialise le mot de passe avec le token reçu par email.
+ * Le token est lu depuis l'URL (?reset_token=xxx) et stocké dans _resetToken.
+ */
+var _resetToken = null;
+
+async function submitResetPassword() {
+    var password = document.getElementById('inputResetPassword').value;
+    var confirm = document.getElementById('inputResetConfirm').value;
+
+    if (!password || password.length < 6) { toast('Le mot de passe doit contenir au moins 6 caractères', 'error'); return; }
+    if (password !== confirm) { toast('Les mots de passe ne correspondent pas', 'error'); return; }
+    if (!_resetToken) { toast('Token de réinitialisation manquant. Utilisez le lien reçu par email.', 'error'); return; }
+
+    try {
+        var r = await callAPIPost({ action: 'reset_password', token: _resetToken, password: password });
+        if (r.ok) {
+            _resetToken = null;
+            // Connecter l'utilisateur automatiquement
+            setUser({ nom: r.nom, email: r.email, auth_type: 'email', auth_id: '' });
+            toast(r.message || 'Mot de passe mis à jour !', 'success');
+        }
+    } catch(e) {
+        toast(e.message, 'error');
+    }
 }
 
 function checkAuthCallback() {
     const p = new URLSearchParams(location.search);
+
+    // Détection du token de réinitialisation de mot de passe dans l'URL
+    // (l'utilisateur a cliqué sur le lien reçu par email)
+    if (p.get('reset_token')) {
+        _resetToken = p.get('reset_token');
+        // Nettoyer l'URL (ne pas laisser le token visible dans la barre d'adresse)
+        history.replaceState({}, '', location.pathname + location.hash);
+        // Ouvrir le modal sur le formulaire de reset
+        document.getElementById('authModal').classList.add('active');
+        showResetForm();
+        return;
+    }
+
     if (p.get('code') && !p.get('auth')) {
         const code = p.get('code');
         // Doit correspondre exactement à la redirect_uri envoyée dans loginDiscord()
@@ -494,8 +630,7 @@ function checkAuthCallback() {
 function editPseudo() {
     if (!currentUser) return;
     document.getElementById('authModal').classList.add('active');
-    document.getElementById('authOptions').style.display='none';
-    document.getElementById('emailForm').classList.remove('active');
+    hideAllAuthForms();
     document.getElementById('pseudoForm').classList.add('active');
     document.getElementById('inputPseudo').value = currentUser.nom;
     document.getElementById('inputPseudo').focus();
@@ -625,12 +760,18 @@ window.closeAuthModal = closeAuthModal;
 window.closeChoixModal = closeChoixModal;
 window.showAuthOptions = showAuthOptions;
 window.showEmailForm = showEmailForm;
+window.showRegisterForm = showRegisterForm;
+window.showForgotForm = showForgotForm;
+window.showResetForm = showResetForm;
 window.showPseudoForm = showPseudoForm;
 window.confirmPseudo = confirmPseudo;
 window.editPseudo = editPseudo;
 window.loginGoogle = loginGoogle;
 window.loginDiscord = loginDiscord;
 window.loginEmail = loginEmail;
+window.registerEmail = registerEmail;
+window.sendForgotPassword = sendForgotPassword;
+window.submitResetPassword = submitResetPassword;
 window.logout = logout;
 window.toast = toast;
 window.escHtml = escHtml;
