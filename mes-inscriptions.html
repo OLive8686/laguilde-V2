@@ -273,7 +273,7 @@ window.envoyerRecap = envoyerRecap;
  * Gere la visibilite des sections selon que l'utilisateur est connecte ou non.
  * Si connecte, lance le chargement de toutes les donnees.
  */
-function updateDashboardView() {
+function updateDashboardView(allData) {
     var user = APP.currentUser;
     var role = APP.currentRole;
 
@@ -299,12 +299,14 @@ function updateDashboardView() {
         (user && role === 'joueur') ? 'block' : 'none';
 
     // Charger les donnees si connecte
+    // Si allData est fourni (premier chargement), utiliser ses données (0 appel API).
+    // Sinon (login/logout callback), faire les appels individuels.
     if (user) {
-        loadMesInscriptionsJdr();
-        loadAccompagnants();
-        loadMesBenevoles();
+        loadMesInscriptionsJdr(allData);
+        loadAccompagnants(allData);
+        loadMesBenevoles(allData);
         if (role === 'mj' || role === 'admin') {
-            loadMesPropositionsMj();
+            loadMesPropositionsMj(allData);
         }
     }
 }
@@ -318,23 +320,30 @@ function updateDashboardView() {
  * et les affiche dans la grille #mesJdrGrid.
  * Separe les inscriptions personnelles de celles des accompagnants.
  */
-async function loadMesInscriptionsJdr() {
+async function loadMesInscriptionsJdr(allData) {
     var user = APP.currentUser;
     if (!user) return;
     try {
-        var r = await callAPI({ action: 'get_mes_inscriptions', email: user.email });
+        // Utiliser allData si disponible (0 appel API), sinon fallback
+        var inscriptions;
+        if (allData && allData.mes_inscriptions) {
+            inscriptions = allData.mes_inscriptions;
+        } else {
+            var r = await callAPI({ action: 'get_mes_inscriptions', email: user.email });
+            inscriptions = r.inscriptions || [];
+        }
         var grid = document.getElementById('mesJdrGrid');
 
-        if (!r.inscriptions || r.inscriptions.length === 0) {
+        if (!inscriptions || inscriptions.length === 0) {
             grid.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:16px;padding:20px 0">Vous n\'&ecirc;tes inscrit&middot;e &agrave; aucune table pour le moment. <a href="programme.html" style="color:var(--gold)">Voir le programme</a></p>';
             return;
         }
 
         // Separer les inscriptions personnelles des accompagnants
-        var perso = r.inscriptions.filter(function(i) {
+        var perso = inscriptions.filter(function(i) {
             return !i.nom_accompagnant || i.type_inscrit !== 'accompagnant';
         });
-        var accs = r.inscriptions.filter(function(i) {
+        var accs = inscriptions.filter(function(i) {
             return i.nom_accompagnant && i.type_inscrit === 'accompagnant';
         });
 
@@ -420,12 +429,17 @@ async function annulerJdr(creneau, jeu, nomAccompagnant) {
  * Charge la liste des accompagnants depuis le backend et les affiche.
  * Montre/cache le formulaire d'ajout selon le nombre (max 3).
  */
-async function loadAccompagnants() {
+async function loadAccompagnants(allData) {
     var user = APP.currentUser;
     if (!user) return;
     try {
-        var r = await callAPI({ action: 'get_accompagnants', email: user.email });
-        var accompagnantsList = r.accompagnants || [];
+        var accompagnantsList;
+        if (allData && allData.mes_accompagnants) {
+            accompagnantsList = allData.mes_accompagnants;
+        } else {
+            var r = await callAPI({ action: 'get_accompagnants', email: user.email });
+            accompagnantsList = r.accompagnants || [];
+        }
         // Mettre a jour l'etat global
         APP.accompagnants = accompagnantsList;
         localStorage.setItem('melusine_accompagnants', JSON.stringify(accompagnantsList));
@@ -436,21 +450,33 @@ async function loadAccompagnants() {
         if (accompagnantsList.length === 0) {
             grid.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:16px">Aucun accompagnant pour le moment.</p>';
         } else {
-            // Charger les inscriptions JDR et b&eacute;n&eacute;voles pour enrichir l'affichage
+            // Utiliser allData si disponible, sinon fallback API
             var insJdr = [];
             var insBen = [];
-            try {
-                var rJdr = await callAPI({ action: 'get_mes_inscriptions', email: user.email });
-                insJdr = (rJdr.inscriptions || []).filter(function(i) {
+            if (allData && allData.mes_inscriptions) {
+                insJdr = allData.mes_inscriptions.filter(function(i) {
                     return i.type_inscrit === 'accompagnant' && (i.statut === 'inscrit' || i.statut === 'attente');
                 });
-            } catch(e) {}
-            try {
-                var rBen = await callAPI({ action: 'get_mes_benevoles', email: user.email });
-                insBen = (rBen.benevoles || []).filter(function(b) {
+            } else {
+                try {
+                    var rJdr = await callAPI({ action: 'get_mes_inscriptions', email: user.email });
+                    insJdr = (rJdr.inscriptions || []).filter(function(i) {
+                        return i.type_inscrit === 'accompagnant' && (i.statut === 'inscrit' || i.statut === 'attente');
+                    });
+                } catch(e) {}
+            }
+            if (allData && allData.mes_benevoles) {
+                insBen = allData.mes_benevoles.filter(function(b) {
                     return b.nom_accompagnant && b.nom_accompagnant.trim() !== '';
                 });
-            } catch(e) {}
+            } else {
+                try {
+                    var rBen = await callAPI({ action: 'get_mes_benevoles', email: user.email });
+                    insBen = (rBen.benevoles || []).filter(function(b) {
+                        return b.nom_accompagnant && b.nom_accompagnant.trim() !== '';
+                    });
+                } catch(e) {}
+            }
 
             grid.innerHTML = accompagnantsList.map(function(a) {
                 var nom = a.nom_accompagnant;
@@ -551,19 +577,25 @@ async function supprimerAccompagnant(nomAccompagnant) {
 /**
  * Charge les inscriptions benevole de l'utilisateur et les affiche.
  */
-async function loadMesBenevoles() {
+async function loadMesBenevoles(allData) {
     var user = APP.currentUser;
     if (!user) return;
     try {
-        var r = await callAPI({ action: 'get_mes_benevoles', email: user.email });
+        var benevoles;
+        if (allData && allData.mes_benevoles) {
+            benevoles = allData.mes_benevoles;
+        } else {
+            var r = await callAPI({ action: 'get_mes_benevoles', email: user.email });
+            benevoles = r.benevoles || [];
+        }
         var grid = document.getElementById('mesBenevolesGrid');
 
-        if (!r.benevoles || r.benevoles.length === 0) {
+        if (!benevoles || benevoles.length === 0) {
             grid.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:16px;padding:20px 0">Vous n\'&ecirc;tes inscrit&middot;e &agrave; aucun cr&eacute;neau b&eacute;n&eacute;vole. <a href="benevoles.html" style="color:var(--gold)">S\'inscrire</a></p>';
             return;
         }
 
-        grid.innerHTML = r.benevoles.map(function(b) {
+        grid.innerHTML = benevoles.map(function(b) {
             var label = b.nom_accompagnant
                 ? 'B&eacute;n&eacute;vole &mdash; ' + escHtml(b.creneau) + ' <span style="color:var(--text-muted);font-size:13px">(' + escHtml(b.nom_accompagnant) + ')</span>'
                 : 'B&eacute;n&eacute;vole &mdash; ' + escHtml(b.creneau);
@@ -615,14 +647,20 @@ async function annulerBenevole(creneau, nomAccompagnant) {
  * Charge les propositions de tables du MJ connecte et les affiche avec
  * des badges de statut (en attente / validee / refusee).
  */
-async function loadMesPropositionsMj() {
+async function loadMesPropositionsMj(allData) {
     var user = APP.currentUser;
     if (!user) return;
     try {
-        var r = await callAPI({ action: 'get_mes_propositions', email: user.email });
+        var propositions;
+        if (allData && allData.mes_propositions) {
+            propositions = allData.mes_propositions;
+        } else {
+            var r = await callAPI({ action: 'get_mes_propositions', email: user.email });
+            propositions = r.propositions || [];
+        }
         var grid = document.getElementById('mesPropositionsGrid');
 
-        if (!r.propositions || r.propositions.length === 0) {
+        if (!propositions || propositions.length === 0) {
             grid.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:16px;padding:20px 0">Aucune proposition de table pour le moment.</p>';
             return;
         }
@@ -639,7 +677,7 @@ async function loadMesPropositionsMj() {
             'refus\u00e9': 'complet'
         };
 
-        grid.innerHTML = r.propositions.map(function(p) {
+        grid.innerHTML = propositions.map(function(p) {
             var statut = p.statut_table || 'en_attente';
             var badgeCls = statusBadge[statut] || 'attente';
             var badgeTxt = statusLabels[statut] || statut;
