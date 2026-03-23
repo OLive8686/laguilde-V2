@@ -33,7 +33,15 @@ const SUPABASE_ANON_KEY = 'sb_publishable_YGImet9fG8OKLDf_H0GNyQ_SmY5Mo56';
 
 // Initialisation du client Supabase
 // window.supabase est fourni par le SDK chargé via <script> dans le HTML.
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// storageKey unique pour éviter les conflits de lock si l'ancien SW sert encore app.js
+// lock: false désactive le Web Locks API qui cause des deadlocks sur certains navigateurs
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+        storageKey: 'melusine-auth-token',
+        lock: false,
+        detectSessionInUrl: true
+    }
+});
 
 // =============================================================================
 
@@ -995,10 +1003,13 @@ function prefetchAllPages() {
 // Lancer l'initialisation au chargement du DOM
 document.addEventListener('DOMContentLoaded', initApp);
 
-// ── Service Worker ──────────────────────────────────────────────────────────
-// Enregistre le SW pour cacher les pages et assets du site.
+// ── Service Worker : désenregistrer l'ancien SW ─────────────────────────────
+// L'ancien SW (version GAS) servait des fichiers cachés qui interfèrent
+// avec la nouvelle version Supabase. On le désenregistre proprement.
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(function() {});
+    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        registrations.forEach(function(reg) { reg.unregister(); });
+    });
 }
 
 // =============================================================================
