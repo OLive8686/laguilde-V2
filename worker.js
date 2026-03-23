@@ -28,14 +28,17 @@
 const GAS_URL = 'https://script.google.com/macros/s/AKfycby01lYf4lSk5Du1Bx1eJp1W5vXyhH-sFL_DbtY5PPBSYA5veBJiLQnNbFvubxN8TIZq/exec';
 
 // ── Durée de cache par action (en secondes) ──
+// TTL élevé (5 min) car le cron scheduled() pré-chauffe le cache toutes les 4 min.
+// Le cache n'expire donc jamais en pratique → tout le monde a ~50ms.
+// L'utilisateur qui vient de s'inscrire voit le résultat via le retour POST (pas via le cache).
 const CACHE_TTL = {
-  'get_all_public': 60,    // Données principales : 60s
-  'get_programme': 60,
-  'get_inscriptions': 30,
-  'get_postes_benevoles': 30,
+  'get_all_public': 300,    // Données principales : 5 min (rafraîchi par cron)
+  'get_programme': 300,
+  'get_inscriptions': 300,
+  'get_postes_benevoles': 300,
   'get_sheet': 300,         // Config, restauration, animations : 5 min
-  'get_role': 10,
-  'check_email': 10,
+  'get_role': 30,
+  'check_email': 30,
   'ping': 0,                // Jamais caché
 };
 
@@ -156,7 +159,41 @@ export default {
       });
     }
   },
+
+  // Handler cron : appelé par le trigger Cloudflare toutes les 4 minutes
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(handleScheduled(event));
+  },
 };
+
+// ── Cron : pré-chauffage du cache toutes les 4 minutes ──────────────────────
+// Configuré dans Cloudflare : Workers → melusineapi → Settings → Triggers → Cron
+// Expression : */4 * * * * (toutes les 4 minutes)
+// Ce handler appelle get_all_public via GAS et met la réponse en cache.
+// Résultat : le cache n'expire jamais → tous les visiteurs ont ~50ms.
+async function handleScheduled(event) {
+  try {
+    const gasUrl = new URL(GAS_URL);
+    gasUrl.searchParams.set('action', 'get_all_public');
+    const gasResponse = await fetch(gasUrl.toString(), { redirect: 'follow' });
+    const data = await gasResponse.text();
+
+    // Mettre en cache avec le même TTL que les requêtes normales
+    const cache = caches.default;
+    const cacheRequest = new Request(gasUrl.toString());
+    const response = new Response(data, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 's-maxage=300',
+        'X-Cache': 'CRON',
+      },
+    });
+    await cache.put(cacheRequest, response);
+  } catch (err) {
+    // Silencieux — le cron réessaiera dans 4 min
+  }
+}
 
 // ── Proxy direct vers GAS (sans cache) ──
 // request est passé pour extraire l'Origin et générer les headers CORS
