@@ -184,7 +184,10 @@ var supabaseProxy = {
                 return chain;
             },
             insert: function(rows) {
-                return sbInsert(table, rows);
+                // Retourner un objet chaînable qui supporte .select() après insert
+                var _promise = sbInsert(table, rows);
+                _promise.select = function() { return _promise; };
+                return _promise;
             },
             upsert: function(rows) {
                 // Upsert = INSERT ... ON CONFLICT DO UPDATE
