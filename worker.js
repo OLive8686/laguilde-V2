@@ -70,15 +70,43 @@ export default {
     }
 
     // ── POST : passe directement à GAS (pas de cache) ──
+    // IMPORTANT : GAS répond avec un 302 redirect. Si on utilise redirect:'follow',
+    // fetch convertit le POST en GET (RFC 7231) et le body est perdu.
+    // On gère donc la redirection manuellement : on suit le 302 avec un nouveau POST.
     if (request.method === 'POST') {
       try {
         const body = await request.text();
-        const gasResponse = await fetch(GAS_URL, {
+        // Première requête : GAS retourne un 302 vers l'URL d'exécution
+        var gasResponse = await fetch(GAS_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
           body: body,
-          redirect: 'follow',
+          redirect: 'manual',  // Ne pas suivre automatiquement (sinon POST → GET)
         });
+        // Si c'est une redirection, refaire le POST vers la nouvelle URL
+        if (gasResponse.status === 302 || gasResponse.status === 301 || gasResponse.status === 307) {
+          var redirectUrl = gasResponse.headers.get('Location');
+          if (redirectUrl) {
+            gasResponse = await fetch(redirectUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain' },
+              body: body,
+              redirect: 'manual',
+            });
+            // GAS peut faire une 2e redirection
+            if (gasResponse.status === 302 || gasResponse.status === 301 || gasResponse.status === 307) {
+              var redirectUrl2 = gasResponse.headers.get('Location');
+              if (redirectUrl2) {
+                gasResponse = await fetch(redirectUrl2, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'text/plain' },
+                  body: body,
+                  redirect: 'follow',
+                });
+              }
+            }
+          }
+        }
         const data = await gasResponse.text();
         return new Response(data, {
           status: 200,
