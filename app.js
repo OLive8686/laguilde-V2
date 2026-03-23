@@ -45,9 +45,12 @@ window.APP = {
 
 // ── Cache localStorage (stale-while-revalidate) ────────────────────────────
 // Affiche les données en cache immédiatement, puis rafraîchit en arrière-plan.
-// Réduit le temps d'affichage perçu de ~2-5s (cold start GAS) à ~0ms.
-// Le cache expire après 5 minutes (les données sont rafraîchies en background).
-var CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+// Réduit le temps d'affichage perçu de ~8s (GAS) à ~0ms.
+// TTL de 30 minutes : les données sont affichées depuis le cache local,
+// puis mises à jour silencieusement en arrière-plan. L'utilisateur voit
+// toujours le contenu immédiatement, même si les données ont ~30 min de retard.
+// Les actions (inscription, annulation) mettent à jour localement via le retour POST.
+var CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
 /**
  * Lit une valeur depuis le cache localStorage.
