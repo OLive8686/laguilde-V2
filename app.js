@@ -261,10 +261,18 @@ function esc(s) {
 }
 
 // ── Toasts ──────────────────────────────────────────────────────────────────
-function toast(msg, type='info') {
+// Options : toast('message', 'success') ou toast('message', 'success', { linkText: '...', linkHref: '...' })
+function toast(msg, type='info', options) {
     const el = document.createElement('div');
     el.className = `toast toast-${type}`;
     el.textContent = msg;
+    if (options && options.linkText && options.linkHref) {
+        var link = document.createElement('a');
+        link.textContent = ' ' + options.linkText;
+        link.href = options.linkHref;
+        link.style.cssText = 'color:inherit;font-weight:600;text-decoration:underline;margin-left:6px';
+        el.appendChild(link);
+    }
     document.getElementById('toasts').appendChild(el);
     setTimeout(() => { el.style.opacity='0'; setTimeout(() => el.remove(), 300); }, 4000);
 }

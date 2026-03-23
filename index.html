@@ -171,13 +171,35 @@ window.onPageInit = async function() {
         (allData.creneaux_benevoles || []).forEach(function(c) { nbBenevoles += parseInt(c.inscrits) || 0; });
 
         if (nbInscrits > 0 || nbTables > 0 || nbBenevoles > 0) {
-            document.getElementById('statInscrits').textContent = nbInscrits;
-            document.getElementById('statTables').textContent = nbTables;
-            document.getElementById('statBenevoles').textContent = nbBenevoles;
             document.getElementById('globalStats').style.display = 'block';
+            // Animation compteur : incrémente de 0 à N en ~800ms
+            animateCounter('statInscrits', nbInscrits);
+            animateCounter('statTables', nbTables);
+            animateCounter('statBenevoles', nbBenevoles);
         }
     }
 };
+
+/**
+ * Anime un compteur de 0 à la valeur cible en ~800ms.
+ * Utilise requestAnimationFrame pour une animation fluide.
+ */
+function animateCounter(elementId, target) {
+    var el = document.getElementById(elementId);
+    if (!el || target <= 0) { el.textContent = target; return; }
+    var start = 0;
+    var duration = 800;
+    var startTime = null;
+    function step(timestamp) {
+        if (!startTime) startTime = timestamp;
+        var progress = Math.min((timestamp - startTime) / duration, 1);
+        // Ease-out pour ralentir vers la fin
+        var eased = 1 - Math.pow(1 - progress, 3);
+        el.textContent = Math.round(eased * target);
+        if (progress < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+}
 
 /**
  * Applique la config Sheet aux éléments de la page d'accueil.

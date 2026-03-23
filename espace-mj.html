@@ -128,12 +128,7 @@
                     <div class="mj-form-group">
                         <label class="mj-label">Créneau souhaité *</label>
                         <select id="mjCreneau" class="mj-input">
-                            <option value="">Choisir un créneau...</option>
-                            <option value="Samedi 10h-13h">Samedi 10h-13h</option>
-                            <option value="Samedi 14h-18h">Samedi 14h-18h</option>
-                            <option value="Samedi 21h-01h">Samedi 21h-01h</option>
-                            <option value="Dimanche 10h-13h">Dimanche 10h-13h</option>
-                            <option value="Dimanche 14h-16h">Dimanche 14h-16h</option>
+                            <option value="">Chargement des créneaux...</option>
                         </select>
                     </div>
                     <div class="mj-form-group">
@@ -183,6 +178,38 @@ window.onUserLogout = function() {
 
 window.onPageInit = async function() {
     updateMJView();
+
+    // Peupler le select des créneaux dynamiquement depuis les données du programme
+    var allData = await fetchAllPublic();
+    if (allData && allData.programme) {
+        var creneauxSet = {};
+        var creneaux = [];
+        allData.programme.forEach(function(p) {
+            if (p.creneau && !creneauxSet[p.creneau]) {
+                creneauxSet[p.creneau] = true;
+                creneaux.push(p.creneau);
+            }
+        });
+        // Aussi ajouter les créneaux bénévoles (ils représentent les créneaux de la convention)
+        if (allData.creneaux_benevoles) {
+            allData.creneaux_benevoles.forEach(function(c) {
+                if (c.creneau && !creneauxSet[c.creneau]) {
+                    creneauxSet[c.creneau] = true;
+                    creneaux.push(c.creneau);
+                }
+            });
+        }
+        // Trier chronologiquement (samedi < dimanche, par heure)
+        creneaux.sort(function(a, b) {
+            var ka = (a.toLowerCase().indexOf('dimanche') !== -1 ? 100 : 0) + (parseInt((a.match(/(\d+)h/) || [])[1]) || 99);
+            var kb = (b.toLowerCase().indexOf('dimanche') !== -1 ? 100 : 0) + (parseInt((b.match(/(\d+)h/) || [])[1]) || 99);
+            return ka - kb;
+        });
+        var select = document.getElementById('mjCreneau');
+        select.innerHTML = '<option value="">Choisir un cr\u00e9neau...</option>' +
+            creneaux.map(function(c) { return '<option value="' + escHtml(c) + '">' + escHtml(c) + '</option>'; }).join('');
+    }
+
     // Compteur de caractères pour la description
     var descInput = document.getElementById('mjDescription');
     if (descInput) {

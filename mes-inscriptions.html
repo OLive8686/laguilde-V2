@@ -118,6 +118,15 @@
         <p style="color:var(--text-muted);font-size:13px;margin-top:8px">Un récap complet avec liens agenda sera envoyé à votre adresse email.</p>
     </div>
 
+    <!-- Encart conseil : visible si aucune inscription et pas MJ -->
+    <div id="tipProposerTable" style="display:none;text-align:center;padding:20px 24px">
+        <div style="background:rgba(212,168,67,0.08);border:1px solid rgba(212,168,67,0.2);border-radius:12px;padding:20px;max-width:600px;margin:0 auto">
+            <p style="color:var(--gold);font-family:var(--font-heading);font-size:15px;margin:0 0 8px">Envie de ma&icirc;triser une partie ?</p>
+            <p style="color:var(--text-light);font-size:14px;margin:0 0 12px">Tout le monde peut proposer une table de JDR. Pas besoin d'exp&eacute;rience de MJ !</p>
+            <a href="espace-mj.html" class="btn btn-small btn-gold">Proposer une table</a>
+        </div>
+    </div>
+
     <!-- ============================================================= -->
     <!-- SECTION 1 : Mes inscriptions JDR (tables en tant que joueur)  -->
     <!-- ============================================================= -->
@@ -285,6 +294,10 @@ function updateDashboardView() {
     document.getElementById('sectionPropositionsMj').style.display =
         (user && (role === 'mj' || role === 'admin')) ? 'block' : 'none';
 
+    // Encart "Proposer une table" — visible si connecté et pas MJ/admin
+    document.getElementById('tipProposerTable').style.display =
+        (user && role === 'joueur') ? 'block' : 'none';
+
     // Charger les donnees si connecte
     if (user) {
         loadMesInscriptionsJdr();
@@ -385,6 +398,8 @@ async function loadMesInscriptionsJdr() {
 async function annulerJdr(creneau, jeu, nomAccompagnant) {
     var user = APP.currentUser;
     if (!user) return;
+    var qui = nomAccompagnant || 'vous';
+    if (!confirm('Annuler l\'inscription de ' + qui + ' à ' + jeu + ' ?')) return;
     try {
         var params = { action: 'annuler', email: user.email, creneau: creneau, jeu: jeu };
         if (nomAccompagnant) params.nom_accompagnant = nomAccompagnant;
@@ -572,6 +587,8 @@ async function loadMesBenevoles() {
 async function annulerBenevole(creneau, nomAccompagnant) {
     var user = APP.currentUser;
     if (!user) return;
+    var qui = nomAccompagnant || 'votre';
+    if (!confirm('Annuler le bénévolat de ' + qui + ' sur ' + creneau + ' ?')) return;
     try {
         var params = {
             action: 'annuler_benevole',

@@ -398,6 +398,8 @@ async function doInscrireBenevoleAccompagnant(creneau, nomAccompagnant) {
  * Annule une inscription bénévole (principal ou accompagnant).
  */
 async function annulerBenevole(creneau, nomAccompagnant) {
+    var qui = nomAccompagnant || 'votre';
+    if (!confirm('Annuler le bénévolat de ' + qui + ' sur ' + creneau + ' ?')) return;
     var user = APP.currentUser;
     if (!user) return;
     try {

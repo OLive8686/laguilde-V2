@@ -329,7 +329,7 @@ async function doInscrire(creneau, jeu, btn) {
             creneau: creneau,
             jeu: jeu
         });
-        toast(r.message, r.statut === 'inscrit' ? 'success' : 'info');
+        toast(r.message, r.statut === 'inscrit' ? 'success' : 'info', { linkText: 'Mes inscriptions', linkHref: 'mes-inscriptions.html' });
         await reloadInscriptionsAndRefresh();
     } catch(e) {
         toast(e.message, 'error');
@@ -366,7 +366,7 @@ async function doInscrireAccompagnant(creneau, jeu, nomAccompagnant) {
             type_inscrit: 'accompagnant',
             nom_accompagnant: nomAccompagnant
         });
-        toast(r.message, r.statut === 'inscrit' ? 'success' : 'info');
+        toast(r.message, r.statut === 'inscrit' ? 'success' : 'info', { linkText: 'Mes inscriptions', linkHref: 'mes-inscriptions.html' });
         await reloadInscriptionsAndRefresh();
     } catch(e) {
         toast(e.message, 'error');
@@ -381,6 +381,8 @@ async function doInscrireAccompagnant(creneau, jeu, nomAccompagnant) {
  */
 async function annulerInscription(creneau, jeu, nomAccompagnant) {
     if (!APP.currentUser || !APP.SCRIPT_URL) return;
+    var qui = nomAccompagnant ? nomAccompagnant : 'vous';
+    if (!confirm('Annuler l\'inscription de ' + qui + ' à ' + jeu + ' ?')) return;
     try {
         var params = { action: 'annuler', email: APP.currentUser.email, creneau: creneau, jeu: jeu };
         if (nomAccompagnant) params.nom_accompagnant = nomAccompagnant;
@@ -439,8 +441,10 @@ function renderProgramme(items) {
     // Si le programme est vide, afficher un message au lieu de shimmers
     if (!items || !items.length) {
         document.getElementById('programmeGrid').innerHTML =
-            '<p style="text-align:center;color:var(--text-muted);font-size:16px;padding:40px 0">' +
-            'Le programme sera bientôt disponible.</p>';
+            '<div style="text-align:center;color:var(--text-muted);padding:60px 20px">' +
+            '<p style="font-size:20px;margin-bottom:12px">Le programme est en préparation</p>' +
+            '<p style="font-size:15px;line-height:1.6">Les tables de jeu seront annoncées prochainement.<br>En attendant, vous pouvez <a href="benevoles.html" style="color:var(--gold)">vous inscrire comme bénévole</a> ou <a href="espace-mj.html" style="color:var(--gold)">proposer une table</a>.</p>' +
+            '</div>';
         document.getElementById('programmeTabs').innerHTML = '';
         return;
     }
