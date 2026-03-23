@@ -2,21 +2,22 @@
 // SOUS L'ŒIL DE MÉLUSINE — Code JavaScript partagé (app.supabase.js)
 // =============================================================================
 // Version Supabase : remplace Google Apps Script + Cloudflare Worker par
-// des appels directs à Supabase (auth + base de données).
+// des appels REST directs à Supabase (auth + base de données).
+//
+// IMPORTANT : on n'utilise PAS le SDK Supabase JS (bug de lock auth v2).
+// À la place, on utilise fetch() directement vers l'API REST de Supabase.
+// C'est plus léger (~0KB de dépendance) et 100% fiable.
 //
 // Ce fichier contient le code commun à toutes les pages du site :
 //   - Configuration (URL Supabase, clé publique)
+//   - Client REST léger (sbQuery, sbInsert, sbUpdate, sbDelete)
 //   - Helpers (escHtml, esc, toast)
-//   - Authentification (login, logout, SSO Google/Discord via Supabase Auth)
+//   - Authentification (login, logout, SSO Google/Discord via Supabase Auth REST)
 //   - Navigation (menu responsive, scroll)
 //   - Gestion des rôles (lecture depuis la table profiles)
-//   - Chargement des données (requêtes directes Supabase)
+//   - Chargement des données (requêtes parallèles fetch)
 //
-// Prérequis : le SDK Supabase JS v2 doit être chargé AVANT ce fichier :
-//   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-//   <script src="app.supabase.js?v=1"></script>
-//
-// Importé par : index.html, espace-mj.html, admin.html
+// Importé par toutes les pages : index.html, programme.html, etc.
 // =============================================================================
 
 (function() {
@@ -25,37 +26,327 @@
 // =============================================================================
 // CONFIGURATION SUPABASE
 // =============================================================================
-// URL du projet Supabase et clé publique (anon key).
-// La clé anon est publique — elle ne donne accès qu'aux données autorisées
-// par les Row Level Security (RLS) policies définies côté Supabase.
 const SUPABASE_URL = 'https://hdbhvwaemrjoantcecuv.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_YGImet9fG8OKLDf_H0GNyQ_SmY5Mo56';
 
-// Initialisation du client Supabase
-// window.supabase est fourni par le SDK chargé via <script> dans le HTML.
-// storageKey unique pour éviter les conflits de lock si l'ancien SW sert encore app.js
-// lock: false désactive le Web Locks API qui cause des deadlocks sur certains navigateurs
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-        storageKey: 'melusine-auth-token',
-        lock: false,
-        detectSessionInUrl: true
+// Token de session (récupéré depuis localStorage après login)
+let _accessToken = null;
+
+// Charger le token depuis localStorage au démarrage
+try {
+    var stored = localStorage.getItem('melusine_session');
+    if (stored) {
+        var session = JSON.parse(stored);
+        if (session && session.access_token) _accessToken = session.access_token;
     }
-});
+} catch(e) {}
+
+// =============================================================================
+// CLIENT REST LÉGER (remplace le SDK Supabase)
+// =============================================================================
+// Chaque fonction retourne une Promise qui résout avec { data, error }.
+// Même interface que le SDK pour que les pages HTML n'aient pas à changer.
+
+/**
+ * Headers communs pour toutes les requêtes Supabase REST.
+ * Si l'utilisateur est connecté, inclut le Bearer token pour le RLS.
+ */
+function sbHeaders(extra) {
+    var h = {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': 'Bearer ' + (_accessToken || SUPABASE_ANON_KEY),
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+    };
+    if (extra) Object.assign(h, extra);
+    return h;
+}
+
+/**
+ * Requête SELECT sur une table Supabase.
+ * @param {string} table - Nom de la table
+ * @param {string} query - Query string PostgREST (ex: 'select=*&statut=eq.inscrit')
+ * @returns {Promise<{data, error}>}
+ */
+async function sbQuery(table, query) {
+    try {
+        var url = SUPABASE_URL + '/rest/v1/' + table + '?' + (query || 'select=*');
+        var r = await fetch(url, { headers: sbHeaders() });
+        if (!r.ok) {
+            var err = await r.json().catch(function() { return { message: r.statusText }; });
+            return { data: null, error: err };
+        }
+        var data = await r.json();
+        return { data: data, error: null };
+    } catch(e) {
+        return { data: null, error: { message: e.message } };
+    }
+}
+
+/**
+ * Requête INSERT sur une table Supabase.
+ * @param {string} table - Nom de la table
+ * @param {Object|Array} rows - Objet ou tableau d'objets à insérer
+ * @returns {Promise<{data, error}>}
+ */
+async function sbInsert(table, rows) {
+    try {
+        var url = SUPABASE_URL + '/rest/v1/' + table;
+        var r = await fetch(url, {
+            method: 'POST',
+            headers: sbHeaders(),
+            body: JSON.stringify(rows)
+        });
+        if (!r.ok) {
+            var err = await r.json().catch(function() { return { message: r.statusText }; });
+            return { data: null, error: err };
+        }
+        var data = await r.json();
+        return { data: data, error: null };
+    } catch(e) {
+        return { data: null, error: { message: e.message } };
+    }
+}
+
+/**
+ * Requête UPDATE sur une table Supabase.
+ * @param {string} table - Nom de la table
+ * @param {Object} values - Colonnes à mettre à jour
+ * @param {string} filter - Filtre PostgREST (ex: 'id=eq.5' ou 'email=eq.test@test.com&creneau=eq.Samedi')
+ * @returns {Promise<{data, error}>}
+ */
+async function sbUpdate(table, values, filter) {
+    try {
+        var url = SUPABASE_URL + '/rest/v1/' + table + '?' + filter;
+        var r = await fetch(url, {
+            method: 'PATCH',
+            headers: sbHeaders(),
+            body: JSON.stringify(values)
+        });
+        if (!r.ok) {
+            var err = await r.json().catch(function() { return { message: r.statusText }; });
+            return { data: null, error: err };
+        }
+        var data = await r.json();
+        return { data: data, error: null };
+    } catch(e) {
+        return { data: null, error: { message: e.message } };
+    }
+}
+
+/**
+ * Requête DELETE sur une table Supabase.
+ * @param {string} table - Nom de la table
+ * @param {string} filter - Filtre PostgREST (ex: 'id=eq.5')
+ * @returns {Promise<{data, error}>}
+ */
+async function sbDelete(table, filter) {
+    try {
+        var url = SUPABASE_URL + '/rest/v1/' + table + '?' + filter;
+        var r = await fetch(url, {
+            method: 'DELETE',
+            headers: sbHeaders()
+        });
+        if (!r.ok) {
+            var err = await r.json().catch(function() { return { message: r.statusText }; });
+            return { data: null, error: err };
+        }
+        var data = await r.json().catch(function() { return []; });
+        return { data: data, error: null };
+    } catch(e) {
+        return { data: null, error: { message: e.message } };
+    }
+}
+
+/**
+ * Objet proxy qui imite l'interface du SDK Supabase : APP.supabase.from('table').select('*')
+ * Permet aux pages HTML de fonctionner sans changement.
+ */
+var supabaseProxy = {
+    from: function(table) {
+        return {
+            select: function(cols) {
+                var q = 'select=' + encodeURIComponent(cols || '*');
+                var _filters = [];
+                var chain = {
+                    eq: function(col, val) { _filters.push(col + '=eq.' + encodeURIComponent(val)); return chain; },
+                    neq: function(col, val) { _filters.push(col + '=neq.' + encodeURIComponent(val)); return chain; },
+                    in: function(col, vals) { _filters.push(col + '=in.(' + vals.map(encodeURIComponent).join(',') + ')'); return chain; },
+                    or: function(expr) { _filters.push('or=(' + expr + ')'); return chain; },
+                    order: function(col, opts) { _filters.push('order=' + col + '.' + (opts && opts.ascending === false ? 'desc' : 'asc')); return chain; },
+                    limit: function(n) { _filters.push('limit=' + n); return chain; },
+                    then: function(resolve, reject) {
+                        var fullQuery = q + (_filters.length ? '&' + _filters.join('&') : '');
+                        return sbQuery(table, fullQuery).then(resolve, reject);
+                    },
+                    catch: function(fn) { return chain.then(undefined, fn); }
+                };
+                return chain;
+            },
+            insert: function(rows) {
+                return sbInsert(table, rows);
+            },
+            upsert: function(rows) {
+                // Upsert = INSERT ... ON CONFLICT DO UPDATE
+                return (async function() {
+                    try {
+                        var url = SUPABASE_URL + '/rest/v1/' + table;
+                        var r = await fetch(url, {
+                            method: 'POST',
+                            headers: sbHeaders({ 'Prefer': 'return=representation,resolution=merge-duplicates' }),
+                            body: JSON.stringify(rows)
+                        });
+                        if (!r.ok) {
+                            var err = await r.json().catch(function() { return { message: r.statusText }; });
+                            return { data: null, error: err };
+                        }
+                        var data = await r.json();
+                        return { data: data, error: null };
+                    } catch(e) {
+                        return { data: null, error: { message: e.message } };
+                    }
+                })();
+            },
+            update: function(values) {
+                var _filters = [];
+                var chain = {
+                    eq: function(col, val) { _filters.push(col + '=eq.' + encodeURIComponent(val)); return chain; },
+                    match: function(obj) { Object.keys(obj).forEach(function(k) { _filters.push(k + '=eq.' + encodeURIComponent(obj[k])); }); return chain; },
+                    then: function(resolve, reject) {
+                        return sbUpdate(table, values, _filters.join('&')).then(resolve, reject);
+                    },
+                    catch: function(fn) { return chain.then(undefined, fn); }
+                };
+                return chain;
+            },
+            delete: function() {
+                var _filters = [];
+                var chain = {
+                    eq: function(col, val) { _filters.push(col + '=eq.' + encodeURIComponent(val)); return chain; },
+                    match: function(obj) { Object.keys(obj).forEach(function(k) { _filters.push(k + '=eq.' + encodeURIComponent(obj[k])); }); return chain; },
+                    then: function(resolve, reject) {
+                        return sbDelete(table, _filters.join('&')).then(resolve, reject);
+                    },
+                    catch: function(fn) { return chain.then(undefined, fn); }
+                };
+                return chain;
+            }
+        };
+    },
+    auth: {
+        // Placeholder — l'auth est gérée par les fonctions loginGoogle/loginDiscord/etc.
+        getUser: async function() {
+            if (!_accessToken) return { data: { user: null }, error: null };
+            try {
+                var r = await fetch(SUPABASE_URL + '/auth/v1/user', { headers: sbHeaders() });
+                if (!r.ok) return { data: { user: null }, error: { message: 'Non connecté' } };
+                var user = await r.json();
+                return { data: { user: user }, error: null };
+            } catch(e) {
+                return { data: { user: null }, error: { message: e.message } };
+            }
+        },
+        signOut: async function() {
+            if (_accessToken) {
+                try {
+                    await fetch(SUPABASE_URL + '/auth/v1/logout', {
+                        method: 'POST',
+                        headers: sbHeaders()
+                    });
+                } catch(e) {}
+            }
+            _accessToken = null;
+            localStorage.removeItem('melusine_session');
+            return { error: null };
+        },
+        signInWithPassword: async function(creds) {
+            try {
+                var r = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
+                    method: 'POST',
+                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: creds.email, password: creds.password })
+                });
+                var data = await r.json();
+                if (!r.ok) return { data: null, error: data };
+                _accessToken = data.access_token;
+                localStorage.setItem('melusine_session', JSON.stringify(data));
+                return { data: { user: data.user, session: data }, error: null };
+            } catch(e) {
+                return { data: null, error: { message: e.message } };
+            }
+        },
+        signUp: async function(creds) {
+            try {
+                var r = await fetch(SUPABASE_URL + '/auth/v1/signup', {
+                    method: 'POST',
+                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: creds.email, password: creds.password, data: creds.options ? creds.options.data : {} })
+                });
+                var data = await r.json();
+                if (!r.ok) return { data: null, error: data };
+                if (data.access_token) {
+                    _accessToken = data.access_token;
+                    localStorage.setItem('melusine_session', JSON.stringify(data));
+                }
+                return { data: { user: data.user || data, session: data }, error: null };
+            } catch(e) {
+                return { data: null, error: { message: e.message } };
+            }
+        },
+        resetPasswordForEmail: async function(email) {
+            try {
+                var redirectTo = (window.location.origin + window.location.pathname).replace(/\/[^\/]*$/, '/index.html');
+                var r = await fetch(SUPABASE_URL + '/auth/v1/recover', {
+                    method: 'POST',
+                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email, gotrue_meta_security: {}, redirect_to: redirectTo })
+                });
+                if (!r.ok) { var err = await r.json(); return { error: err }; }
+                return { error: null };
+            } catch(e) {
+                return { error: { message: e.message } };
+            }
+        },
+        updateUser: async function(updates) {
+            try {
+                var r = await fetch(SUPABASE_URL + '/auth/v1/user', {
+                    method: 'PUT',
+                    headers: sbHeaders(),
+                    body: JSON.stringify(updates)
+                });
+                var data = await r.json();
+                if (!r.ok) return { data: null, error: data };
+                return { data: { user: data }, error: null };
+            } catch(e) {
+                return { data: null, error: { message: e.message } };
+            }
+        },
+        signInWithOAuth: function(opts) {
+            var provider = opts.provider;
+            var redirectTo = opts.options && opts.options.redirectTo
+                ? opts.options.redirectTo
+                : window.location.href;
+            var url = SUPABASE_URL + '/auth/v1/authorize?provider=' + provider
+                + '&redirect_to=' + encodeURIComponent(redirectTo);
+            window.location.href = url;
+            return { error: null };
+        }
+    }
+};
 
 // =============================================================================
 
+// Alias pour que le reste du code (et les pages HTML) puisse utiliser "supabase.from(...)"
+const supabase = supabaseProxy;
+
 // ── État global ─────────────────────────────────────────────────────────────
-// L'état d'authentification est géré par Supabase (session stockée
-// automatiquement dans localStorage par le SDK). On garde des variables
-// locales pour un accès rapide depuis le code de la page.
 let currentUser = null;   // { nom, email, id } — null si déconnecté
 let currentRole = 'joueur';
 let accompagnants = [];
 let pendingInscription = null;
 let pendingSSOUser = null;
 
-// Exposer l'état global en lecture pour les pages spécifiques (espace-mj, admin, etc.)
+// Exposer l'état global en lecture pour les pages spécifiques
 window.APP = {
     get currentUser() { return currentUser; },
     get currentRole() { return currentRole; },
@@ -63,8 +354,8 @@ window.APP = {
     set accompagnants(val) { accompagnants = val; },
     SUPABASE_URL: SUPABASE_URL,
     SUPABASE_KEY: SUPABASE_ANON_KEY,
-    // Référence au client Supabase pour les pages qui ont besoin de requêtes custom
-    get supabase() { return supabase; }
+    // Proxy qui imite le SDK Supabase — les pages HTML utilisent APP.supabase.from('table')...
+    get supabase() { return supabaseProxy; }
 };
 
 // =============================================================================
@@ -901,60 +1192,62 @@ async function loadTheme() {
  *   7. Précharger les autres pages
  */
 async function initApp() {
-    // Écouter les changements d'état d'authentification Supabase.
-    // Cet écouteur réagit à : connexion, déconnexion, refresh token,
-    // retour SSO, clic sur lien de reset password.
-    supabase.auth.onAuthStateChange(async function(event, session) {
-        if (event === 'SIGNED_IN' && session && session.user) {
-            setUserFromSupabase(session.user);
-
-            // Si c'est un SSO (Google/Discord), proposer de choisir un pseudo
-            var provider = session.user.app_metadata && session.user.app_metadata.provider;
-            if (provider && provider !== 'email') {
-                var meta = session.user.user_metadata || {};
-                // Vérifier si l'utilisateur a déjà un pseudo personnalisé
-                if (!meta.nom) {
-                    var nom = meta.full_name || meta.name || meta.preferred_username || '';
-                    showPseudoForm({
-                        nom: nom,
-                        email: session.user.email,
-                        auth_type: provider
-                    });
-                    document.getElementById('authModal').classList.add('active');
-                    return;
-                }
-            }
-
-            await fetchRole();
-            updateNavUser();
-            updateNavForRole();
-        }
-
-        if (event === 'SIGNED_OUT') {
-            currentUser = null;
-            currentRole = 'joueur';
-            accompagnants = [];
-            updateNavUser();
-            updateNavForRole();
-            if (window.onUserLogout) window.onUserLogout();
-        }
-
-        // Événement spécial : l'utilisateur a cliqué sur un lien de reset password
-        if (event === 'PASSWORD_RECOVERY') {
-            document.getElementById('authModal').classList.add('active');
-            showResetForm();
-        }
-    });
-
-    // Vérifier la session existante (l'utilisateur était peut-être déjà connecté)
+    // ── Détecter le retour SSO (Google/Discord) ──────────────────────────
+    // Après un SSO, Supabase redirige vers le site avec un fragment #access_token=...
+    // ou des paramètres ?error=... On les traite ici.
     try {
-        var { data: { session } } = await supabase.auth.getSession();
-        if (session && session.user) {
-            setUserFromSupabase(session.user);
-            await fetchRole();
+        var hashParams = {};
+        if (window.location.hash) {
+            window.location.hash.substring(1).split('&').forEach(function(part) {
+                var kv = part.split('=');
+                if (kv.length === 2) hashParams[kv[0]] = decodeURIComponent(kv[1]);
+            });
+        }
+        // Si on a un access_token dans le hash → retour SSO réussi
+        if (hashParams.access_token) {
+            _accessToken = hashParams.access_token;
+            // Sauvegarder la session complète
+            var sessionData = {
+                access_token: hashParams.access_token,
+                refresh_token: hashParams.refresh_token || '',
+                token_type: hashParams.token_type || 'bearer',
+                expires_in: hashParams.expires_in || 3600
+            };
+            localStorage.setItem('melusine_session', JSON.stringify(sessionData));
+            // Nettoyer l'URL (enlever le fragment)
+            history.replaceState(null, '', window.location.pathname + window.location.search);
+        }
+        // Si erreur dans l'URL (ex: ?error=server_error)
+        var urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('error')) {
+            var errDesc = urlParams.get('error_description') || urlParams.get('error');
+            console.error('Auth error:', errDesc);
+            toast('Erreur de connexion : ' + errDesc.replace(/\+/g, ' '), 'error');
+            history.replaceState(null, '', window.location.pathname);
+        }
+    } catch(e) {
+        console.error('Erreur traitement callback SSO:', e);
+    }
+
+    // ── Restaurer la session existante ─────────────────────────────────
+    // Si un token est en localStorage, vérifier qu'il est encore valide
+    // et récupérer les infos utilisateur.
+    try {
+        if (_accessToken) {
+            var { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                setUserFromSupabase(user);
+                await fetchRole();
+            } else {
+                // Token invalide → nettoyer
+                _accessToken = null;
+                localStorage.removeItem('melusine_session');
+            }
         }
     } catch(e) {
         console.error('Erreur restauration session:', e);
+        _accessToken = null;
+        localStorage.removeItem('melusine_session');
     }
 
     // Vérifier les callbacks d'authentification dans l'URL
