@@ -146,8 +146,27 @@
             <div class="menu-grid" id="menuGrid">
                 <div class="loading-shimmer" style="height:80px"></div>
             </div>
+
+            <!-- Inscription au repas du samedi soir -->
+            <div id="repasSection" style="display:none;margin-top:32px;text-align:center">
+                <div style="background:var(--dark-card);border-radius:12px;padding:24px;max-width:500px;margin:0 auto;border:1px solid rgba(212,168,67,0.15)">
+                    <h4 style="font-family:var(--font-heading);color:var(--gold);font-size:16px;margin:0 0 8px">Repas du samedi soir</h4>
+                    <p style="font-size:14px;color:var(--text-light);margin:0 0 16px" id="repasDesc">Repas chaud le samedi soir. Inscription recommand&eacute;e.</p>
+                    <p style="font-size:13px;color:var(--text-muted);margin:0 0 12px"><span id="repasCount">0</span> inscrit(s)</p>
+                    <div id="repasBtn"></div>
+                </div>
+            </div>
         </div>
     </section>
+
+    <!-- MODAL CHOIX ACCOMPAGNANT REPAS -->
+    <div class="modal-overlay" id="choixRepasModal">
+        <div class="modal">
+            <button class="modal-close" onclick="closeChoixRepasModal()">&#10005;</button>
+            <h3>Inscrire au repas</h3>
+            <div id="choixRepasOptions" class="auth-options"></div>
+        </div>
+    </div>
 
     <!-- ANIMATIONS -->
     <section class="section section-dark" id="animations">
@@ -199,6 +218,7 @@ window.onPageInit = async function() {
         renderConfig(allData.config || null);
         renderRestauration(allData.restauration || null);
         renderAnimations(allData.animations || null);
+        renderRepas(allData);
     } else {
         // Fallback : appels séparés si le groupé échoue
         var results = await Promise.all([fetchConfig(), fetchSheetData('restauration'), fetchSheetData('animations')]);
@@ -331,6 +351,115 @@ function renderAnimations(items) {
         '</div>';
     }).join('');
 }
+
+// ── Repas du soir ────────────────────────────────────────────────────────────
+
+/**
+ * Affiche la section repas avec le compteur et le bouton d'inscription.
+ * Appelée depuis onPageInit avec allData.
+ */
+function renderRepas(allData) {
+    var section = document.getElementById('repasSection');
+    section.style.display = 'block';
+
+    // Compteur
+    var count = allData ? (allData.repas_count || 0) : 0;
+    document.getElementById('repasCount').textContent = count;
+
+    // Bouton selon l'état de connexion et d'inscription
+    var btnDiv = document.getElementById('repasBtn');
+    var user = APP.currentUser;
+
+    if (!user) {
+        btnDiv.innerHTML = '<button class="btn btn-small btn-gold" onclick="openAuthModal()">Se connecter pour s\'inscrire</button>';
+        return;
+    }
+
+    // Vérifier si déjà inscrit (principal + accompagnants)
+    var mesRepas = allData ? (allData.mes_repas || []) : [];
+    var principalInscrit = mesRepas.some(function(r) { return !r.nom_accompagnant || r.nom_accompagnant.trim() === ''; });
+
+    var html = '';
+    if (principalInscrit) {
+        html += '<span class="badge badge-inscrit" style="font-size:13px;margin-right:8px">Inscrit·e</span>';
+        html += '<button class="btn btn-small btn-red" onclick="annulerRepas()">Annuler</button>';
+    } else {
+        html += '<button class="btn btn-small btn-green" onclick="handleInscrireRepas()">S\'inscrire au repas</button>';
+    }
+
+    // Accompagnants
+    var accompagnants = APP.accompagnants || [];
+    if (accompagnants.length > 0) {
+        html += '<div style="margin-top:12px;font-size:13px;color:var(--text-muted)">';
+        accompagnants.forEach(function(a) {
+            var accInscrit = mesRepas.some(function(r) {
+                return (r.nom_accompagnant || '').toLowerCase() === a.nom_accompagnant.toLowerCase();
+            });
+            if (accInscrit) {
+                html += '<div style="margin:4px 0">' + escHtml(a.nom_accompagnant) + ' <span class="badge badge-inscrit" style="font-size:11px">Inscrit</span> '
+                    + '<span style="color:var(--red);cursor:pointer;font-size:12px" onclick="annulerRepas(\'' + esc(a.nom_accompagnant) + '\')">Annuler</span></div>';
+            } else {
+                html += '<div style="margin:4px 0">' + escHtml(a.nom_accompagnant) + ' '
+                    + '<span style="color:var(--green);cursor:pointer;font-size:12px" onclick="doInscrireRepasAccompagnant(\'' + esc(a.nom_accompagnant) + '\')">Inscrire</span></div>';
+            }
+        });
+        html += '</div>';
+    }
+
+    btnDiv.innerHTML = html;
+}
+
+function handleInscrireRepas() {
+    if (!APP.currentUser) { openAuthModal(); return; }
+    doInscrireRepas();
+}
+
+async function doInscrireRepas() {
+    var user = APP.currentUser;
+    if (!user) return;
+    try {
+        var r = await callAPIPost({ action: 'inscrire_repas', nom: user.nom, email: user.email });
+        toast(r.message, 'success');
+        var allData = await fetchAllPublic();
+        renderRepas(allData);
+    } catch(e) { toast(e.message, 'error'); }
+}
+
+async function doInscrireRepasAccompagnant(nomAccompagnant) {
+    var user = APP.currentUser;
+    if (!user) return;
+    try {
+        var r = await callAPIPost({ action: 'inscrire_repas', nom: user.nom, email: user.email, type_inscrit: 'accompagnant', nom_accompagnant: nomAccompagnant });
+        toast(r.message, 'success');
+        var allData = await fetchAllPublic();
+        renderRepas(allData);
+    } catch(e) { toast(e.message, 'error'); }
+}
+
+async function annulerRepas(nomAccompagnant) {
+    var qui = nomAccompagnant || 'votre';
+    if (!confirm('Annuler l\'inscription repas de ' + qui + ' ?')) return;
+    var user = APP.currentUser;
+    if (!user) return;
+    try {
+        var params = { action: 'annuler_repas', email: user.email };
+        if (nomAccompagnant) params.nom_accompagnant = nomAccompagnant;
+        var r = await callAPIPost(params);
+        toast(r.message, 'success');
+        var allData = await fetchAllPublic();
+        renderRepas(allData);
+    } catch(e) { toast(e.message, 'error'); }
+}
+
+function closeChoixRepasModal() {
+    document.getElementById('choixRepasModal').classList.remove('active');
+}
+
+window.handleInscrireRepas = handleInscrireRepas;
+window.doInscrireRepas = doInscrireRepas;
+window.doInscrireRepasAccompagnant = doInscrireRepasAccompagnant;
+window.annulerRepas = annulerRepas;
+window.closeChoixRepasModal = closeChoixRepasModal;
 
 })();
 </script>

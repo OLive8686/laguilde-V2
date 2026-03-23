@@ -818,6 +818,11 @@ function getSheet(tabName) {
       sheet.getRange(1, 1, 1, 7).setFontWeight('bold');
     }
 
+    if (tabName === 'repas') {
+      sheet.appendRow(['timestamp', 'nom', 'email', 'statut', 'type_inscrit', 'nom_accompagnant']);
+      sheet.getRange(1, 1, 1, 6).setFontWeight('bold');
+    }
+
     if (tabName === 'creneaux_benevoles') {
       sheet.appendRow(['creneau', 'description', 'places']);
       sheet.getRange(1, 1, 1, 3).setFontWeight('bold');
@@ -1282,6 +1287,10 @@ function doGet(e) {
           .filter(function(i) { return i.statut === 'inscrit' || i.statut === 'attente'; })
           .map(function(i) { return { nom: i.nom, creneau: i.creneau, jeu: i.jeu, statut: i.statut, type_inscrit: i.type_inscrit || 'principal', nom_accompagnant: i.nom_accompagnant || '' }; });
 
+        // 5b. Compteur repas du soir
+        var allRepas = getFromCacheOrSheet('cache_repas', function() { return readSheet('repas'); }, 30);
+        var repasInscrits = allRepas.filter(function(r) { return r.statut === 'inscrit'; }).length;
+
         var result = {
           ok: true,
           config: cfgData,
@@ -1289,7 +1298,8 @@ function doGet(e) {
           animations: animData,
           programme: programmePublic,
           creneaux_benevoles: creneauxBen,
-          inscriptions_publiques: inscPubliques
+          inscriptions_publiques: inscPubliques,
+          repas_count: repasInscrits
         };
 
         // 6. Données privées utilisateur (réutilise les mêmes tableaux)
@@ -1319,6 +1329,13 @@ function doGet(e) {
             return (p.email_mj || '').toLowerCase().trim() === userEmail;
           }).map(function(p) {
             return { jeu: p.jeu, mj: p.mj, systeme: p.systeme || '', description: p.description || '', creneau: p.creneau, places: p.places, statut_table: p.statut_table || 'validé' };
+          });
+
+          // Inscriptions repas de l'utilisateur (principal + accompagnants)
+          result.mes_repas = allRepas.filter(function(r) {
+            return r.email.toLowerCase().trim() === userEmail && r.statut === 'inscrit';
+          }).map(function(r) {
+            return { nom: r.nom, type_inscrit: r.type_inscrit || 'principal', nom_accompagnant: r.nom_accompagnant || '' };
           });
 
           result.role = getOrCreateRole(userEmail, e.parameter.nom || '');
@@ -1426,6 +1443,12 @@ function doPost(e) {
         return jsonResponse(inscrireBenevole(data));
       case 'annuler_benevole':
         return jsonResponse(annulerBenevole(data));
+
+      // --- Repas du soir (écritures) ---
+      case 'inscrire_repas':
+        return jsonResponse(inscrireRepas(data));
+      case 'annuler_repas':
+        return jsonResponse(annulerRepas(data));
 
       // --- Récap email (à la demande) ---
       case 'send_recap':
@@ -2070,6 +2093,24 @@ function removeAccompagnant(params) {
         && (dataBen[k][benNomAccCol] || '').toString().trim().toLowerCase() === nomAccompagnant.toLowerCase()
         && dataBen[k][benStatutCol] === 'inscrit') {
       sheetBen.getRange(k + 1, benStatutCol + 1).setValue('annulé');
+      annulees++;
+    }
+  }
+
+  // 2c. Annuler aussi les inscriptions repas de cet accompagnant
+  var sheetRepas = getSheet('repas');
+  var dataRepas = sheetRepas.getDataRange().getValues();
+  var headersRepas = dataRepas[0].map(function(h) { return h.toString().trim(); });
+  var repasEmailCol = headersRepas.indexOf('email');
+  var repasStatutCol = headersRepas.indexOf('statut');
+  var repasNomAccCol = headersRepas.indexOf('nom_accompagnant');
+
+  for (var m = 1; m < dataRepas.length; m++) {
+    if (dataRepas[m][repasEmailCol].toString().toLowerCase().trim() === email
+        && repasNomAccCol >= 0
+        && (dataRepas[m][repasNomAccCol] || '').toString().trim().toLowerCase() === nomAccompagnant.toLowerCase()
+        && dataRepas[m][repasStatutCol] === 'inscrit') {
+      sheetRepas.getRange(m + 1, repasStatutCol + 1).setValue('annulé');
       annulees++;
     }
   }
@@ -2827,6 +2868,115 @@ function getPropositionsEnAttente(params) {
 }
 
 
+// ─── Repas du soir ──────────────────────────────────────────────────────────
+// Inscription au repas du samedi soir (optionnel).
+// Même pattern que les bénévoles : principal + accompagnants.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Inscrit un utilisateur (ou un accompagnant) au repas du soir.
+ * Anti-doublon : une seule inscription par personne.
+ * @param {Object} params - { nom, email, type_inscrit (optionnel), nom_accompagnant (optionnel) }
+ * @returns {Object} { ok, message } ou { error }
+ */
+function inscrireRepas(params) {
+  var nom = (params.nom || '').trim();
+  var email = (params.email || '').toLowerCase().trim();
+  var typeInscrit = (params.type_inscrit || 'principal').trim();
+  var nomAccompagnant = (params.nom_accompagnant || '').trim();
+
+  if (!nom) return { error: 'Le nom est requis' };
+  if (!email) return { error: "L'email est requis" };
+  if (!isValidEmail(email)) return { error: "Format d'email invalide" };
+
+  return withLock(function() {
+    // Si accompagnant, vérifier qu'il existe
+    if (typeInscrit === 'accompagnant') {
+      if (!nomAccompagnant) return { error: 'Nom de l\'accompagnant requis' };
+      var accompagnants = readSheet('accompagnants');
+      var estValide = accompagnants.some(function(a) {
+        return a.email_parent.toLowerCase().trim() === email
+          && a.nom_accompagnant.trim().toLowerCase() === nomAccompagnant.toLowerCase();
+      });
+      if (!estValide) return { error: 'Accompagnant non trouvé. Ajoutez-le d\'abord.' };
+    }
+
+    var repas = readSheet('repas');
+
+    // Anti-doublon : déjà inscrit ?
+    var personneMatch = function(r) {
+      if (typeInscrit === 'accompagnant') {
+        return r.email.toLowerCase().trim() === email
+          && (r.nom_accompagnant || '').trim().toLowerCase() === nomAccompagnant.toLowerCase();
+      } else {
+        return r.email.toLowerCase().trim() === email
+          && (!r.nom_accompagnant || r.nom_accompagnant.trim() === '');
+      }
+    };
+
+    var dejaInscrit = repas.some(function(r) {
+      return personneMatch(r) && r.statut === 'inscrit';
+    });
+    if (dejaInscrit) {
+      var qui = typeInscrit === 'accompagnant' ? nomAccompagnant + ' est' : 'Vous êtes';
+      return { error: qui + ' déjà inscrit·e au repas.' };
+    }
+
+    // Écrire l'inscription
+    var nomAffiche = typeInscrit === 'accompagnant' ? nomAccompagnant : nom;
+    var sheet = getSheet('repas');
+    sheet.appendRow([new Date().toISOString(), nomAffiche, email, 'inscrit', typeInscrit, nomAccompagnant]);
+
+    var msgNom = typeInscrit === 'accompagnant' ? nomAccompagnant : 'Vous';
+    return { ok: true, message: msgNom + ' — inscription au repas confirmée !' };
+  });
+}
+
+/**
+ * Annule une inscription repas (principal ou accompagnant).
+ * @param {Object} params - { email, nom_accompagnant (optionnel) }
+ * @returns {Object} { ok, message } ou { error }
+ */
+function annulerRepas(params) {
+  var email = (params.email || '').toLowerCase().trim();
+  var nomAccompagnant = (params.nom_accompagnant || '').trim();
+
+  if (!email) return { error: 'Email requis' };
+
+  return withLock(function() {
+    var sheet = getSheet('repas');
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0].map(function(h) { return h.toString().trim(); });
+    var emailCol = headers.indexOf('email');
+    var statutCol = headers.indexOf('statut');
+    var nomAccCol = headers.indexOf('nom_accompagnant');
+
+    for (var i = 1; i < data.length; i++) {
+      var rowEmail = data[i][emailCol].toString().toLowerCase().trim();
+      var rowStatut = (data[i][statutCol] || '').toString();
+      var rowNomAcc = nomAccCol >= 0 ? (data[i][nomAccCol] || '').toString().trim() : '';
+
+      var personneMatch;
+      if (nomAccompagnant) {
+        personneMatch = (rowNomAcc.toLowerCase() === nomAccompagnant.toLowerCase());
+      } else {
+        personneMatch = (rowNomAcc === '');
+      }
+
+      if (rowEmail === email && personneMatch && rowStatut === 'inscrit') {
+        sheet.getRange(i + 1, statutCol + 1).setValue('annulé');
+        var msg = nomAccompagnant
+          ? 'Inscription repas de ' + nomAccompagnant + ' annulée.'
+          : 'Inscription repas annulée.';
+        return { ok: true, message: msg };
+      }
+    }
+
+    return { error: 'Inscription repas introuvable' };
+  });
+}
+
+
 // ─── Keep-alive ─────────────────────────────────────────────────────────────
 // Empêche le cold start de Google Apps Script en gardant le script "chaud".
 // À configurer : Déclencheurs → Ajouter un déclencheur →
@@ -3041,7 +3191,7 @@ function sendRecapPreConvention() {
 function clearCache() {
   CacheService.getScriptCache().removeAll([
     'cache_config', 'cache_programme', 'cache_restauration', 'cache_animations',
-    'cache_inscriptions', 'cache_benevoles', 'cache_accompagnants'
+    'cache_inscriptions', 'cache_benevoles', 'cache_accompagnants', 'cache_repas'
   ]);
   Logger.log('Cache vidé avec succès');
 }

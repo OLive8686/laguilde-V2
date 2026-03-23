@@ -182,6 +182,20 @@
     </section>
 
     <!-- ============================================================= -->
+    <!-- SECTION 3b : Repas du soir                                    -->
+    <!-- ============================================================= -->
+    <section class="section section-dark" id="sectionRepas" style="display:none">
+        <div class="section-inner">
+            <div class="section-header">
+                <p class="section-label">Restauration</p>
+                <h2 class="section-title">Repas du samedi soir</h2>
+                <div class="section-sep"></div>
+            </div>
+            <div id="mesRepasGrid"></div>
+        </div>
+    </section>
+
+    <!-- ============================================================= -->
     <!-- SECTION 4 : Mes propositions MJ (mj/admin uniquement)         -->
     <!-- ============================================================= -->
     <section class="section section-dark" id="sectionPropositionsMj" style="display:none">
@@ -288,6 +302,7 @@ function updateDashboardView(allData) {
     document.getElementById('sectionMesJdr').style.display = user ? 'block' : 'none';
     document.getElementById('sectionAccompagnants').style.display = user ? 'block' : 'none';
     document.getElementById('sectionBenevoles').style.display = user ? 'block' : 'none';
+    document.getElementById('sectionRepas').style.display = user ? 'block' : 'none';
     document.getElementById('recapBtnSection').style.display = user ? 'block' : 'none';
 
     // Section MJ — visible uniquement si role mj ou admin
@@ -305,6 +320,7 @@ function updateDashboardView(allData) {
         loadMesInscriptionsJdr(allData);
         loadAccompagnants(allData);
         loadMesBenevoles(allData);
+        loadMesRepas(allData);
         if (role === 'mj' || role === 'admin') {
             loadMesPropositionsMj(allData);
         }
@@ -699,10 +715,65 @@ async function loadMesPropositionsMj(allData) {
 
 // ── Exports window ──────────────────────────────────────────────────────────
 // Necessaires pour les handlers onclick dans le HTML
+// =========================================================================
+// SECTION 3b : Repas du soir
+// =========================================================================
+
+async function loadMesRepas(allData) {
+    var user = APP.currentUser;
+    if (!user) return;
+    try {
+        var repas;
+        if (allData && allData.mes_repas) {
+            repas = allData.mes_repas;
+        } else {
+            // Pas d'endpoint individuel — refetch allData
+            var fresh = await fetchAllPublic();
+            repas = fresh ? (fresh.mes_repas || []) : [];
+        }
+        var grid = document.getElementById('mesRepasGrid');
+
+        if (!repas || repas.length === 0) {
+            grid.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:16px;padding:20px 0">Pas d\'inscription au repas. <a href="infos.html#restauration" style="color:var(--gold)">S\'inscrire</a></p>';
+            return;
+        }
+
+        grid.innerHTML = repas.map(function(r) {
+            var label = r.nom_accompagnant
+                ? 'Repas &mdash; ' + escHtml(r.nom_accompagnant)
+                : 'Repas du samedi soir';
+            var annulerArgs = r.nom_accompagnant
+                ? '\'' + esc(r.nom_accompagnant) + '\''
+                : '';
+            return '<div class="mes-inscriptions">'
+                + '<div class="mi-info"><h4>' + label + '</h4></div>'
+                + '<button class="btn btn-small btn-red" onclick="annulerRepas(' + annulerArgs + ')">Annuler</button>'
+                + '</div>';
+        }).join('');
+    } catch(e) {
+        document.getElementById('mesRepasGrid').innerHTML = '<p style="text-align:center;color:var(--text-muted)">Erreur lors du chargement.</p>';
+    }
+}
+
+async function annulerRepas(nomAccompagnant) {
+    var user = APP.currentUser;
+    if (!user) return;
+    var qui = nomAccompagnant || 'votre';
+    if (!confirm('Annuler l\'inscription repas de ' + qui + ' ?')) return;
+    try {
+        var params = { action: 'annuler_repas', email: user.email };
+        if (nomAccompagnant) params.nom_accompagnant = nomAccompagnant;
+        var r = await callAPIPost(params);
+        toast(r.message, 'success');
+        loadMesRepas();
+    } catch(e) { toast(e.message, 'error'); }
+}
+
 window.annulerJdr = annulerJdr;
 window.ajouterAccompagnant = ajouterAccompagnant;
 window.supprimerAccompagnant = supprimerAccompagnant;
 window.annulerBenevole = annulerBenevole;
+window.annulerRepas = annulerRepas;
 
 })();
 </script>
