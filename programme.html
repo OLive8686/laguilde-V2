@@ -6,8 +6,6 @@
     <title>Programme — Sous l'Œil de Mélusine</title>
     <meta name="description" content="Programme des tables de jeu de rôle — Convention Sous l'Œil de Mélusine, 16 & 17 mai 2026, Poitiers.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://melusineapi.olivier-gramain.workers.dev">
-    <link rel="dns-prefetch" href="https://melusineapi.olivier-gramain.workers.dev">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400&family=Lora:wght@400;600&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400&family=Lora:wght@400;600&display=swap"></noscript>
     <link rel="icon" type="image/png" href="https://sousloeildemelusine.fr/wp-content/uploads/2023/02/cropped-cropped-logo_guilde.png">
@@ -146,7 +144,8 @@
 <button class="scroll-top" id="scrollTop" aria-label="Retour en haut">↑</button>
 
 <!-- Scripts : app.js (partagé) puis code spécifique à la page programme -->
-<script src="app.js?v=5"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.supabase.js?v=1"></script>
 <script>
 // =============================================================================
 // CODE SPÉCIFIQUE À LA PAGE PROGRAMME (programme.html)
@@ -167,10 +166,12 @@
 window.onUserLogin = async function() {
     loadAccompagnants();
     updateMJButton();
-    // Recharger les inscriptions de l'utilisateur
+    // Recharger les inscriptions de l'utilisateur via Supabase
     try {
-        var mesData = await callAPI({ action: 'get_mes_inscriptions', email: APP.currentUser.email });
-        _mesInscriptions = mesData.inscriptions || [];
+        var { data, error } = await APP.supabase.from('inscriptions').select('*')
+            .eq('email', APP.currentUser.email);
+        if (error) throw error;
+        _mesInscriptions = data || [];
     } catch(e) { _mesInscriptions = []; }
     refreshProgramme();
 };
@@ -236,10 +237,12 @@ window.onPageInit = async function() {
  * Ces données servent à alimenter la modal "Pour qui ?" (choixModal).
  */
 async function loadAccompagnants() {
-    if (!APP.currentUser || !APP.SCRIPT_URL) return;
+    if (!APP.currentUser) return;
     try {
-        var r = await callAPI({ action: 'get_accompagnants', email: APP.currentUser.email });
-        APP.accompagnants = r.accompagnants || [];
+        var { data, error } = await APP.supabase.from('accompagnants').select('*')
+            .eq('email_parent', APP.currentUser.email);
+        if (error) throw error;
+        APP.accompagnants = data || [];
         localStorage.setItem('melusine_accompagnants', JSON.stringify(APP.accompagnants));
     } catch(e) {
         console.warn('Erreur chargement accompagnants:', e);
@@ -303,12 +306,11 @@ function handleInscrire(creneau, jeu) {
 
 /**
  * Inscrit l'utilisateur connecté à une table.
- * Appelle le backend via callAPIPost, affiche un toast, et rafraîchit le programme.
+ * Insère dans Supabase, affiche un toast, et rafraîchit le programme.
  * @param {string} creneau - Le créneau horaire
  * @param {string} jeu - Le nom du jeu
  */
 async function doInscrire(creneau, jeu, btn) {
-    if (!APP.SCRIPT_URL) { toast('Backend non configuré', 'info'); return; }
     if (btn) {
         btn.classList.add('btn-click-pulse');
         setTimeout(function() {
@@ -320,16 +322,18 @@ async function doInscrire(creneau, jeu, btn) {
 
     try {
         var u = APP.currentUser;
-        var r = await callAPIPost({
-            action: 'inscrire',
+        // Insertion directe dans Supabase (les RLS vérifient l'auth)
+        var { data, error } = await APP.supabase.from('inscriptions').insert({
             nom: u.nom,
             email: u.email,
-            auth_type: u.auth_type,
-            auth_id: u.auth_id || '',
             creneau: creneau,
-            jeu: jeu
-        });
-        toast(r.message, r.statut === 'inscrit' ? 'success' : 'info', { linkText: 'Mes inscriptions', linkHref: 'mes-inscriptions.html' });
+            jeu: jeu,
+            statut: 'inscrit',
+            type_inscrit: 'principal',
+            timestamp: new Date().toISOString()
+        }).select();
+        if (error) throw error;
+        toast('Inscription confirmée !', 'success', { linkText: 'Mes inscriptions', linkHref: 'mes-inscriptions.html' });
         await reloadInscriptionsAndRefresh();
     } catch(e) {
         toast(e.message, 'error');
@@ -350,23 +354,22 @@ async function doInscrire(creneau, jeu, btn) {
  * @param {string} nomAccompagnant - Le nom de l'accompagnant à inscrire
  */
 async function doInscrireAccompagnant(creneau, jeu, nomAccompagnant) {
-    if (!APP.SCRIPT_URL) { toast('Backend non configuré', 'info'); return; }
     // Feedback immédiat via toast léger
     toast('Inscription de ' + nomAccompagnant + ' en cours...', 'info');
     try {
         var u = APP.currentUser;
-        var r = await callAPIPost({
-            action: 'inscrire',
+        var { data, error } = await APP.supabase.from('inscriptions').insert({
             nom: u.nom,
             email: u.email,
-            auth_type: u.auth_type,
-            auth_id: u.auth_id || '',
             creneau: creneau,
             jeu: jeu,
             type_inscrit: 'accompagnant',
-            nom_accompagnant: nomAccompagnant
-        });
-        toast(r.message, r.statut === 'inscrit' ? 'success' : 'info', { linkText: 'Mes inscriptions', linkHref: 'mes-inscriptions.html' });
+            nom_accompagnant: nomAccompagnant,
+            statut: 'inscrit',
+            timestamp: new Date().toISOString()
+        }).select();
+        if (error) throw error;
+        toast('Inscription confirmée pour ' + nomAccompagnant + ' !', 'success', { linkText: 'Mes inscriptions', linkHref: 'mes-inscriptions.html' });
         await reloadInscriptionsAndRefresh();
     } catch(e) {
         toast(e.message, 'error');
@@ -380,16 +383,27 @@ async function doInscrireAccompagnant(creneau, jeu, nomAccompagnant) {
  * @param {string} [nomAccompagnant] - Si renseigné, annule l'inscription de cet accompagnant
  */
 async function annulerInscription(creneau, jeu, nomAccompagnant) {
-    if (!APP.currentUser || !APP.SCRIPT_URL) return;
+    if (!APP.currentUser) return;
     var msg = nomAccompagnant
         ? 'Annuler l\'inscription de ' + nomAccompagnant + ' à ' + jeu + ' ?'
         : 'Annuler votre inscription à ' + jeu + ' ?';
     if (!confirm(msg)) return;
     try {
-        var params = { action: 'annuler', email: APP.currentUser.email, creneau: creneau, jeu: jeu };
-        if (nomAccompagnant) params.nom_accompagnant = nomAccompagnant;
-        var r = await callAPIPost(params);
-        toast(r.message, 'success');
+        // Mise à jour du statut via Supabase
+        var query = APP.supabase.from('inscriptions')
+            .update({ statut: 'annulé' })
+            .eq('email', APP.currentUser.email)
+            .eq('creneau', creneau)
+            .eq('jeu', jeu)
+            .in('statut', ['inscrit', 'attente']);
+        if (nomAccompagnant) {
+            query = query.eq('nom_accompagnant', nomAccompagnant);
+        } else {
+            query = query.or('nom_accompagnant.is.null,nom_accompagnant.eq.');
+        }
+        var { error } = await query;
+        if (error) throw error;
+        toast('Inscription annulée', 'success');
         await reloadInscriptionsAndRefresh();
     } catch(e) {
         toast(e.message, 'error');
@@ -402,11 +416,15 @@ async function annulerInscription(creneau, jeu, nomAccompagnant) {
  */
 async function reloadInscriptionsAndRefresh() {
     try {
-        var insData = await callAPI({ action: 'get_inscriptions' });
-        _allInscriptions = insData.inscriptions || [];
+        // Recharger les inscriptions publiques via Supabase
+        var { data: allIns } = await APP.supabase.from('inscriptions')
+            .select('nom, creneau, jeu, statut, type_inscrit, nom_accompagnant')
+            .in('statut', ['inscrit', 'attente']);
+        _allInscriptions = allIns || [];
         if (APP.currentUser) {
-            var mesData = await callAPI({ action: 'get_mes_inscriptions', email: APP.currentUser.email });
-            _mesInscriptions = mesData.inscriptions || [];
+            var { data: mesIns } = await APP.supabase.from('inscriptions').select('*')
+                .eq('email', APP.currentUser.email);
+            _mesInscriptions = mesIns || [];
         }
     } catch(e) { /* silencieux */ }
     refreshProgramme();
@@ -415,22 +433,19 @@ async function reloadInscriptionsAndRefresh() {
 // ── Programme ───────────────────────────────────────────────────────────────
 
 /**
- * Récupère les données du programme depuis le backend (get_programme),
- * avec fallback sur la feuille Google Sheets (fetchSheetData).
+ * Récupère les données du programme depuis Supabase.
  * Appelle renderProgramme pour afficher les résultats.
  */
 async function refreshProgramme() {
-    var items;
-    if (APP.SCRIPT_URL) {
-        try {
-            items = (await callAPI({ action: 'get_programme' })).programme;
-        } catch(e) {
-            items = await fetchSheetData('programme');
-        }
-    } else {
-        items = await fetchSheetData('programme');
+    try {
+        // Charger le programme directement depuis Supabase
+        var { data, error } = await APP.supabase.from('programme').select('*')
+            .or('statut_table.eq.validé,statut_table.eq.');
+        if (error) throw error;
+        if (data) renderProgramme(data);
+    } catch(e) {
+        console.warn('Erreur chargement programme:', e);
     }
-    if (items) renderProgramme(items);
 }
 
 /**

@@ -25,7 +25,7 @@
 
 // ── URL de ton déploiement Google Apps Script ──
 // REMPLACE cette URL par la tienne (celle dans app.js actuellement)
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbx3ZqTyUMvIUFToqOK4RGpma2LGDz2cQ0M9Tbhe_fZp2bP0z4N7bIIacfFO8LDoP1wZ/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbx3ZqTyUMvIUFToqOK4RGpma2LGDz2cQ0M9Tbhe_fZp2bP0z4N7blIacfFO8LDoP1wZ/exec';
 
 // ── Durée de cache par action (en secondes) ──
 // TTL élevé (5 min) car le cron scheduled() pré-chauffe le cache toutes les 4 min.

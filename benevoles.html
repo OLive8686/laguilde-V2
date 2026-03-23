@@ -6,8 +6,6 @@
     <title>Espace Bénévoles — Sous l'Œil de Mélusine</title>
     <meta name="description" content="Inscrivez-vous comme bénévole pour la convention Sous l'Œil de Mélusine.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://melusineapi.olivier-gramain.workers.dev">
-    <link rel="dns-prefetch" href="https://melusineapi.olivier-gramain.workers.dev">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400&family=Lora:wght@400;600&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400&family=Lora:wght@400;600&display=swap"></noscript>
     <link rel="icon" type="image/png" href="https://sousloeildemelusine.fr/wp-content/uploads/2023/02/cropped-cropped-logo_guilde.png">
@@ -138,7 +136,8 @@
 <footer class="footer"><div class="footer-inner"><div><div class="footer-brand">Sous l'Œil de Mélusine</div><div class="footer-sub">Organisé par La Guilde · Foyer du Porteau · Poitiers</div></div><div class="footer-right">16 & 17 mai 2026</div></div></footer>
 <button class="scroll-top" id="scrollTop" aria-label="Retour en haut">↑</button>
 
-<script src="app.js?v=5"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.supabase.js?v=1"></script>
 <script>
 (function() {
 'use strict';
@@ -178,9 +177,9 @@ async function loadCreneauxBenevoles(allData) {
         // Utiliser les données du endpoint groupé (0 appels supplémentaires)
         var creneaux = (allData && allData.creneaux_benevoles) ? allData.creneaux_benevoles : null;
         if (!creneaux) {
-            // Fallback si pas de données groupées
-            var r = await callAPI({ action: 'get_postes_benevoles' });
-            creneaux = r.creneaux;
+            // Fallback : charger directement depuis Supabase
+            var { data } = await APP.supabase.from('creneaux_benevoles').select('*');
+            creneaux = data || [];
         }
         var grid = document.getElementById('benevoleGrid');
         if (!creneaux || creneaux.length === 0) {
@@ -266,13 +265,16 @@ async function loadMesBenevoles() {
     var user = APP.currentUser;
     if (!user) return;
     try {
-        var r = await callAPI({ action: 'get_mes_benevoles', email: user.email });
+        var { data: benevoles, error } = await APP.supabase.from('benevoles').select('*')
+            .eq('email', user.email)
+            .in('statut', ['inscrit']);
+        if (error) throw error;
         var grid = document.getElementById('mesBenevoleGrid');
-        if (!r.benevoles || r.benevoles.length === 0) {
+        if (!benevoles || benevoles.length === 0) {
             grid.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:16px">Vous n\'êtes inscrit·e à aucun créneau bénévole.</p>';
             return;
         }
-        grid.innerHTML = r.benevoles.map(function(b) {
+        grid.innerHTML = benevoles.map(function(b) {
             var label = b.nom_accompagnant
                 ? 'Bénévole — ' + escHtml(b.creneau) + ' <span style="color:var(--text-muted);font-size:13px">(' + escHtml(b.nom_accompagnant) + ')</span>'
                 : 'Bénévole — ' + escHtml(b.creneau);
@@ -357,13 +359,15 @@ async function doInscrireBenevole(creneau, btn) {
         setTimeout(function() { btn.disabled = true; btn.classList.add('btn-loading'); btn.dataset.originalText = btn.textContent; }, 200);
     }
     try {
-        var r = await callAPIPost({
-            action: 'inscrire_benevole',
+        var { error } = await APP.supabase.from('benevoles').insert({
             nom: user.nom,
             email: user.email,
-            creneau: creneau
+            creneau: creneau,
+            statut: 'inscrit',
+            timestamp: new Date().toISOString()
         });
-        toast(r.message, 'success');
+        if (error) throw error;
+        toast('Inscription bénévole confirmée !', 'success');
         loadCreneauxBenevoles();
         loadMesBenevoles();
     } catch(e) {
@@ -380,15 +384,17 @@ async function doInscrireBenevoleAccompagnant(creneau, nomAccompagnant) {
     if (!user) { openAuthModal(); return; }
     toast('Inscription de ' + nomAccompagnant + ' en cours...', 'info');
     try {
-        var r = await callAPIPost({
-            action: 'inscrire_benevole',
+        var { error } = await APP.supabase.from('benevoles').insert({
             nom: user.nom,
             email: user.email,
             creneau: creneau,
             type_inscrit: 'accompagnant',
-            nom_accompagnant: nomAccompagnant
+            nom_accompagnant: nomAccompagnant,
+            statut: 'inscrit',
+            timestamp: new Date().toISOString()
         });
-        toast(r.message, 'success');
+        if (error) throw error;
+        toast('Inscription bénévole confirmée pour ' + nomAccompagnant + ' !', 'success');
         loadCreneauxBenevoles();
         loadMesBenevoles();
     } catch(e) { toast(e.message, 'error'); }
@@ -405,14 +411,20 @@ async function annulerBenevole(creneau, nomAccompagnant) {
     var user = APP.currentUser;
     if (!user) return;
     try {
-        var params = {
-            action: 'annuler_benevole',
-            email: user.email,
-            creneau: creneau
-        };
-        if (nomAccompagnant) params.nom_accompagnant = nomAccompagnant;
-        var r = await callAPIPost(params);
-        toast(r.message, 'success');
+        // Annuler l'inscription bénévole via Supabase
+        var query = APP.supabase.from('benevoles')
+            .update({ statut: 'annulé' })
+            .eq('email', user.email)
+            .eq('creneau', creneau)
+            .eq('statut', 'inscrit');
+        if (nomAccompagnant) {
+            query = query.eq('nom_accompagnant', nomAccompagnant);
+        } else {
+            query = query.or('nom_accompagnant.is.null,nom_accompagnant.eq.');
+        }
+        var { error } = await query;
+        if (error) throw error;
+        toast('Inscription bénévole annulée', 'success');
         loadCreneauxBenevoles();
         loadMesBenevoles();
     } catch(e) { toast(e.message, 'error'); }

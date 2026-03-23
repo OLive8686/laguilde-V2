@@ -6,8 +6,6 @@
     <title>Mes inscriptions — Sous l'Œil de Mélusine</title>
     <meta name="description" content="Récapitulatif de vos inscriptions pour la convention Sous l'Œil de Mélusine.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://melusineapi.olivier-gramain.workers.dev">
-    <link rel="dns-prefetch" href="https://melusineapi.olivier-gramain.workers.dev">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400&family=Lora:wght@400;600&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400&family=Lora:wght@400;600&display=swap"></noscript>
     <link rel="icon" type="image/png" href="https://sousloeildemelusine.fr/wp-content/uploads/2023/02/cropped-cropped-logo_guilde.png">
@@ -221,7 +219,8 @@
 <button class="scroll-top" id="scrollTop" aria-label="Retour en haut">&uarr;</button>
 
 <!-- Scripts : app.js (partage) puis code specifique a cette page -->
-<script src="app.js?v=5"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.supabase.js?v=1"></script>
 <script>
 // =============================================================================
 // CODE SPECIFIQUE A LA PAGE "MES INSCRIPTIONS" (mes-inscriptions.html)
@@ -270,7 +269,11 @@ async function envoyerRecap() {
     btn.disabled = true;
     btn.textContent = 'Envoi en cours...';
     try {
-        var r = await callAPIPost({ action: 'send_recap', email: user.email });
+        // Appel à une Edge Function Supabase pour envoyer le récap email
+        var { data, error } = await APP.supabase.functions.invoke('send-recap', {
+            body: { email: user.email }
+        });
+        if (error) throw error;
         toast('Récap envoyé ! Vérifiez votre boîte mail (' + user.email + ')', 'success');
     } catch(e) {
         toast(e.message || 'Erreur lors de l\'envoi', 'error');
@@ -345,8 +348,10 @@ async function loadMesInscriptionsJdr(allData) {
         if (allData && allData.mes_inscriptions) {
             inscriptions = allData.mes_inscriptions;
         } else {
-            var r = await callAPI({ action: 'get_mes_inscriptions', email: user.email });
-            inscriptions = r.inscriptions || [];
+            // Fallback : charger directement depuis Supabase
+            var { data } = await APP.supabase.from('inscriptions').select('*')
+                .eq('email', user.email);
+            inscriptions = data || [];
         }
         var grid = document.getElementById('mesJdrGrid');
 
@@ -428,10 +433,21 @@ async function annulerJdr(creneau, jeu, nomAccompagnant) {
         : 'Annuler votre inscription \u00e0 ' + jeu + ' ?';
     if (!confirm(msg)) return;
     try {
-        var params = { action: 'annuler', email: user.email, creneau: creneau, jeu: jeu };
-        if (nomAccompagnant) params.nom_accompagnant = nomAccompagnant;
-        var r = await callAPIPost(params);
-        toast(r.message, 'success');
+        // Annuler l'inscription via Supabase
+        var query = APP.supabase.from('inscriptions')
+            .update({ statut: 'annulé' })
+            .eq('email', user.email)
+            .eq('creneau', creneau)
+            .eq('jeu', jeu)
+            .in('statut', ['inscrit', 'attente']);
+        if (nomAccompagnant) {
+            query = query.eq('nom_accompagnant', nomAccompagnant);
+        } else {
+            query = query.or('nom_accompagnant.is.null,nom_accompagnant.eq.');
+        }
+        var { error } = await query;
+        if (error) throw error;
+        toast('Inscription annulée', 'success');
         loadMesInscriptionsJdr();
         loadAccompagnants(); // Rafra&icirc;chir aussi la section accompagnants
     } catch(e) { toast(e.message, 'error'); }
@@ -453,8 +469,10 @@ async function loadAccompagnants(allData) {
         if (allData && allData.mes_accompagnants) {
             accompagnantsList = allData.mes_accompagnants;
         } else {
-            var r = await callAPI({ action: 'get_accompagnants', email: user.email });
-            accompagnantsList = r.accompagnants || [];
+            // Fallback : charger directement depuis Supabase
+            var { data } = await APP.supabase.from('accompagnants').select('*')
+                .eq('email_parent', user.email);
+            accompagnantsList = data || [];
         }
         // Mettre a jour l'etat global
         APP.accompagnants = accompagnantsList;
@@ -475,8 +493,9 @@ async function loadAccompagnants(allData) {
                 });
             } else {
                 try {
-                    var rJdr = await callAPI({ action: 'get_mes_inscriptions', email: user.email });
-                    insJdr = (rJdr.inscriptions || []).filter(function(i) {
+                    var { data: rJdr } = await APP.supabase.from('inscriptions').select('*')
+                        .eq('email', user.email);
+                    insJdr = (rJdr || []).filter(function(i) {
                         return i.type_inscrit === 'accompagnant' && (i.statut === 'inscrit' || i.statut === 'attente');
                     });
                 } catch(e) {}
@@ -487,8 +506,10 @@ async function loadAccompagnants(allData) {
                 });
             } else {
                 try {
-                    var rBen = await callAPI({ action: 'get_mes_benevoles', email: user.email });
-                    insBen = (rBen.benevoles || []).filter(function(b) {
+                    var { data: rBen } = await APP.supabase.from('benevoles').select('*')
+                        .eq('email', user.email)
+                        .in('statut', ['inscrit']);
+                    insBen = (rBen || []).filter(function(b) {
                         return b.nom_accompagnant && b.nom_accompagnant.trim() !== '';
                     });
                 } catch(e) {}
@@ -554,12 +575,12 @@ async function ajouterAccompagnant() {
     if (!nom) { toast('Entrez le nom de l\'accompagnant', 'error'); return; }
     if (!APP.currentUser) { toast('Connectez-vous d\'abord', 'error'); return; }
     try {
-        var r = await callAPIPost({
-            action: 'add_accompagnant',
-            email: APP.currentUser.email,
+        var { error } = await APP.supabase.from('accompagnants').insert({
+            email_parent: APP.currentUser.email,
             nom_accompagnant: nom
         });
-        toast(r.message, 'success');
+        if (error) throw error;
+        toast('Accompagnant ajouté !', 'success');
         input.value = '';
         // Recharger la liste des accompagnants et les inscriptions JDR
         loadAccompagnants();
@@ -574,13 +595,26 @@ async function ajouterAccompagnant() {
 async function supprimerAccompagnant(nomAccompagnant) {
     if (!confirm('Supprimer ' + nomAccompagnant + ' ? Toutes ses inscriptions seront annul\u00e9es.')) return;
     try {
-        var r = await callAPIPost({
-            action: 'remove_accompagnant',
-            email: APP.currentUser.email,
-            nom_accompagnant: nomAccompagnant
-        });
-        toast(r.message, 'success');
-        // Recharger accompagnants et inscriptions JDR (les inscriptions accompagnant ont pu etre annulees)
+        // Annuler toutes les inscriptions JDR de cet accompagnant
+        await APP.supabase.from('inscriptions')
+            .update({ statut: 'annulé' })
+            .eq('email', APP.currentUser.email)
+            .eq('nom_accompagnant', nomAccompagnant)
+            .in('statut', ['inscrit', 'attente']);
+        // Annuler toutes les inscriptions bénévoles de cet accompagnant
+        await APP.supabase.from('benevoles')
+            .update({ statut: 'annulé' })
+            .eq('email', APP.currentUser.email)
+            .eq('nom_accompagnant', nomAccompagnant)
+            .eq('statut', 'inscrit');
+        // Supprimer l'accompagnant
+        var { error } = await APP.supabase.from('accompagnants')
+            .delete()
+            .eq('email_parent', APP.currentUser.email)
+            .eq('nom_accompagnant', nomAccompagnant);
+        if (error) throw error;
+        toast('Accompagnant supprimé', 'success');
+        // Recharger accompagnants et inscriptions JDR
         loadAccompagnants();
         loadMesInscriptionsJdr();
     } catch(e) { toast(e.message, 'error'); }
@@ -601,8 +635,11 @@ async function loadMesBenevoles(allData) {
         if (allData && allData.mes_benevoles) {
             benevoles = allData.mes_benevoles;
         } else {
-            var r = await callAPI({ action: 'get_mes_benevoles', email: user.email });
-            benevoles = r.benevoles || [];
+            // Fallback : charger directement depuis Supabase
+            var { data } = await APP.supabase.from('benevoles').select('*')
+                .eq('email', user.email)
+                .in('statut', ['inscrit']);
+            benevoles = data || [];
         }
         var grid = document.getElementById('mesBenevolesGrid');
 
@@ -642,14 +679,20 @@ async function annulerBenevole(creneau, nomAccompagnant) {
         : 'Annuler votre b\u00e9n\u00e9volat sur ' + creneau + ' ?';
     if (!confirm(msg)) return;
     try {
-        var params = {
-            action: 'annuler_benevole',
-            email: user.email,
-            creneau: creneau
-        };
-        if (nomAccompagnant) params.nom_accompagnant = nomAccompagnant;
-        var r = await callAPIPost(params);
-        toast(r.message, 'success');
+        // Annuler via Supabase
+        var query = APP.supabase.from('benevoles')
+            .update({ statut: 'annulé' })
+            .eq('email', user.email)
+            .eq('creneau', creneau)
+            .eq('statut', 'inscrit');
+        if (nomAccompagnant) {
+            query = query.eq('nom_accompagnant', nomAccompagnant);
+        } else {
+            query = query.or('nom_accompagnant.is.null,nom_accompagnant.eq.');
+        }
+        var { error } = await query;
+        if (error) throw error;
+        toast('Inscription bénévole annulée', 'success');
         loadMesBenevoles();
         loadAccompagnants(); // Rafra&icirc;chir aussi la section accompagnants
     } catch(e) { toast(e.message, 'error'); }
@@ -671,8 +714,10 @@ async function loadMesPropositionsMj(allData) {
         if (allData && allData.mes_propositions) {
             propositions = allData.mes_propositions;
         } else {
-            var r = await callAPI({ action: 'get_mes_propositions', email: user.email });
-            propositions = r.propositions || [];
+            // Fallback : charger directement depuis Supabase
+            var { data } = await APP.supabase.from('programme').select('*')
+                .eq('email_mj', user.email);
+            propositions = data || [];
         }
         var grid = document.getElementById('mesPropositionsGrid');
 
@@ -761,10 +806,16 @@ async function annulerRepas(nomAccompagnant) {
     var qui = nomAccompagnant || 'votre';
     if (!confirm('Annuler l\'inscription repas de ' + qui + ' ?')) return;
     try {
-        var params = { action: 'annuler_repas', email: user.email };
-        if (nomAccompagnant) params.nom_accompagnant = nomAccompagnant;
-        var r = await callAPIPost(params);
-        toast(r.message, 'success');
+        var query = APP.supabase.from('repas').delete()
+            .eq('email', user.email);
+        if (nomAccompagnant) {
+            query = query.eq('nom_accompagnant', nomAccompagnant);
+        } else {
+            query = query.or('nom_accompagnant.is.null,nom_accompagnant.eq.');
+        }
+        var { error } = await query;
+        if (error) throw error;
+        toast('Inscription repas annulée', 'success');
         loadMesRepas();
     } catch(e) { toast(e.message, 'error'); }
 }

@@ -6,8 +6,6 @@
     <title>Espace MJ — Sous l'Œil de Mélusine</title>
     <meta name="description" content="Proposez une table de JDR pour la convention Sous l'Œil de Mélusine.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://melusineapi.olivier-gramain.workers.dev">
-    <link rel="dns-prefetch" href="https://melusineapi.olivier-gramain.workers.dev">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400&family=Lora:wght@400;600&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400&family=Lora:wght@400;600&display=swap"></noscript>
     <link rel="icon" type="image/png" href="https://sousloeildemelusine.fr/wp-content/uploads/2023/02/cropped-cropped-logo_guilde.png">
@@ -159,7 +157,8 @@
 <button class="scroll-top" id="scrollTop" aria-label="Retour en haut">↑</button>
 
 <!-- Scripts partagés puis spécifiques -->
-<script src="app.js?v=5"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.supabase.js?v=1"></script>
 <script>
 (function() {
 'use strict';
@@ -257,12 +256,20 @@ async function proposerTable() {
     if (!creneau) { toast('Choisissez un créneau', 'error'); return; }
 
     try {
-        var r = await callAPIPost({
-            action: 'proposer_table',
-            jeu: jeu, mj: mj, systeme: systeme, description: description,
-            content: content, creneau: creneau, places: places, email_mj: user.email
+        // Insérer la proposition dans Supabase avec statut "en_attente"
+        var { error } = await APP.supabase.from('programme').insert({
+            jeu: jeu,
+            mj: mj,
+            systeme: systeme,
+            description: description,
+            content: content,
+            creneau: creneau,
+            places: parseInt(places) || 5,
+            email_mj: user.email,
+            statut_table: 'en_attente'
         });
-        toast(r.message, 'success');
+        if (error) throw error;
+        toast('Table proposée ! Un admin la validera prochainement.', 'success');
         document.getElementById('mjJeu').value = '';
         document.getElementById('mjSysteme').value = '';
         document.getElementById('mjDescription').value = '';
@@ -279,9 +286,12 @@ async function loadMesPropositions() {
     var user = APP.currentUser;
     if (!user) return;
     try {
-        var r = await callAPI({ action: 'get_mes_propositions', email: user.email });
+        // Charger les propositions du MJ directement depuis Supabase
+        var { data: propositions, error } = await APP.supabase.from('programme').select('*')
+            .eq('email_mj', user.email);
+        if (error) throw error;
         var container = document.getElementById('mjPropositions');
-        if (!r.propositions || r.propositions.length === 0) {
+        if (!propositions || propositions.length === 0) {
             container.innerHTML = '';
             return;
         }
@@ -291,7 +301,7 @@ async function loadMesPropositions() {
 
         container.innerHTML = `
             <h3 class="mj-propositions-title">Mes propositions</h3>
-            ${r.propositions.map(p => `
+            ${propositions.map(p => `
                 <div class="mes-inscriptions">
                     <div class="mi-info">
                         <h4>${escHtml(p.jeu)}</h4>

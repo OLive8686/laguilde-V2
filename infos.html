@@ -6,8 +6,6 @@
     <title>Infos pratiques — Sous l'Œil de Mélusine</title>
     <meta name="description" content="Informations pratiques, restauration et animations — Convention Sous l'Œil de Mélusine, Poitiers.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://melusineapi.olivier-gramain.workers.dev">
-    <link rel="dns-prefetch" href="https://melusineapi.olivier-gramain.workers.dev">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400&family=Lora:wght@400;600&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400&family=Lora:wght@400;600&display=swap"></noscript>
     <link rel="icon" type="image/png" href="https://sousloeildemelusine.fr/wp-content/uploads/2023/02/cropped-cropped-logo_guilde.png">
@@ -189,7 +187,8 @@
 <button class="scroll-top" id="scrollTop" aria-label="Retour en haut">↑</button>
 
 <!-- Scripts : app.js (partagé) puis code spécifique à la page Infos -->
-<script src="app.js?v=5"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.supabase.js?v=1"></script>
 <script>
 // =============================================================================
 // CODE SPÉCIFIQUE À LA PAGE INFOS (infos.html)
@@ -418,8 +417,13 @@ async function doInscrireRepas() {
     var user = APP.currentUser;
     if (!user) return;
     try {
-        var r = await callAPIPost({ action: 'inscrire_repas', nom: user.nom, email: user.email });
-        toast(r.message, 'success');
+        var { error } = await APP.supabase.from('repas').insert({
+            nom: user.nom,
+            email: user.email,
+            timestamp: new Date().toISOString()
+        });
+        if (error) throw error;
+        toast('Inscription au repas confirmée !', 'success');
         var allData = await fetchAllPublic();
         renderRepas(allData);
     } catch(e) { toast(e.message, 'error'); }
@@ -429,8 +433,15 @@ async function doInscrireRepasAccompagnant(nomAccompagnant) {
     var user = APP.currentUser;
     if (!user) return;
     try {
-        var r = await callAPIPost({ action: 'inscrire_repas', nom: user.nom, email: user.email, type_inscrit: 'accompagnant', nom_accompagnant: nomAccompagnant });
-        toast(r.message, 'success');
+        var { error } = await APP.supabase.from('repas').insert({
+            nom: user.nom,
+            email: user.email,
+            type_inscrit: 'accompagnant',
+            nom_accompagnant: nomAccompagnant,
+            timestamp: new Date().toISOString()
+        });
+        if (error) throw error;
+        toast('Inscription au repas confirmée pour ' + nomAccompagnant + ' !', 'success');
         var allData = await fetchAllPublic();
         renderRepas(allData);
     } catch(e) { toast(e.message, 'error'); }
@@ -442,10 +453,17 @@ async function annulerRepas(nomAccompagnant) {
     var user = APP.currentUser;
     if (!user) return;
     try {
-        var params = { action: 'annuler_repas', email: user.email };
-        if (nomAccompagnant) params.nom_accompagnant = nomAccompagnant;
-        var r = await callAPIPost(params);
-        toast(r.message, 'success');
+        // Supprimer l'inscription repas via Supabase
+        var query = APP.supabase.from('repas').delete()
+            .eq('email', user.email);
+        if (nomAccompagnant) {
+            query = query.eq('nom_accompagnant', nomAccompagnant);
+        } else {
+            query = query.or('nom_accompagnant.is.null,nom_accompagnant.eq.');
+        }
+        var { error } = await query;
+        if (error) throw error;
+        toast('Inscription repas annulée', 'success');
         var allData = await fetchAllPublic();
         renderRepas(allData);
     } catch(e) { toast(e.message, 'error'); }
