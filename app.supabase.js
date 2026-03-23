@@ -63,6 +63,30 @@ function sbHeaders(extra) {
 }
 
 /**
+ * Rafraîchit le token d'accès si un refresh_token est disponible.
+ * Appelé automatiquement quand une requête retourne 401.
+ * @returns {boolean} true si le refresh a réussi
+ */
+async function refreshSession() {
+    try {
+        var stored = JSON.parse(localStorage.getItem('melusine_session') || '{}');
+        if (!stored.refresh_token) return false;
+        var r = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=refresh_token', {
+            method: 'POST',
+            headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: stored.refresh_token })
+        });
+        if (!r.ok) return false;
+        var data = await r.json();
+        _accessToken = data.access_token;
+        localStorage.setItem('melusine_session', JSON.stringify(data));
+        return true;
+    } catch(e) {
+        return false;
+    }
+}
+
+/**
  * Requête SELECT sur une table Supabase.
  * @param {string} table - Nom de la table
  * @param {string} query - Query string PostgREST (ex: 'select=*&statut=eq.inscrit')
@@ -72,6 +96,13 @@ async function sbQuery(table, query) {
     try {
         var url = SUPABASE_URL + '/rest/v1/' + table + '?' + (query || 'select=*');
         var r = await fetch(url, { headers: sbHeaders() });
+        // Si 401 (token expiré), tenter un refresh et réessayer
+        if (r.status === 401 && _accessToken) {
+            var refreshed = await refreshSession();
+            if (refreshed) {
+                r = await fetch(url, { headers: sbHeaders() });
+            }
+        }
         if (!r.ok) {
             var err = await r.json().catch(function() { return { message: r.statusText }; });
             return { data: null, error: err };
@@ -164,36 +195,61 @@ async function sbDelete(table, filter) {
  */
 var supabaseProxy = {
     from: function(table) {
+        // Méthodes de filtre communes à select/update/delete
+        function makeFilters() {
+            var _f = [];
+            return {
+                _f: _f,
+                eq: function(col, val) { _f.push(col + '=eq.' + encodeURIComponent(val)); return this; },
+                neq: function(col, val) { _f.push(col + '=neq.' + encodeURIComponent(val)); return this; },
+                in: function(col, vals) { _f.push(col + '=in.(' + vals.map(encodeURIComponent).join(',') + ')'); return this; },
+                or: function(expr) { _f.push('or=(' + expr + ')'); return this; },
+                match: function(obj) { var self = this; Object.keys(obj).forEach(function(k) { self.eq(k, obj[k]); }); return this; },
+                order: function(col, opts) { _f.push('order=' + col + '.' + (opts && opts.ascending === false ? 'desc' : 'asc')); return this; },
+                limit: function(n) { _f.push('limit=' + n); return this; },
+                qs: function() { return _f.join('&'); }
+            };
+        }
         return {
+            // ── SELECT ──────────────────────────────────────────────
             select: function(cols) {
                 var q = 'select=' + encodeURIComponent(cols || '*');
-                var _filters = [];
-                var chain = {
-                    eq: function(col, val) { _filters.push(col + '=eq.' + encodeURIComponent(val)); return chain; },
-                    neq: function(col, val) { _filters.push(col + '=neq.' + encodeURIComponent(val)); return chain; },
-                    in: function(col, vals) { _filters.push(col + '=in.(' + vals.map(encodeURIComponent).join(',') + ')'); return chain; },
-                    or: function(expr) { _filters.push('or=(' + expr + ')'); return chain; },
-                    order: function(col, opts) { _filters.push('order=' + col + '.' + (opts && opts.ascending === false ? 'desc' : 'asc')); return chain; },
-                    limit: function(n) { _filters.push('limit=' + n); return chain; },
-                    then: function(resolve, reject) {
-                        var fullQuery = q + (_filters.length ? '&' + _filters.join('&') : '');
-                        return sbQuery(table, fullQuery).then(resolve, reject);
-                    },
-                    catch: function(fn) { return chain.then(undefined, fn); }
+                var filters = makeFilters();
+                var chain = Object.create(filters);
+                // maybeSingle() : retourne le premier résultat ou null
+                var _single = false;
+                chain.maybeSingle = function() { _single = true; return chain; };
+                chain.single = function() { _single = true; return chain; };
+                chain.then = function(resolve, reject) {
+                    var fullQuery = q + (filters.qs() ? '&' + filters.qs() : '');
+                    return sbQuery(table, fullQuery).then(function(result) {
+                        if (_single && result.data) {
+                            result.data = result.data.length > 0 ? result.data[0] : null;
+                        }
+                        if (resolve) resolve(result);
+                    }, reject);
                 };
+                chain.catch = function(fn) { return chain.then(undefined, fn); };
+                // Rendre chaînable (eq/in/or retournent chain, pas filters)
+                ['eq','neq','in','or','match','order','limit'].forEach(function(m) {
+                    var orig = chain[m];
+                    chain[m] = function() { orig.apply(filters, arguments); return chain; };
+                });
                 return chain;
             },
+            // ── INSERT ──────────────────────────────────────────────
             insert: function(rows) {
-                // Retourner un objet chaînable qui supporte .select() après insert
                 var _promise = sbInsert(table, rows);
+                // Supporter .select() après insert (no-op, les données sont déjà retournées)
                 _promise.select = function() { return _promise; };
                 return _promise;
             },
-            upsert: function(rows) {
-                // Upsert = INSERT ... ON CONFLICT DO UPDATE
+            // ── UPSERT ──────────────────────────────────────────────
+            upsert: function(rows, opts) {
+                var onConflict = opts && opts.onConflict ? '&on_conflict=' + opts.onConflict : '';
                 return (async function() {
                     try {
-                        var url = SUPABASE_URL + '/rest/v1/' + table;
+                        var url = SUPABASE_URL + '/rest/v1/' + table + '?select=*' + onConflict;
                         var r = await fetch(url, {
                             method: 'POST',
                             headers: sbHeaders({ 'Prefer': 'return=representation,resolution=merge-duplicates' }),
@@ -210,31 +266,52 @@ var supabaseProxy = {
                     }
                 })();
             },
+            // ── UPDATE ──────────────────────────────────────────────
             update: function(values) {
-                var _filters = [];
-                var chain = {
-                    eq: function(col, val) { _filters.push(col + '=eq.' + encodeURIComponent(val)); return chain; },
-                    match: function(obj) { Object.keys(obj).forEach(function(k) { _filters.push(k + '=eq.' + encodeURIComponent(obj[k])); }); return chain; },
-                    then: function(resolve, reject) {
-                        return sbUpdate(table, values, _filters.join('&')).then(resolve, reject);
-                    },
-                    catch: function(fn) { return chain.then(undefined, fn); }
+                var filters = makeFilters();
+                var chain = Object.create(filters);
+                chain.then = function(resolve, reject) {
+                    return sbUpdate(table, values, filters.qs()).then(resolve, reject);
                 };
+                chain.catch = function(fn) { return chain.then(undefined, fn); };
+                ['eq','neq','in','or','match'].forEach(function(m) {
+                    var orig = chain[m];
+                    chain[m] = function() { orig.apply(filters, arguments); return chain; };
+                });
                 return chain;
             },
+            // ── DELETE ──────────────────────────────────────────────
             delete: function() {
-                var _filters = [];
-                var chain = {
-                    eq: function(col, val) { _filters.push(col + '=eq.' + encodeURIComponent(val)); return chain; },
-                    match: function(obj) { Object.keys(obj).forEach(function(k) { _filters.push(k + '=eq.' + encodeURIComponent(obj[k])); }); return chain; },
-                    then: function(resolve, reject) {
-                        return sbDelete(table, _filters.join('&')).then(resolve, reject);
-                    },
-                    catch: function(fn) { return chain.then(undefined, fn); }
+                var filters = makeFilters();
+                var chain = Object.create(filters);
+                chain.then = function(resolve, reject) {
+                    return sbDelete(table, filters.qs()).then(resolve, reject);
                 };
+                chain.catch = function(fn) { return chain.then(undefined, fn); };
+                ['eq','neq','in','or','match'].forEach(function(m) {
+                    var orig = chain[m];
+                    chain[m] = function() { orig.apply(filters, arguments); return chain; };
+                });
                 return chain;
             }
         };
+    },
+    // ── FUNCTIONS (Edge Functions) ───────────────────────────────────────
+    functions: {
+        invoke: async function(name, opts) {
+            try {
+                var r = await fetch(SUPABASE_URL + '/functions/v1/' + name, {
+                    method: 'POST',
+                    headers: sbHeaders(),
+                    body: JSON.stringify(opts && opts.body ? opts.body : {})
+                });
+                var data = await r.json().catch(function() { return {}; });
+                if (!r.ok) return { data: null, error: data };
+                return { data: data, error: null };
+            } catch(e) {
+                return { data: null, error: { message: e.message } };
+            }
+        }
     },
     auth: {
         // Placeholder — l'auth est gérée par les fonctions loginGoogle/loginDiscord/etc.
@@ -454,65 +531,60 @@ async function fetchAllData() {
     try {
         // --- Requêtes publiques (pas besoin d'être connecté) ---
         var queries = [
-            // Config : paramètres clé/valeur du site
-            supabase.from('config').select('*'),
-
-            // Programme : tables validées ou sans statut (rétro-compatibilité)
-            supabase.from('programme').select('*')
-                .or('statut_table.eq.validé,statut_table.eq.'),
-
-            // Inscriptions : uniquement les inscriptions actives (pour compter les places)
-            // On ne récupère que les colonnes nécessaires pour l'affichage public
-            supabase.from('inscriptions').select('nom, creneau, jeu, statut, type_inscrit, nom_accompagnant')
-                .in('statut', ['inscrit', 'attente'])
+            /* 0 */ supabase.from('config').select('*'),
+            /* 1 */ supabase.from('programme').select('*').or('statut_table.eq.validé,statut_table.eq.'),
+            /* 2 */ supabase.from('inscriptions').select('nom, creneau, jeu, statut, type_inscrit, nom_accompagnant').in('statut', ['inscrit', 'attente']),
+            /* 3 */ supabase.from('creneaux_benevoles').select('*'),
+            /* 4 */ supabase.from('benevoles').select('*').eq('statut', 'inscrit'),
+            /* 5 */ supabase.from('restauration').select('*'),
+            /* 6 */ supabase.from('animations').select('*'),
+            /* 7 */ supabase.from('repas').select('*').eq('statut', 'inscrit')
         ];
 
         // --- Requêtes privées (seulement si connecté) ---
+        var privateStart = queries.length;
         if (currentUser && currentUser.email) {
-            // Mes inscriptions personnelles (toutes, y compris annulées pour l'historique)
-            queries.push(
-                supabase.from('inscriptions').select('*')
-                    .eq('email', currentUser.email)
-            );
-
-            // Mes accompagnants
-            queries.push(
-                supabase.from('accompagnants').select('*')
-                    .eq('email_parent', currentUser.email)
-            );
+            /* 8 */ queries.push(supabase.from('inscriptions').select('*').eq('email', currentUser.email).in('statut', ['inscrit', 'attente']));
+            /* 9 */ queries.push(supabase.from('accompagnants').select('*').eq('email_parent', currentUser.email));
+            /* 10 */ queries.push(supabase.from('benevoles').select('*').eq('email', currentUser.email).eq('statut', 'inscrit'));
+            /* 11 */ queries.push(supabase.from('programme').select('*').eq('email_mj', currentUser.email));
+            /* 12 */ queries.push(supabase.from('repas').select('*').eq('email', currentUser.email).eq('statut', 'inscrit'));
         }
 
         var results = await Promise.all(queries);
 
-        // Extraire les résultats
-        var configRows = results[0].data || [];
-        var programmeRows = results[1].data || [];
-        var inscriptionsRows = results[2].data || [];
-
-        // Construire l'objet config clé/valeur (même format que l'ancien backend)
+        // Config clé/valeur
         var config = {};
-        configRows.forEach(function(row) {
+        (results[0].data || []).forEach(function(row) {
             if (row.cle) config[row.cle.trim()] = (row.valeur || '').trim();
         });
+
+        // Compteur repas
+        var repasAll = results[7].data || [];
 
         // Construire l'objet de retour compatible avec l'ancien format
         var allData = {
             ok: true,
             config: config,
-            programme: programmeRows,
-            inscriptions: inscriptionsRows
+            programme: results[1].data || [],
+            inscriptions_publiques: results[2].data || [],
+            inscriptions: results[2].data || [],  // alias pour compatibilité
+            creneaux_benevoles: results[3].data || [],
+            benevoles_all: results[4].data || [],
+            restauration: results[5].data || [],
+            animations: results[6].data || [],
+            repas_count: repasAll.length
         };
 
         // Données privées si connecté
-        if (currentUser && currentUser.email && results.length > 3) {
-            allData.mes_inscriptions = results[3].data || [];
-
-            if (results.length > 4) {
-                var mesAccompagnants = results[4].data || [];
-                allData.mes_accompagnants = mesAccompagnants;
-                // Stocker les accompagnants localement pour les modals "Pour qui ?"
-                accompagnants = mesAccompagnants;
-            }
+        if (currentUser && currentUser.email) {
+            allData.mes_inscriptions = (results[privateStart] || {}).data || [];
+            var mesAcc = (results[privateStart + 1] || {}).data || [];
+            allData.mes_accompagnants = mesAcc;
+            accompagnants = mesAcc;
+            allData.mes_benevoles = (results[privateStart + 2] || {}).data || [];
+            allData.mes_propositions = (results[privateStart + 3] || {}).data || [];
+            allData.mes_repas = (results[privateStart + 4] || {}).data || [];
         }
 
         return allData;
