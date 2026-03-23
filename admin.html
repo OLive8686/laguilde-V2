@@ -151,7 +151,7 @@ function updateAdminView() {
     document.getElementById('adminPanel').style.display = isAdmin ? 'block' : 'none';
 
     // Si admin, charger le panneau directement (plus besoin de mot de passe,
-    // l'accès est contrôlé par le rôle dans la table roles + RLS Supabase)
+    // l'accès est contrôlé par le rôle dans la table profiles + RLS Supabase)
     if (isAdmin) loadAdminPanel();
 }
 
@@ -277,8 +277,8 @@ async function loadPropositionsAdmin() {
 
 async function loadRolesAdmin() {
     try {
-        // Charger tous les rôles directement depuis Supabase
-        var { data: users, error } = await APP.supabase.from('roles').select('*');
+        // Charger tous les profils directement depuis Supabase (table 'profiles', pas 'roles')
+        var { data: users, error } = await APP.supabase.from('profiles').select('*');
         if (error) throw error;
         var container = document.getElementById('adminRoles');
         if (!users || users.length === 0) { container.innerHTML = ''; return; }
@@ -360,7 +360,8 @@ window.adminRefuserTable = async function(emailMj, jeu, creneau) {
 
 window.changeRole = async function(email, newRole) {
     try {
-        var { error } = await APP.supabase.from('roles')
+        // Corrigé : table 'profiles' (pas 'roles') conformément au schéma Supabase
+        var { error } = await APP.supabase.from('profiles')
             .update({ role: newRole })
             .eq('email', email);
         if (error) throw error;

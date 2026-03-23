@@ -439,7 +439,7 @@ async function refreshProgramme() {
     try {
         // Charger le programme directement depuis Supabase
         var { data, error } = await APP.supabase.from('programme').select('*')
-            .or('statut_table.eq.validé,statut_table.eq.');
+            .or('statut_table.eq.validé,statut_table.eq.,statut_table.is.null');
         if (error) throw error;
         if (data) renderProgramme(data);
     } catch(e) {
@@ -574,7 +574,7 @@ function renderProgramme(items) {
                     '<h4>' + (escHtml(item.jeu) || '') + '</h4>' +
                     '<div class="mj">MJ : ' + (escHtml(item.mj) || '—') + (item.systeme ? ' · ' + escHtml(item.systeme) : '') + '</div>' +
                     '<div class="desc">' + (escHtml(item.description) || '') + '</div>' +
-                    (item.content ? '<div class="content-warning">⚠️ ' + escHtml(item.content) + '</div>' : '') +
+                    (item.content_warning ? '<div class="content-warning">⚠️ ' + escHtml(item.content_warning) + '</div>' : '') +
                     '<span class="badge ' + badgeCls + '">' + statusTxt + '</span>' +
                     inscritsHtml +
                 '</div>' +

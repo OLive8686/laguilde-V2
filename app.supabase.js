@@ -528,11 +528,27 @@ function toast(msg, type='info', options) {
  *   Structure similaire à l'ancien get_all_public pour compatibilité.
  */
 async function fetchAllData() {
+    // Cache simple : si les données ont déjà été chargées dans cette session de page,
+    // on retourne le cache au lieu de refaire toutes les requêtes Supabase.
+    // Cela évite le double-fetch entre loadTheme() et onPageInit().
+    if (_allDataCache) return _allDataCache;
+    // Éviter les appels concurrents : si un fetch est déjà en cours, réutiliser la même Promise
+    if (_allDataCachePromise) return _allDataCachePromise;
+    _allDataCachePromise = _fetchAllDataImpl();
+    var result = await _allDataCachePromise;
+    _allDataCachePromise = null;
+    return result;
+}
+
+/**
+ * Implémentation réelle de fetchAllData (appelée une seule fois par page).
+ */
+async function _fetchAllDataImpl() {
     try {
         // --- Requêtes publiques (pas besoin d'être connecté) ---
         var queries = [
             /* 0 */ supabase.from('config').select('*'),
-            /* 1 */ supabase.from('programme').select('*').or('statut_table.eq.validé,statut_table.eq.'),
+            /* 1 */ supabase.from('programme').select('*').or('statut_table.eq.validé,statut_table.eq.,statut_table.is.null'),
             /* 2 */ supabase.from('inscriptions').select('nom, creneau, jeu, statut, type_inscrit, nom_accompagnant').in('statut', ['inscrit', 'attente']),
             /* 3 */ supabase.from('creneaux_benevoles').select('*'),
             /* 4 */ supabase.from('benevoles').select('*').eq('statut', 'inscrit'),
@@ -587,6 +603,8 @@ async function fetchAllData() {
             allData.mes_repas = (results[privateStart + 4] || {}).data || [];
         }
 
+        // Stocker dans le cache mémoire pour éviter le double-fetch
+        _allDataCache = allData;
         return allData;
     } catch(e) {
         console.error('fetchAllData erreur:', e);
@@ -596,6 +614,9 @@ async function fetchAllData() {
 
 // Cache config en mémoire (évite les appels multiples dans la même page)
 var _configCacheClient = null;
+// Cache fetchAllData en mémoire : évite le double-fetch (loadTheme + onPageInit)
+var _allDataCache = null;
+var _allDataCachePromise = null;
 
 /**
  * Charge la configuration du site depuis la table config.
@@ -650,7 +671,7 @@ async function fetchAllPublic() {
 // =============================================================================
 
 /**
- * Récupère le rôle de l'utilisateur depuis la table roles.
+ * Récupère le rôle de l'utilisateur depuis la table profiles.
  * Appelé après chaque connexion.
  * Si l'utilisateur n'existe pas dans la table, il est considéré comme "joueur".
  *
@@ -659,8 +680,9 @@ async function fetchAllPublic() {
 async function fetchRole() {
     if (!currentUser || !currentUser.email) return 'joueur';
     try {
+        // Corrigé : utilise la table 'profiles' (et non 'roles') conformément au schéma Supabase
         var { data, error } = await supabase
-            .from('roles')
+            .from('profiles')
             .select('role')
             .eq('email', currentUser.email)
             .maybeSingle();
@@ -670,9 +692,9 @@ async function fetchRole() {
         if (data && data.role) {
             currentRole = data.role;
         } else {
-            // Nouveau joueur : créer l'entrée dans roles avec le rôle par défaut
+            // Nouveau joueur : créer l'entrée dans profiles avec le rôle par défaut
             currentRole = 'joueur';
-            await supabase.from('roles').insert({
+            await supabase.from('profiles').insert({
                 email: currentUser.email,
                 nom: currentUser.nom || '',
                 role: 'joueur',
@@ -909,9 +931,9 @@ async function confirmPseudo() {
             currentUser.nom = pseudo;
         }
 
-        // Mettre à jour la table roles si elle existe
+        // Mettre à jour la table profiles (et non 'roles') conformément au schéma Supabase
         if (currentUser && currentUser.email) {
-            await supabase.from('roles').upsert({
+            await supabase.from('profiles').upsert({
                 email: currentUser.email,
                 nom: pseudo,
                 role: currentRole || 'joueur',
@@ -1145,17 +1167,22 @@ function editPseudo() {
  * - Reset password : event PASSWORD_RECOVERY → afficher le formulaire de reset
  * - Confirmation email : session active → connexion automatique
  */
+/**
+ * Vérifie si l'URL contient un callback d'authentification Supabase.
+ * Si type=recovery est détecté dans le hash, affiche le formulaire de reset mot de passe.
+ * Le token a déjà été extrait et sauvegardé dans initApp() avant cet appel.
+ */
 async function checkAuthCallback() {
-    // Supabase met les tokens dans le hash fragment (#access_token=...&type=recovery)
-    // Le SDK les détecte automatiquement et restaure la session.
-    // On écoute l'événement onAuthStateChange pour réagir.
-
     // Vérifier si on revient d'un lien de réinitialisation de mot de passe
     // (Supabase utilise le hash fragment : #type=recovery&access_token=...)
-    var hash = window.location.hash;
-    if (hash && hash.includes('type=recovery')) {
-        // Attendre que Supabase ait traité le hash et restauré la session
-        // Le formulaire de reset sera affiché par onAuthStateChange (PASSWORD_RECOVERY)
+    // Note : le hash a pu être nettoyé par initApp(), on vérifie aussi un flag en mémoire
+    var hash = window.location.hash || '';
+    if (hash.includes('type=recovery') || window._pendingRecovery) {
+        // Afficher le formulaire de réinitialisation de mot de passe
+        // Le token d'accès a déjà été extrait et stocké par initApp()
+        openAuthModal();
+        showResetForm();
+        toast('Choisissez votre nouveau mot de passe', 'info');
         return;
     }
 }
@@ -1278,7 +1305,7 @@ async function initApp() {
                 if (kv.length === 2) hashParams[kv[0]] = decodeURIComponent(kv[1]);
             });
         }
-        // Si on a un access_token dans le hash → retour SSO réussi
+        // Si on a un access_token dans le hash → retour SSO réussi ou recovery
         if (hashParams.access_token) {
             _accessToken = hashParams.access_token;
             // Sauvegarder la session complète
@@ -1289,6 +1316,11 @@ async function initApp() {
                 expires_in: hashParams.expires_in || 3600
             };
             localStorage.setItem('melusine_session', JSON.stringify(sessionData));
+            // Détecter le type=recovery AVANT de nettoyer le hash
+            // On sauvegarde un flag pour que checkAuthCallback() puisse l'utiliser
+            if (hashParams.type === 'recovery') {
+                window._pendingRecovery = true;
+            }
             // Nettoyer l'URL (enlever le fragment)
             history.replaceState(null, '', window.location.pathname + window.location.search);
         }

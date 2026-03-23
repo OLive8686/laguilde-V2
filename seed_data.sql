@@ -48,7 +48,7 @@ ON CONFLICT DO NOTHING;
 --   - Samedi 10h-13h, Samedi 14h-17h, Samedi 21h-00h, Dimanche 10h-13h
 -- =============================================================================
 
-INSERT INTO programme (creneau, jeu, mj, systeme, description, content, places, statut_table, email_mj)
+INSERT INTO programme (creneau, jeu, mj, systeme, description, content_warning, places, statut_table, email_mj)
 VALUES
     -- ── Samedi matin ─────────────────────────────────────────────────────
     (
