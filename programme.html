@@ -381,8 +381,10 @@ async function doInscrireAccompagnant(creneau, jeu, nomAccompagnant) {
  */
 async function annulerInscription(creneau, jeu, nomAccompagnant) {
     if (!APP.currentUser || !APP.SCRIPT_URL) return;
-    var qui = nomAccompagnant ? nomAccompagnant : 'vous';
-    if (!confirm('Annuler l\'inscription de ' + qui + ' à ' + jeu + ' ?')) return;
+    var msg = nomAccompagnant
+        ? 'Annuler l\'inscription de ' + nomAccompagnant + ' à ' + jeu + ' ?'
+        : 'Annuler votre inscription à ' + jeu + ' ?';
+    if (!confirm(msg)) return;
     try {
         var params = { action: 'annuler', email: APP.currentUser.email, creneau: creneau, jeu: jeu };
         if (nomAccompagnant) params.nom_accompagnant = nomAccompagnant;

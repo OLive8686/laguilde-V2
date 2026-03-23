@@ -398,8 +398,10 @@ async function loadMesInscriptionsJdr() {
 async function annulerJdr(creneau, jeu, nomAccompagnant) {
     var user = APP.currentUser;
     if (!user) return;
-    var qui = nomAccompagnant || 'vous';
-    if (!confirm('Annuler l\'inscription de ' + qui + ' à ' + jeu + ' ?')) return;
+    var msg = nomAccompagnant
+        ? 'Annuler l\'inscription de ' + nomAccompagnant + ' \u00e0 ' + jeu + ' ?'
+        : 'Annuler votre inscription \u00e0 ' + jeu + ' ?';
+    if (!confirm(msg)) return;
     try {
         var params = { action: 'annuler', email: user.email, creneau: creneau, jeu: jeu };
         if (nomAccompagnant) params.nom_accompagnant = nomAccompagnant;
@@ -587,8 +589,10 @@ async function loadMesBenevoles() {
 async function annulerBenevole(creneau, nomAccompagnant) {
     var user = APP.currentUser;
     if (!user) return;
-    var qui = nomAccompagnant || 'votre';
-    if (!confirm('Annuler le bénévolat de ' + qui + ' sur ' + creneau + ' ?')) return;
+    var msg = nomAccompagnant
+        ? 'Annuler le b\u00e9n\u00e9volat de ' + nomAccompagnant + ' sur ' + creneau + ' ?'
+        : 'Annuler votre b\u00e9n\u00e9volat sur ' + creneau + ' ?';
+    if (!confirm(msg)) return;
     try {
         var params = {
             action: 'annuler_benevole',
