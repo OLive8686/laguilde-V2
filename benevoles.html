@@ -366,7 +366,9 @@ async function doInscrireBenevole(creneau, btn) {
         });
         if (error) throw error;
         toast('Inscription bénévole confirmée !', 'success');
-        loadCreneauxBenevoles();
+        invalidateCache();
+        var freshData = await fetchAllData();
+        loadCreneauxBenevoles(freshData);
         loadMesBenevoles();
     } catch(e) {
         toast(e.message, 'error');
@@ -392,7 +394,9 @@ async function doInscrireBenevoleAccompagnant(creneau, nomAccompagnant) {
         });
         if (error) throw error;
         toast('Inscription bénévole confirmée pour ' + nomAccompagnant + ' !', 'success');
-        loadCreneauxBenevoles();
+        invalidateCache();
+        var freshData = await fetchAllData();
+        loadCreneauxBenevoles(freshData);
         loadMesBenevoles();
     } catch(e) { toast(e.message, 'error'); }
 }
@@ -422,7 +426,9 @@ async function annulerBenevole(creneau, nomAccompagnant) {
         var { error } = await query;
         if (error) throw error;
         toast('Inscription bénévole annulée', 'success');
-        loadCreneauxBenevoles();
+        invalidateCache();
+        var freshData = await fetchAllData();
+        loadCreneauxBenevoles(freshData);
         loadMesBenevoles();
     } catch(e) { toast(e.message, 'error'); }
 }

@@ -663,6 +663,19 @@ var _allDataCache = null;
 var _allDataCachePromise = null;
 
 /**
+ * Invalide le cache de fetchAllData.
+ * À appeler après chaque écriture (inscription, annulation, etc.)
+ * pour que le prochain fetchAllData() recharge les données fraîches.
+ */
+function invalidateCache() {
+    _allDataCache = null;
+    _allDataCachePromise = null;
+    _configCacheClient = null;
+}
+// Exposer pour que les pages puissent l'appeler après une action
+window.invalidateCache = invalidateCache;
+
+/**
  * Charge la configuration du site depuis la table config.
  * Mise en cache mémoire : un seul appel réseau par session de page.
  * @returns {Object} Objet clé/valeur de la config
