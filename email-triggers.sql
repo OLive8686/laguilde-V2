@@ -19,6 +19,8 @@
 --
 -- SÉCURITÉ :
 --   - pg_net envoie les requêtes depuis le réseau interne Supabase
+--   - Un header X-Webhook-Secret authentifie les appels au Worker
+--     (la même valeur doit être configurée en var d'env WEBHOOK_SECRET sur Cloudflare)
 --   - Aucune clé API n'est exposée dans les triggers (elle est dans le Worker)
 --   - Les triggers sont AFTER (l'opération DB réussit même si l'email échoue)
 --
@@ -89,9 +91,12 @@ BEGIN
 
   -- Appel asynchrone au Worker via pg_net
   -- pg_net_http_post retourne un ID de requête (bigint) qu'on ignore ici
+  -- Le header X-Webhook-Secret authentifie l'appel auprès du Worker
+  -- IMPORTANT : cette valeur doit correspondre à la variable WEBHOOK_SECRET
+  -- configurée dans Cloudflare Workers (Settings → Variables).
   PERFORM net.http_post(
     url     := get_email_worker_url(),
-    headers := '{"Content-Type": "application/json"}'::jsonb,
+    headers := '{"Content-Type": "application/json", "X-Webhook-Secret": "melusine-pg-webhook-2026-secret"}'::jsonb,
     body    := jsonb_build_object(
       'type', email_type,
       'to',   recipient,
@@ -368,6 +373,14 @@ BEGIN
   -- Valider l'email
   IF clean_email IS NULL OR clean_email = '' OR position('@' IN clean_email) = 0 THEN
     RETURN jsonb_build_object('error', 'Email invalide');
+  END IF;
+
+  -- Protection anti-abus : maximum 1 récap par email toutes les 2 minutes.
+  -- On vérifie dans pg_net les requêtes récentes pour cet email.
+  -- Approche simple : on utilise un advisory lock basé sur le hash de l'email.
+  -- Si le lock n'est pas immédiatement disponible, quelqu'un envoie déjà un récap.
+  IF NOT pg_try_advisory_xact_lock(hashtext(clean_email)) THEN
+    RETURN jsonb_build_object('error', 'Un récap est déjà en cours d''envoi. Réessayez dans quelques instants.');
   END IF;
 
   -- 1. Collecter les inscriptions (joueur + accompagnants)

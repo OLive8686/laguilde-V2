@@ -162,7 +162,7 @@
 (function() {
 'use strict';
 
-// ── Callbacks appelés par app.js après login/logout ─────────────────────────
+// ── Callbacks appelés par app.supabase.js après login/logout ────────────────
 
 window.onUserLogin = function() {
     updateMJView();
@@ -242,9 +242,12 @@ function updateMJView() {
 /**
  * Envoie une proposition de table au backend.
  */
+var _isProposing = false;
+
 async function proposerTable() {
     var user = APP.currentUser;
     if (!user) { toast('Connectez-vous d\'abord', 'error'); return; }
+    if (_isProposing) return;
 
     var jeu = document.getElementById('mjJeu').value.trim();
     var mj = document.getElementById('mjNom').value.trim();
@@ -258,6 +261,10 @@ async function proposerTable() {
     if (!mj) { toast('Votre nom de MJ est requis', 'error'); return; }
     if (!creneau) { toast('Choisissez un créneau', 'error'); return; }
 
+    // Protection double-clic : désactiver le bouton pendant l'envoi
+    var btn = document.querySelector('.mj-form-actions .btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Envoi en cours...'; }
+    _isProposing = true;
     try {
         // Insérer la proposition dans Supabase avec statut "en_attente"
         var { error } = await APP.supabase.from('programme').insert({
@@ -287,6 +294,9 @@ async function proposerTable() {
             msg = 'Ce jeu existe déjà sur ce créneau. Choisissez un autre nom ou créneau.';
         }
         toast(msg, 'error');
+    } finally {
+        _isProposing = false;
+        if (btn) { btn.disabled = false; btn.textContent = 'Proposer cette table'; }
     }
 }
 

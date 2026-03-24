@@ -194,12 +194,12 @@
 // =============================================================================
 // Gère : affichage du contenu config (bienvenue, lieu, dates, tarif),
 //        restauration (menu depuis Google Sheet), animations
-// Le code partagé (auth, nav, API, toasts) est dans app.js
+// Le code partagé (auth, nav, API, toasts) est dans app.supabase.js
 // =============================================================================
 (function() {
 'use strict';
 
-// ── Callbacks appelés par app.js après login/logout ─────────────────────────
+// ── Callbacks appelés par app.supabase.js après login/logout ────────────────
 // Cette page n'a pas de fonctionnalités liées à l'utilisateur connecté,
 // mais on définit les callbacks vides pour éviter les erreurs.
 window.onUserLogin = function() {};
@@ -412,9 +412,13 @@ function handleInscrireRepas() {
     doInscrireRepas();
 }
 
+var _isProcessingRepas = false;
+
 async function doInscrireRepas() {
     var user = APP.currentUser;
     if (!user) return;
+    if (_isProcessingRepas) return;
+    _isProcessingRepas = true;
     try {
         var { error } = await APP.supabase.from('repas').insert({
             nom: user.nom,
@@ -426,12 +430,14 @@ async function doInscrireRepas() {
         toast('Inscription au repas confirmée !', 'success');
         var allData = await fetchAllPublic();
         renderRepas(allData);
-    } catch(e) { toast(e.message, 'error'); }
+    } catch(e) { toast(e.message, 'error'); } finally { _isProcessingRepas = false; }
 }
 
 async function doInscrireRepasAccompagnant(nomAccompagnant) {
     var user = APP.currentUser;
     if (!user) return;
+    if (_isProcessingRepas) return;
+    _isProcessingRepas = true;
     try {
         var { error } = await APP.supabase.from('repas').insert({
             nom: nomAccompagnant,
@@ -445,7 +451,7 @@ async function doInscrireRepasAccompagnant(nomAccompagnant) {
         toast('Inscription au repas confirmée pour ' + nomAccompagnant + ' !', 'success');
         var allData = await fetchAllPublic();
         renderRepas(allData);
-    } catch(e) { toast(e.message, 'error'); }
+    } catch(e) { toast(e.message, 'error'); } finally { _isProcessingRepas = false; }
 }
 
 async function annulerRepas(nomAccompagnant) {
@@ -453,6 +459,8 @@ async function annulerRepas(nomAccompagnant) {
     if (!confirm('Annuler l\'inscription repas de ' + qui + ' ?')) return;
     var user = APP.currentUser;
     if (!user) return;
+    if (_isProcessingRepas) return;
+    _isProcessingRepas = true;
     try {
         // Supprimer l'inscription repas via Supabase
         var query = APP.supabase.from('repas').delete()
@@ -468,7 +476,7 @@ async function annulerRepas(nomAccompagnant) {
         toast('Inscription repas annulée', 'success');
         var allData = await fetchAllPublic();
         renderRepas(allData);
-    } catch(e) { toast(e.message, 'error'); }
+    } catch(e) { toast(e.message, 'error'); } finally { _isProcessingRepas = false; }
 }
 
 function closeChoixRepasModal() {

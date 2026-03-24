@@ -15,7 +15,9 @@
 // DÉPLOIEMENT :
 //   1. Créer un Worker sur dash.cloudflare.com → Workers & Pages → Create
 //   2. Coller ce code dans l'éditeur du Worker
-//   3. Ajouter la variable d'environnement RESEND_API_KEY dans Settings → Variables
+//   3. Ajouter les variables d'environnement dans Settings → Variables :
+//      - RESEND_API_KEY  : clé API Resend
+//      - WEBHOOK_SECRET  : secret partagé avec pg_net (même valeur que dans email-triggers.sql)
 //   4. (Optionnel) Ajouter FROM_EMAIL si vous avez un domaine vérifié sur Resend
 //   5. Dans app.js, définir EMAIL_WORKER_URL avec l'URL de ce Worker
 //
@@ -103,7 +105,7 @@ function getCorsHeaders(request) {
   return {
     'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Webhook-Secret',
     'Vary': 'Origin',
   };
 }
@@ -721,8 +723,9 @@ export default {
    * }
    *
    * Variables d'environnement requises (dans Cloudflare → Settings → Variables) :
-   *   - RESEND_API_KEY : clé API Resend
-   *   - FROM_EMAIL     : adresse d'expédition (optionnel, défaut: "Mélusine <onboarding@resend.dev>")
+   *   - RESEND_API_KEY  : clé API Resend
+   *   - FROM_EMAIL      : adresse d'expédition (optionnel, défaut: "Mélusine <onboarding@resend.dev>")
+   *   - WEBHOOK_SECRET  : secret partagé avec pg_net pour authentifier les appels
    *
    * @param {Request} request - La requête HTTP entrante
    * @param {Object}  env     - Variables d'environnement du Worker
@@ -739,6 +742,24 @@ export default {
       return new Response(
         JSON.stringify({ error: 'Méthode non autorisée. Utilisez POST.' }),
         { status: 405, headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) } }
+      );
+    }
+
+    // ── Vérification du secret partagé (webhook) ──
+    // Seuls les appels provenant de pg_net (Supabase) doivent inclure ce header.
+    // Cela empêche un tiers d'envoyer des emails via ce Worker sans le secret.
+    const webhookSecret = request.headers.get('X-Webhook-Secret');
+    if (!env.WEBHOOK_SECRET) {
+      console.error('WEBHOOK_SECRET non configurée dans les variables d\'environnement.');
+      return new Response(
+        JSON.stringify({ error: 'Service email non configuré (secret manquant).' }),
+        { status: 500, headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) } }
+      );
+    }
+    if (!webhookSecret || webhookSecret !== env.WEBHOOK_SECRET) {
+      return new Response(
+        JSON.stringify({ error: 'Accès refusé : secret invalide.' }),
+        { status: 403, headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) } }
       );
     }
 

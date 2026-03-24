@@ -144,7 +144,7 @@
 // Variable partagée : engagements du principal par créneau (pour le modal "Pour qui ?")
 var _engagements = {};
 
-// ── Callbacks app.js ────────────────────────────────────────────────────────
+// ── Callbacks app.supabase.js ────────────────────────────────────────────────
 window.onUserLogin = function() { updateBenevoleView(); };
 window.onUserLogout = function() { updateBenevoleView(); };
 
@@ -379,9 +379,13 @@ async function doInscrireBenevole(creneau, btn) {
 /**
  * Inscrit un accompagnant comme bénévole.
  */
+var _isProcessingBenevole = false;
+
 async function doInscrireBenevoleAccompagnant(creneau, nomAccompagnant) {
     var user = APP.currentUser;
     if (!user) { openAuthModal(); return; }
+    if (_isProcessingBenevole) return;
+    _isProcessingBenevole = true;
     toast('Inscription de ' + nomAccompagnant + ' en cours...', 'info');
     try {
         var { error } = await APP.supabase.from('benevoles').insert({
@@ -398,7 +402,7 @@ async function doInscrireBenevoleAccompagnant(creneau, nomAccompagnant) {
         var freshData = await fetchAllData();
         loadCreneauxBenevoles(freshData);
         loadMesBenevoles();
-    } catch(e) { toast(e.message, 'error'); }
+    } catch(e) { toast(e.message, 'error'); } finally { _isProcessingBenevole = false; }
 }
 
 /**
@@ -411,6 +415,8 @@ async function annulerBenevole(creneau, nomAccompagnant) {
     if (!confirm(msg)) return;
     var user = APP.currentUser;
     if (!user) return;
+    if (_isProcessingBenevole) return;
+    _isProcessingBenevole = true;
     try {
         // Annuler l'inscription bénévole via Supabase
         var query = APP.supabase.from('benevoles')
@@ -430,7 +436,7 @@ async function annulerBenevole(creneau, nomAccompagnant) {
         var freshData = await fetchAllData();
         loadCreneauxBenevoles(freshData);
         loadMesBenevoles();
-    } catch(e) { toast(e.message, 'error'); }
+    } catch(e) { toast(e.message, 'error'); } finally { _isProcessingBenevole = false; }
 }
 
 // ── Exports ─────────────────────────────────────────────────────────────────

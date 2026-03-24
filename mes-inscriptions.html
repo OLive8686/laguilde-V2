@@ -226,12 +226,15 @@
 // =============================================================================
 // Cette page affiche un recapitulatif complet de tout ce a quoi l'utilisateur
 // connecte est inscrit : tables JDR, accompagnants, benevolat, propositions MJ.
-// Le code partage (auth, nav, API, toasts) est dans app.js.
+// Le code partage (auth, nav, API, toasts) est dans app.supabase.js.
 // =============================================================================
 (function() {
 'use strict';
 
-// ── Callbacks appeles par app.js apres login/logout ─────────────────────────
+// ── Flag anti double-clic pour toutes les actions de la page ─────────────────
+var _isProcessing = false;
+
+// ── Callbacks appeles par app.supabase.js apres login/logout ────────────────
 
 /**
  * Appele automatiquement par app.js quand l'utilisateur se connecte.
@@ -444,6 +447,8 @@ async function annulerJdr(creneau, jeu, nomAccompagnant) {
         ? 'Annuler l\'inscription de ' + nomAccompagnant + ' \u00e0 ' + jeu + ' ?'
         : 'Annuler votre inscription \u00e0 ' + jeu + ' ?';
     if (!confirm(msg)) return;
+    if (_isProcessing) return;
+    _isProcessing = true;
     try {
         // Annuler l'inscription via Supabase
         var query = APP.supabase.from('inscriptions')
@@ -463,7 +468,7 @@ async function annulerJdr(creneau, jeu, nomAccompagnant) {
         toast('Inscription annulée', 'success');
         loadMesInscriptionsJdr();
         loadAccompagnants(); // Rafra&icirc;chir aussi la section accompagnants
-    } catch(e) { toast(e.message, 'error'); }
+    } catch(e) { toast(e.message, 'error'); } finally { _isProcessing = false; }
 }
 
 // =========================================================================
@@ -587,6 +592,8 @@ async function ajouterAccompagnant() {
     var nom = input.value.trim();
     if (!nom) { toast('Entrez le nom de l\'accompagnant', 'error'); return; }
     if (!APP.currentUser) { toast('Connectez-vous d\'abord', 'error'); return; }
+    if (_isProcessing) return;
+    _isProcessing = true;
     try {
         var { error } = await APP.supabase.from('accompagnants').insert({
             email_parent: APP.currentUser.email,
@@ -598,7 +605,7 @@ async function ajouterAccompagnant() {
         input.value = '';
         // Recharger la liste des accompagnants et les inscriptions JDR
         loadAccompagnants();
-    } catch(e) { toast(e.message, 'error'); }
+    } catch(e) { toast(e.message, 'error'); } finally { _isProcessing = false; }
 }
 
 /**
@@ -608,6 +615,8 @@ async function ajouterAccompagnant() {
  */
 async function supprimerAccompagnant(nomAccompagnant) {
     if (!confirm('Supprimer ' + nomAccompagnant + ' ? Toutes ses inscriptions seront annul\u00e9es.')) return;
+    if (_isProcessing) return;
+    _isProcessing = true;
     try {
         // Annuler toutes les inscriptions JDR de cet accompagnant
         await APP.supabase.from('inscriptions')
@@ -632,7 +641,7 @@ async function supprimerAccompagnant(nomAccompagnant) {
         // Recharger accompagnants et inscriptions JDR
         loadAccompagnants();
         loadMesInscriptionsJdr();
-    } catch(e) { toast(e.message, 'error'); }
+    } catch(e) { toast(e.message, 'error'); } finally { _isProcessing = false; }
 }
 
 // =========================================================================
@@ -693,6 +702,8 @@ async function annulerBenevole(creneau, nomAccompagnant) {
         ? 'Annuler le b\u00e9n\u00e9volat de ' + nomAccompagnant + ' sur ' + creneau + ' ?'
         : 'Annuler votre b\u00e9n\u00e9volat sur ' + creneau + ' ?';
     if (!confirm(msg)) return;
+    if (_isProcessing) return;
+    _isProcessing = true;
     try {
         // Annuler via Supabase
         var query = APP.supabase.from('benevoles')
@@ -711,7 +722,7 @@ async function annulerBenevole(creneau, nomAccompagnant) {
         toast('Inscription bénévole annulée', 'success');
         loadMesBenevoles();
         loadAccompagnants(); // Rafra&icirc;chir aussi la section accompagnants
-    } catch(e) { toast(e.message, 'error'); }
+    } catch(e) { toast(e.message, 'error'); } finally { _isProcessing = false; }
 }
 
 // =========================================================================
@@ -821,6 +832,8 @@ async function annulerRepas(nomAccompagnant) {
     if (!user) return;
     var qui = nomAccompagnant || 'votre';
     if (!confirm('Annuler l\'inscription repas de ' + qui + ' ?')) return;
+    if (_isProcessing) return;
+    _isProcessing = true;
     try {
         var query = APP.supabase.from('repas').delete()
             .eq('email', user.email);
@@ -834,7 +847,7 @@ async function annulerRepas(nomAccompagnant) {
         if (window.invalidateCache) invalidateCache();
         toast('Inscription repas annulée', 'success');
         loadMesRepas();
-    } catch(e) { toast(e.message, 'error'); }
+    } catch(e) { toast(e.message, 'error'); } finally { _isProcessing = false; }
 }
 
 window.annulerJdr = annulerJdr;
