@@ -464,6 +464,7 @@ async function annulerRepas(nomAccompagnant) {
         }
         var { error } = await query;
         if (error) throw error;
+        if (window.invalidateCache) invalidateCache();
         toast('Inscription repas annulée', 'success');
         var allData = await fetchAllPublic();
         renderRepas(allData);
