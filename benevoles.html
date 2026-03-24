@@ -363,7 +363,6 @@ async function doInscrireBenevole(creneau, btn) {
             email: user.email,
             creneau: creneau,
             statut: 'inscrit',
-            timestamp: new Date().toISOString()
         });
         if (error) throw error;
         toast('Inscription bénévole confirmée !', 'success');
@@ -390,7 +389,6 @@ async function doInscrireBenevoleAccompagnant(creneau, nomAccompagnant) {
             type_inscrit: 'accompagnant',
             nom_accompagnant: nomAccompagnant,
             statut: 'inscrit',
-            timestamp: new Date().toISOString()
         });
         if (error) throw error;
         toast('Inscription bénévole confirmée pour ' + nomAccompagnant + ' !', 'success');

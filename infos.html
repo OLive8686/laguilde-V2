@@ -419,7 +419,6 @@ async function doInscrireRepas() {
         var { error } = await APP.supabase.from('repas').insert({
             nom: user.nom,
             email: user.email,
-            timestamp: new Date().toISOString()
         });
         if (error) throw error;
         toast('Inscription au repas confirmée !', 'success');
@@ -437,7 +436,6 @@ async function doInscrireRepasAccompagnant(nomAccompagnant) {
             email: user.email,
             type_inscrit: 'accompagnant',
             nom_accompagnant: nomAccompagnant,
-            timestamp: new Date().toISOString()
         });
         if (error) throw error;
         toast('Inscription au repas confirmée pour ' + nomAccompagnant + ' !', 'success');

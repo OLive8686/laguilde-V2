@@ -329,7 +329,6 @@ async function doInscrire(creneau, jeu, btn) {
             jeu: jeu,
             statut: 'inscrit',
             type_inscrit: 'principal',
-            timestamp: new Date().toISOString()
         }).select();
         if (error) throw error;
         toast('Inscription confirmée !', 'success', { linkText: 'Mes inscriptions', linkHref: 'mes-inscriptions.html' });
@@ -365,7 +364,6 @@ async function doInscrireAccompagnant(creneau, jeu, nomAccompagnant) {
             type_inscrit: 'accompagnant',
             nom_accompagnant: nomAccompagnant,
             statut: 'inscrit',
-            timestamp: new Date().toISOString()
         }).select();
         if (error) throw error;
         toast('Inscription confirmée pour ' + nomAccompagnant + ' !', 'success', { linkText: 'Mes inscriptions', linkHref: 'mes-inscriptions.html' });
