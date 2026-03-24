@@ -265,7 +265,7 @@ function renderConfig(c) {
 
     // Carte "Dates"
     if (c.dates_detail) {
-        document.getElementById('infoDates').innerHTML = escHtml(c.dates_detail).replace(/\n/g, '<br>');
+        document.getElementById('infoDates').innerHTML = escHtmlSafe(c.dates_detail).replace(/\n/g, '<br>');
     }
 
     // Carte "Tarif"
