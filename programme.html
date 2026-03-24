@@ -122,6 +122,8 @@
         <div id="mjProposerBtn" style="display:none;text-align:center;margin-bottom:24px">
             <a href="espace-mj.html" class="btn btn-gold">Proposer une table (MJ)</a>
         </div>
+        <!-- Mention quota — affichée dynamiquement si des tables ont un quota web -->
+        <p id="quotaInfo" style="display:none;text-align:center;font-size:13px;color:var(--text-muted);margin-bottom:16px;font-style:italic"></p>
         <div class="tabs" id="programmeTabs"></div>
         <div class="programme-grid" id="programmeGrid">
             <div class="loading-shimmer" style="height:80px"></div>
@@ -465,6 +467,17 @@ function renderProgramme(items) {
 
     var grid = document.getElementById('programmeGrid');
     var tabsEl = document.getElementById('programmeTabs');
+
+    // Afficher la mention quota si des tables ont un quota web
+    var hasAnyQuota = items.some(function(i) { return i.has_quota; });
+    var quotaEl = document.getElementById('quotaInfo');
+    if (hasAnyQuota && quotaEl) {
+        var quotaText = (_config && _config.quota_web_info)
+            ? _config.quota_web_info
+            : 'Les places affichées sont réservées aux inscriptions en ligne. Des places supplémentaires seront disponibles sur place le jour J.';
+        quotaEl.textContent = quotaText;
+        quotaEl.style.display = '';
+    }
 
     // Fonction de tri chronologique des créneaux
     // Ordre : Samedi < Dimanche, puis par heure de début
