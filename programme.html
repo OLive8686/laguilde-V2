@@ -204,6 +204,7 @@ function updateMJButton() {
 // Données globales pour le rendu du programme
 var _allInscriptions = []; // inscriptions publiques (pseudos par table)
 var _mesInscriptions = []; // inscriptions de l'utilisateur connecté
+var _allProgramme = [];    // données programme avec places calculées
 
 window.onPageInit = async function() {
     // UN SEUL appel API charge tout (public + utilisateur si connecté)
@@ -226,6 +227,9 @@ window.onPageInit = async function() {
     if (allData && allData.config) window._programmeConfig = allData.config;
 
     if (allData && allData.programme) {
+        _allInscriptions = allData.inscriptions_publiques || allData.inscriptions || [];
+        if (allData.mes_inscriptions) _mesInscriptions = allData.mes_inscriptions;
+        _allProgramme = allData.programme;
         renderProgramme(allData.programme);
     } else {
         await refreshProgramme();

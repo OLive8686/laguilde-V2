@@ -1057,9 +1057,9 @@ async function loginEmail() {
         await finalizeLogin();
     } catch(e) {
         // Messages d'erreur Supabase traduits en français
-        var msg = e.message;
-        if (msg.includes('Invalid login credentials')) msg = 'Email ou mot de passe incorrect';
-        if (msg.includes('Email not confirmed')) msg = 'Veuillez confirmer votre email (vérifiez vos spams)';
+        var msg = e.message || e.error_description || e.msg || 'Erreur de connexion';
+        if (msg.includes && msg.includes('Invalid login credentials')) msg = 'Email ou mot de passe incorrect';
+        else if (msg.includes && msg.includes('Email not confirmed')) msg = 'Veuillez confirmer votre email (vérifiez vos spams)';
         toast(msg, 'error');
     }
 }
