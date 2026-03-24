@@ -48,7 +48,7 @@ LANGUAGE sql
 IMMUTABLE
 AS $$
   -- REMPLACER cette URL par celle de votre Worker Cloudflare
-  SELECT 'https://melusine-email.votre-compte.workers.dev'::text
+  SELECT 'https://melusine-email.olivier-gramain.workers.dev'::text
 $$;
 
 -- Note : le commentaire ci-dessous documente la raison du choix d'une fonction

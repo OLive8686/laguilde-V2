@@ -53,12 +53,12 @@ const ALLOWED_ORIGINS = [
 // ── Couleurs par défaut du thème Mélusine (dark) ──
 // Ces valeurs sont utilisées si aucune config custom n'est passée.
 const DEFAULT_COLORS = {
-  bg:       '#0D2B2B',   // Fond principal (vert foncé)
-  cardBg:   '#22223A',   // Fond des cartes (bleu-gris foncé)
-  accent:   '#D4A843',   // Or / accent (titres, liens)
-  text:     '#FDF8F0',   // Texte principal (crème)
-  muted:    '#7A9999',   // Texte secondaire (gris-vert)
-  light:    '#BCC8C8',   // Texte tertiaire (gris clair)
+  bg:       '#F5EFE5',   // Fond principal (beige clair)
+  cardBg:   '#FFFFFF',   // Fond des cartes (blanc)
+  accent:   '#D4A030',   // Or / accent (titres, liens)
+  text:     '#1A2A3A',   // Texte principal (bleu foncé)
+  muted:    '#6A8899',   // Texte secondaire (gris-bleu)
+  light:    '#4A6070',   // Texte tertiaire (gris foncé)
   success:  '#4A8B5E',   // Vert succès
   error:    '#B8293A',   // Rouge erreur
 };
@@ -76,7 +76,7 @@ const ALLOWED_EMAIL_TYPES = [
 ];
 
 // ── URL du site (pour les liens dans les emails) ──
-const SITE_URL = 'https://olive8686.github.io/Guilde_V2';
+const SITE_URL = 'https://olive8686.github.io/laguilde-V2/';
 
 // ── Dates de la convention (pour les liens agenda) ──
 const DATE_SAMEDI   = '2026-05-16';
