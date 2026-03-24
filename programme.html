@@ -417,19 +417,8 @@ async function annulerInscription(creneau, jeu, nomAccompagnant) {
  * Appelé après chaque inscription ou annulation.
  */
 async function reloadInscriptionsAndRefresh() {
-    try {
-        // Recharger les inscriptions publiques via Supabase
-        var { data: allIns } = await APP.supabase.from('inscriptions')
-            .select('nom, creneau, jeu, statut, type_inscrit, nom_accompagnant')
-            .in('statut', ['inscrit', 'attente']);
-        _allInscriptions = allIns || [];
-        if (APP.currentUser) {
-            var { data: mesIns } = await APP.supabase.from('inscriptions').select('*')
-                .eq('email', APP.currentUser.email);
-            _mesInscriptions = mesIns || [];
-        }
-    } catch(e) { /* silencieux */ }
-    refreshProgramme();
+    // Rafraîchir tout via fetchAllData (invalide le cache + recalcule les places)
+    await refreshProgramme();
 }
 
 // ── Programme ───────────────────────────────────────────────────────────────
@@ -440,11 +429,17 @@ async function reloadInscriptionsAndRefresh() {
  */
 async function refreshProgramme() {
     try {
-        // Charger le programme directement depuis Supabase
-        var { data, error } = await APP.supabase.from('programme').select('*')
-            .or('statut_table.eq.validé,statut_table.eq.,statut_table.is.null');
-        if (error) throw error;
-        if (data) renderProgramme(data);
+        // Invalider le cache pour avoir des données fraîches
+        if (window.invalidateCache) invalidateCache();
+        var allData = await fetchAllData();
+        if (allData && allData.config) window._programmeConfig = allData.config;
+        if (allData && allData.programme) {
+            // Les places sont déjà calculées dans fetchAllData (_fetchAllDataImpl)
+            renderProgramme(allData.programme);
+            // Mettre à jour les inscriptions locales
+            _allInscriptions = allData.inscriptions_publiques || allData.inscriptions || [];
+            if (allData.mes_inscriptions) _mesInscriptions = allData.mes_inscriptions;
+        }
     } catch(e) {
         console.warn('Erreur chargement programme:', e);
     }
