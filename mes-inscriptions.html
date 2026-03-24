@@ -268,10 +268,18 @@ async function envoyerRecap() {
     btn.disabled = true;
     btn.textContent = 'Envoi en cours...';
     try {
-        // Appel à une Edge Function Supabase pour envoyer le récap email
-        var { data, error } = await APP.supabase.functions.invoke('send-recap', {
-            body: { email: user.email }
+        // Appel à la fonction SQL send_recap_email via l'API RPC de Supabase
+        var r = await fetch(APP.SUPABASE_URL + '/rest/v1/rpc/send_recap_email', {
+            method: 'POST',
+            headers: {
+                'apikey': APP.SUPABASE_KEY,
+                'Authorization': 'Bearer ' + APP.SUPABASE_KEY,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ user_email: user.email })
         });
+        var data = await r.json();
+        var error = data && data.error ? data : null;
         if (error) throw error;
         toast('Récap envoyé ! Vérifiez votre boîte mail (' + user.email + ')', 'success');
     } catch(e) {
