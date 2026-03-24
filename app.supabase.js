@@ -812,6 +812,26 @@ async function finalizeLogin() {
     updateNavUser();
     updateNavForRole();
 
+    // Si l'utilisateur SSO n'a pas de pseudo, proposer d'en choisir un
+    if (currentUser && (!currentUser.nom || currentUser.nom.trim() === '')) {
+        // Récupérer un nom par défaut depuis les métadonnées Supabase
+        var defaultNom = '';
+        try {
+            var { data: { user } } = await supabase.auth.getUser();
+            if (user && user.user_metadata) {
+                defaultNom = user.user_metadata.full_name || user.user_metadata.name || user.user_metadata.preferred_username || '';
+            }
+        } catch(e) {}
+        showPseudoForm({
+            nom: defaultNom,
+            email: currentUser.email,
+            auth_type: 'sso'
+        });
+        var modal = document.getElementById('authModal');
+        if (modal) modal.classList.add('active');
+        return;
+    }
+
     // Rediriger vers la page d'origine si on vient d'un SSO
     var returnPage = localStorage.getItem('melusine_return_page');
     if (returnPage) {

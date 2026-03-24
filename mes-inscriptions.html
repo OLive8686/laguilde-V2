@@ -269,17 +269,22 @@ async function envoyerRecap() {
     btn.textContent = 'Envoi en cours...';
     try {
         // Appel à la fonction SQL send_recap_email via l'API RPC de Supabase
+        // On utilise la anon key car la fonction est SECURITY DEFINER
+        var token = localStorage.getItem('melusine_session');
+        var accessToken = APP.SUPABASE_KEY;
+        try { accessToken = JSON.parse(token).access_token || APP.SUPABASE_KEY; } catch(e) {}
         var r = await fetch(APP.SUPABASE_URL + '/rest/v1/rpc/send_recap_email', {
             method: 'POST',
             headers: {
                 'apikey': APP.SUPABASE_KEY,
-                'Authorization': 'Bearer ' + APP.SUPABASE_KEY,
-                'Content-Type': 'application/json'
+                'Authorization': 'Bearer ' + accessToken,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
             },
             body: JSON.stringify({ user_email: user.email })
         });
         var data = await r.json();
-        var error = data && data.error ? data : null;
+        var error = (!r.ok || (data && data.error)) ? (data || { message: 'Erreur serveur' }) : null;
         if (error) throw error;
         toast('Récap envoyé ! Vérifiez votre boîte mail (' + user.email + ')', 'success');
     } catch(e) {

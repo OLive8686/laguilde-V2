@@ -419,8 +419,10 @@ async function doInscrireRepas() {
         var { error } = await APP.supabase.from('repas').insert({
             nom: user.nom,
             email: user.email,
+            statut: 'inscrit',
         });
         if (error) throw error;
+        if (window.invalidateCache) invalidateCache();
         toast('Inscription au repas confirmée !', 'success');
         var allData = await fetchAllPublic();
         renderRepas(allData);
@@ -432,8 +434,9 @@ async function doInscrireRepasAccompagnant(nomAccompagnant) {
     if (!user) return;
     try {
         var { error } = await APP.supabase.from('repas').insert({
-            nom: user.nom,
+            nom: nomAccompagnant,
             email: user.email,
+            statut: 'inscrit',
             type_inscrit: 'accompagnant',
             nom_accompagnant: nomAccompagnant,
         });
