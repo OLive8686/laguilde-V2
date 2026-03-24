@@ -222,6 +222,9 @@ window.onPageInit = async function() {
         }
     }
 
+    // Stocker la config pour renderProgramme (mention quota)
+    if (allData && allData.config) window._programmeConfig = allData.config;
+
     if (allData && allData.programme) {
         renderProgramme(allData.programme);
     } else {
@@ -472,9 +475,9 @@ function renderProgramme(items) {
     var hasAnyQuota = items.some(function(i) { return i.has_quota; });
     var quotaEl = document.getElementById('quotaInfo');
     if (hasAnyQuota && quotaEl) {
-        var quotaText = (_config && _config.quota_web_info)
-            ? _config.quota_web_info
-            : 'Les places affichées sont réservées aux inscriptions en ligne. Des places supplémentaires seront disponibles sur place le jour J.';
+        var cfgQuota = window._programmeConfig && window._programmeConfig.quota_web_info;
+        var quotaText = cfgQuota
+            || 'Les places affichées sont réservées aux inscriptions en ligne. Des places supplémentaires seront disponibles sur place le jour J.';
         quotaEl.textContent = quotaText;
         quotaEl.style.display = '';
     }
