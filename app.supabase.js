@@ -578,15 +578,59 @@ async function _fetchAllDataImpl() {
         // Compteur repas
         var repasAll = results[7].data || [];
 
+        // ── Calcul places restantes pour le programme ──
+        // (équivalent de getProgrammeAvecPlaces() dans l'ancien code.gs)
+        var programmeRows = results[1].data || [];
+        var inscriptionsRows = results[2].data || [];
+        var inscCounts = {};
+        inscriptionsRows.forEach(function(ins) {
+            if (ins.statut === 'inscrit') {
+                var key = ins.creneau + '|||' + ins.jeu;
+                inscCounts[key] = (inscCounts[key] || 0) + 1;
+            }
+        });
+        programmeRows.forEach(function(p) {
+            var key = p.creneau + '|||' + p.jeu;
+            var maxPlaces = parseInt(p.places) || 0;
+            var placesWeb = p.places_web ? parseInt(p.places_web) : maxPlaces;
+            var inscrits = inscCounts[key] || 0;
+            p.places_restantes = Math.max(0, maxPlaces - inscrits);
+            p.places_web_restantes = Math.max(0, placesWeb - inscrits);
+            p.inscrits = inscrits;
+            p.complet_web = p.places_web_restantes <= 0;
+            p.complet = p.places_restantes <= 0;
+            p.has_quota = (p.places_web && parseInt(p.places_web) < maxPlaces);
+        });
+
+        // ── Calcul places restantes pour les créneaux bénévoles ──
+        // (équivalent de getPostesBenevoles() dans l'ancien code.gs)
+        var creneauxBen = results[3].data || [];
+        var benevolesAll = results[4].data || [];
+        var benCounts = {};
+        var benNoms = {};
+        benevolesAll.forEach(function(b) {
+            benCounts[b.creneau] = (benCounts[b.creneau] || 0) + 1;
+            if (!benNoms[b.creneau]) benNoms[b.creneau] = [];
+            benNoms[b.creneau].push(b.nom || '');
+        });
+        creneauxBen.forEach(function(c) {
+            var maxP = parseInt(c.places) || 0;
+            var ins = benCounts[c.creneau] || 0;
+            c.inscrits = ins;
+            c.places_restantes = Math.max(0, maxP - ins);
+            c.complet = c.places_restantes <= 0;
+            c.noms_inscrits = benNoms[c.creneau] || [];
+        });
+
         // Construire l'objet de retour compatible avec l'ancien format
         var allData = {
             ok: true,
             config: config,
-            programme: results[1].data || [],
-            inscriptions_publiques: results[2].data || [],
-            inscriptions: results[2].data || [],  // alias pour compatibilité
-            creneaux_benevoles: results[3].data || [],
-            benevoles_all: results[4].data || [],
+            programme: programmeRows,
+            inscriptions_publiques: inscriptionsRows,
+            inscriptions: inscriptionsRows,  // alias pour compatibilité
+            creneaux_benevoles: creneauxBen,
+            benevoles_all: benevolesAll,
             restauration: results[5].data || [],
             animations: results[6].data || [],
             repas_count: repasAll.length
