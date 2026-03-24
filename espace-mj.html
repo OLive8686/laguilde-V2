@@ -273,6 +273,7 @@ async function proposerTable() {
             statut_table: 'en_attente'
         });
         if (error) throw error;
+        if (window.invalidateCache) invalidateCache();
         toast('Table proposée ! Un admin la validera prochainement.', 'success');
         document.getElementById('mjJeu').value = '';
         document.getElementById('mjSysteme').value = '';

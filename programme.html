@@ -326,17 +326,24 @@ async function doInscrire(creneau, jeu, btn) {
 
     try {
         var u = APP.currentUser;
+        // Déterminer le statut : inscrit si places web dispo, sinon liste d'attente
+        var tableInfo = _allProgramme ? _allProgramme.find(function(p) { return p.creneau === creneau && p.jeu === jeu; }) : null;
+        var statut = 'inscrit';
+        if (tableInfo && tableInfo.complet_web) statut = 'attente';
         // Insertion directe dans Supabase (les RLS vérifient l'auth)
         var { data, error } = await APP.supabase.from('inscriptions').insert({
             nom: u.nom,
             email: u.email,
             creneau: creneau,
             jeu: jeu,
-            statut: 'inscrit',
+            statut: statut,
             type_inscrit: 'principal',
         }).select();
         if (error) throw error;
-        toast('Inscription confirmée !', 'success', { linkText: 'Mes inscriptions', linkHref: 'mes-inscriptions.html' });
+        var msg = statut === 'inscrit'
+            ? 'Inscription confirmée !'
+            : 'Table complète en ligne — vous êtes en liste d\'attente.';
+        toast(msg, statut === 'inscrit' ? 'success' : 'info', { linkText: 'Mes inscriptions', linkHref: 'mes-inscriptions.html' });
         await reloadInscriptionsAndRefresh();
     } catch(e) {
         toast(e.message, 'error');
@@ -361,17 +368,23 @@ async function doInscrireAccompagnant(creneau, jeu, nomAccompagnant) {
     toast('Inscription de ' + nomAccompagnant + ' en cours...', 'info');
     try {
         var u = APP.currentUser;
+        var tableInfo = _allProgramme ? _allProgramme.find(function(p) { return p.creneau === creneau && p.jeu === jeu; }) : null;
+        var statut = 'inscrit';
+        if (tableInfo && tableInfo.complet_web) statut = 'attente';
         var { data, error } = await APP.supabase.from('inscriptions').insert({
-            nom: u.nom,
+            nom: nomAccompagnant,
             email: u.email,
             creneau: creneau,
             jeu: jeu,
             type_inscrit: 'accompagnant',
             nom_accompagnant: nomAccompagnant,
-            statut: 'inscrit',
+            statut: statut,
         }).select();
         if (error) throw error;
-        toast('Inscription confirmée pour ' + nomAccompagnant + ' !', 'success', { linkText: 'Mes inscriptions', linkHref: 'mes-inscriptions.html' });
+        var msg = statut === 'inscrit'
+            ? 'Inscription confirmée pour ' + nomAccompagnant + ' !'
+            : nomAccompagnant + ' est en liste d\'attente.';
+        toast(msg, statut === 'inscrit' ? 'success' : 'info', { linkText: 'Mes inscriptions', linkHref: 'mes-inscriptions.html' });
         await reloadInscriptionsAndRefresh();
     } catch(e) {
         toast(e.message, 'error');
@@ -434,11 +447,12 @@ async function refreshProgramme() {
         var allData = await fetchAllData();
         if (allData && allData.config) window._programmeConfig = allData.config;
         if (allData && allData.programme) {
-            // Les places sont déjà calculées dans fetchAllData (_fetchAllDataImpl)
-            renderProgramme(allData.programme);
-            // Mettre à jour les inscriptions locales
+            // Mettre à jour les données locales AVANT le render
             _allInscriptions = allData.inscriptions_publiques || allData.inscriptions || [];
             if (allData.mes_inscriptions) _mesInscriptions = allData.mes_inscriptions;
+            _allProgramme = allData.programme;
+            // Les places sont déjà calculées dans fetchAllData (_fetchAllDataImpl)
+            renderProgramme(allData.programme);
         }
     } catch(e) {
         console.warn('Erreur chargement programme:', e);

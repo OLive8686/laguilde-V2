@@ -611,7 +611,7 @@ async function _fetchAllDataImpl() {
         benevolesAll.forEach(function(b) {
             benCounts[b.creneau] = (benCounts[b.creneau] || 0) + 1;
             if (!benNoms[b.creneau]) benNoms[b.creneau] = [];
-            benNoms[b.creneau].push(b.nom || '');
+            benNoms[b.creneau].push(b.nom_accompagnant || b.nom || '');
         });
         creneauxBen.forEach(function(c) {
             var maxP = parseInt(c.places) || 0;

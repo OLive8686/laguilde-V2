@@ -315,6 +315,7 @@ window.adminPromouvoir = async function(id) {
             .update({ statut: 'inscrit' })
             .eq('id', id);
         if (error) throw error;
+        if (window.invalidateCache) invalidateCache();
         toast('Inscription promue !', 'success');
         loadAdminPanel();
     } catch(e) { toast(e.message, 'error'); }
@@ -327,6 +328,7 @@ window.adminSupprimer = async function(id) {
             .update({ statut: 'supprimé' })
             .eq('id', id);
         if (error) throw error;
+        if (window.invalidateCache) invalidateCache();
         toast('Inscription supprimée', 'success');
         loadAdminPanel();
     } catch(e) { toast(e.message, 'error'); }
@@ -340,6 +342,7 @@ window.adminValiderTable = async function(emailMj, jeu, creneau) {
             .eq('jeu', jeu)
             .eq('creneau', creneau);
         if (error) throw error;
+        if (window.invalidateCache) invalidateCache();
         toast('Table validée !', 'success');
         loadAdminPanel();
     } catch(e) { toast(e.message, 'error'); }
@@ -353,6 +356,7 @@ window.adminRefuserTable = async function(emailMj, jeu, creneau) {
             .eq('jeu', jeu)
             .eq('creneau', creneau);
         if (error) throw error;
+        if (window.invalidateCache) invalidateCache();
         toast('Table refusée', 'info');
         loadAdminPanel();
     } catch(e) { toast(e.message, 'error'); }
@@ -365,6 +369,7 @@ window.changeRole = async function(email, newRole) {
             .update({ role: newRole })
             .eq('email', email);
         if (error) throw error;
+        if (window.invalidateCache) invalidateCache();
         toast('Rôle modifié : ' + email + ' → ' + newRole, 'success');
     } catch(e) { toast(e.message, 'error'); }
 };
