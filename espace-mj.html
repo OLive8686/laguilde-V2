@@ -281,7 +281,13 @@ async function proposerTable() {
         document.getElementById('mjContentWarning').value = '';
         document.getElementById('mjDescCount').textContent = '0';
         loadMesPropositions();
-    } catch(e) { toast(e.message, 'error'); }
+    } catch(e) {
+        var msg = (e.message || '').toString();
+        if (msg.includes('duplicate') || msg.includes('unique constraint')) {
+            msg = 'Ce jeu existe déjà sur ce créneau. Choisissez un autre nom ou créneau.';
+        }
+        toast(msg, 'error');
+    }
 }
 
 /**
