@@ -574,7 +574,7 @@ function renderProgramme(items) {
             var inscritsHtml = '';
             if (inscritsTable.length > 0) {
                 var noms = inscritsTable.map(function(i) {
-                    var nom = escHtml(i.nom);
+                    var nom = escHtml(i.type_inscrit === 'accompagnant' && i.nom_accompagnant ? i.nom_accompagnant : i.nom);
                     if (i.type_inscrit === 'accompagnant') nom += ' <span style="font-size:12px;color:var(--text-muted)">(acc.)</span>';
                     return nom;
                 });

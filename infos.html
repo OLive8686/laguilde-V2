@@ -441,6 +441,7 @@ async function doInscrireRepasAccompagnant(nomAccompagnant) {
             nom_accompagnant: nomAccompagnant,
         });
         if (error) throw error;
+        if (window.invalidateCache) invalidateCache();
         toast('Inscription au repas confirmée pour ' + nomAccompagnant + ' !', 'success');
         var allData = await fetchAllPublic();
         renderRepas(allData);

@@ -203,6 +203,10 @@ window.onPageInit = async function() {
             var kb = (b.toLowerCase().indexOf('dimanche') !== -1 ? 100 : 0) + (parseInt((b.match(/(\d+)h/) || [])[1]) || 99);
             return ka - kb;
         });
+        // Si aucun créneau trouvé, utiliser des créneaux par défaut
+        if (creneaux.length === 0) {
+            creneaux = ['Samedi 10h-13h', 'Samedi 14h-17h', 'Samedi 21h-00h', 'Dimanche 10h-13h', 'Dimanche 13h-17h'];
+        }
         var select = document.getElementById('mjCreneau');
         select.innerHTML = '<option value="">Choisir un cr\u00e9neau...</option>' +
             creneaux.map(function(c) { return '<option value="' + escHtml(c) + '">' + escHtml(c) + '</option>'; }).join('');
