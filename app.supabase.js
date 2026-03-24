@@ -128,6 +128,10 @@ async function sbInsert(table, rows) {
             headers: sbHeaders(),
             body: JSON.stringify(rows)
         });
+        if (r.status === 401 && _accessToken) {
+            var refreshed = await refreshSession();
+            if (refreshed) r = await fetch(url, { method: 'POST', headers: sbHeaders(), body: JSON.stringify(rows) });
+        }
         if (!r.ok) {
             var err = await r.json().catch(function() { return { message: r.statusText }; });
             return { data: null, error: err };
@@ -154,6 +158,10 @@ async function sbUpdate(table, values, filter) {
             headers: sbHeaders(),
             body: JSON.stringify(values)
         });
+        if (r.status === 401 && _accessToken) {
+            var refreshed = await refreshSession();
+            if (refreshed) r = await fetch(url, { method: 'PATCH', headers: sbHeaders(), body: JSON.stringify(values) });
+        }
         if (!r.ok) {
             var err = await r.json().catch(function() { return { message: r.statusText }; });
             return { data: null, error: err };
@@ -178,6 +186,10 @@ async function sbDelete(table, filter) {
             method: 'DELETE',
             headers: sbHeaders()
         });
+        if (r.status === 401 && _accessToken) {
+            var refreshed = await refreshSession();
+            if (refreshed) r = await fetch(url, { method: 'DELETE', headers: sbHeaders() });
+        }
         if (!r.ok) {
             var err = await r.json().catch(function() { return { message: r.statusText }; });
             return { data: null, error: err };
@@ -859,6 +871,14 @@ async function logout() {
     currentUser = null;
     currentRole = 'joueur';
     accompagnants = [];
+    // Nettoyer toutes les données locales
+    localStorage.removeItem('melusine_session');
+    localStorage.removeItem('melusine_user');
+    localStorage.removeItem('melusine_role');
+    localStorage.removeItem('melusine_accompagnants');
+    localStorage.removeItem('melusine_pending');
+    localStorage.removeItem('melusine_return_page');
+    invalidateCache();
     updateNavUser();
     updateNavForRole();
     // Appeler le callback de la page si défini
