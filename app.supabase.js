@@ -1028,14 +1028,12 @@ async function confirmPseudo() {
             currentUser.nom = pseudo;
         }
 
-        // Mettre à jour la table profiles (et non 'roles') conformément au schéma Supabase
+        // Mettre à jour le pseudo dans la table profiles
+        // On utilise UPDATE (pas upsert) pour déclencher le trigger trg_sync_pseudo
+        // qui propage le changement dans inscriptions, benevoles, repas et programme
         if (currentUser && currentUser.email) {
-            await supabase.from('profiles').upsert({
-                email: currentUser.email,
-                nom: pseudo,
-                role: currentRole || 'joueur',
-                date_inscription: new Date().toISOString()
-            }, { onConflict: 'email' });
+            await supabase.from('profiles').update({ nom: pseudo })
+                .eq('email', currentUser.email);
         }
 
         updateNavUser();
