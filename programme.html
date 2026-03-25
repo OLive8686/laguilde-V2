@@ -576,7 +576,7 @@ function renderProgramme(items) {
                     + '<button class="btn btn-small btn-red" style="margin-top:6px" onclick="annulerInscription(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">Annuler</button>';
                 // Bouton pour inscrire un accompagnant (si l'utilisateur en a)
                 if (APP.accompagnants && APP.accompagnants.length > 0) {
-                    btn += '<button class="btn btn-small" style="margin-top:6px;border:1px solid var(--gold);color:var(--gold);background:transparent" onclick="handleInscrire(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">Inscrire un accompagnant</button>';
+                    btn += '<button class="btn btn-small" style="margin-top:6px;border:1px solid var(--teal);color:var(--teal);background:transparent;font-size:12px" onclick="handleInscrire(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">Inscrire un accompagnant</button>';
                 }
             } else if (fullWeb) {
                 btn = '<button class="btn btn-small btn-gold" onclick="handleInscrire(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">Liste d\'attente</button>';
