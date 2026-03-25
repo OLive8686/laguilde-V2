@@ -1040,7 +1040,11 @@ async function confirmPseudo() {
         closeAuthModal();
         toast('Bienvenue ' + pseudo + ' !', 'success');
 
-        // Appeler le callback de la page
+        // Invalider le cache pour que les données fraîches (pseudo propagé par le trigger)
+        // soient rechargées sur toutes les pages
+        invalidateCache();
+
+        // Appeler le callback de la page pour rafraîchir l'affichage
         if (window.onUserLogin) window.onUserLogin();
     } catch(e) {
         toast('Erreur : ' + e.message, 'error');
