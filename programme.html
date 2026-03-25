@@ -350,12 +350,16 @@ async function doInscrire(creneau, jeu, btn) {
         toast(msg, statut === 'inscrit' ? 'success' : 'info', { linkText: 'Mes inscriptions', linkHref: 'mes-inscriptions.html' });
         await reloadInscriptionsAndRefresh();
     } catch(e) {
-        // Traduire les erreurs PostgreSQL courantes en français
+        // Traduire les erreurs PostgreSQL courantes en français lisible
         var msg = e.message || e.details || 'Erreur lors de l\'inscription';
-        if (msg.includes('Déjà inscrit')) msg = msg; // déjà en français
-        else if (msg.includes('bénévole')) msg = msg;
-        else if (msg.includes('MJ')) msg = msg;
-        else if (msg.includes('duplicate') || msg.includes('unique')) msg = 'Vous êtes déjà inscrit·e à cette table.';
+        if (msg.includes('Déjà inscrit') || msg.includes('sur ce créneau'))
+            msg = 'Vous êtes déjà inscrit·e sur ce créneau. Pour changer de table, annulez d\'abord votre inscription actuelle.';
+        else if (msg.includes('bénévole'))
+            msg = 'Vous êtes bénévole sur ce créneau. Annulez votre bénévolat d\'abord pour vous inscrire à une table.';
+        else if (msg.includes('MJ'))
+            msg = 'Vous êtes MJ sur ce créneau. Vous ne pouvez pas vous inscrire comme joueur.';
+        else if (msg.includes('duplicate') || msg.includes('unique'))
+            msg = 'Vous êtes déjà inscrit·e à cette table.';
         toast(msg, 'error');
     } finally {
         // Toujours restaurer le bouton, même en cas d'erreur
