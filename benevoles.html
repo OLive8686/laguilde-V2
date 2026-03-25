@@ -363,6 +363,7 @@ async function doInscrireBenevole(creneau, btn) {
             email: user.email,
             creneau: creneau,
             statut: 'inscrit',
+            type_inscrit: 'principal',
         });
         if (error) throw error;
         toast('Inscription bénévole confirmée !', 'success');

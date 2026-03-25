@@ -268,12 +268,24 @@ function showChoixModal(creneau, jeu) {
     document.getElementById('choixModalGame').textContent = jeu;
     document.getElementById('choixModalCreneau').textContent = 'Créneau : ' + creneau;
 
-    // Bouton pour s'inscrire soi-même
-    var options = `
+    // Bouton pour s'inscrire soi-même (masqué si déjà inscrit sur ce créneau)
+    var dejaInscritCreneau = _mesInscriptions.some(function(mi) {
+        return mi.creneau === creneau
+            && (mi.statut === 'inscrit' || mi.statut === 'attente')
+            && (!mi.nom_accompagnant || mi.nom_accompagnant.trim() === '');
+    });
+    var estMJCreneau = APP.currentUser && _allProgramme.some(function(p) {
+        return p.creneau === creneau && p.email_mj &&
+            p.email_mj.toLowerCase() === APP.currentUser.email.toLowerCase() && p.statut_table !== 'refusé';
+    });
+    var options = '';
+    if (!dejaInscritCreneau && !estMJCreneau) {
+        options += `
         <button class="auth-btn" onclick="this.classList.add('btn-loading');doInscrire('${esc(creneau)}','${esc(jeu)}',this); closeChoixModal()">
             <span class="auth-btn-icon">🧑</span>
             <div><div class="auth-btn-text">${escHtml(APP.currentUser.nom)} (moi)</div><div class="auth-btn-sub">Inscription personnelle</div></div>
         </button>`;
+    }
 
     // Un bouton par accompagnant
     APP.accompagnants.forEach(function(a) {

@@ -424,6 +424,7 @@ async function doInscrireRepas() {
             nom: user.nom,
             email: user.email,
             statut: 'inscrit',
+            type_inscrit: 'principal',
         });
         if (error) throw error;
         if (window.invalidateCache) invalidateCache();
