@@ -1077,7 +1077,9 @@ async function loginEmail() {
         await finalizeLogin();
     } catch(e) {
         // Messages d'erreur Supabase traduits en français
-        var msg = e.message || e.error_description || e.msg || 'Erreur de connexion';
+        // L'objet erreur peut venir du proxy REST ({ error, error_description })
+        // ou d'une vraie Error JS (avec .message). On teste tous les formats.
+        var msg = e.message || e.error_description || e.msg || e.error || 'Erreur de connexion';
         if (msg.includes && msg.includes('Invalid login credentials')) msg = 'Email ou mot de passe incorrect';
         else if (msg.includes && msg.includes('Email not confirmed')) msg = 'Veuillez confirmer votre email (vérifiez vos spams)';
         toast(msg, 'error');

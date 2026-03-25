@@ -587,7 +587,7 @@ function renderProgramme(items) {
                     + '<button class="btn btn-small btn-red" style="margin-top:6px" onclick="annulerInscription(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">Annuler</button>';
                 // Bouton pour inscrire un accompagnant (si l'utilisateur en a)
                 if (APP.accompagnants && APP.accompagnants.length > 0) {
-                    btn += '<button class="btn btn-small" style="margin-top:6px;border:1px solid var(--teal);color:var(--teal);background:transparent;font-size:12px" onclick="handleInscrire(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">Inscrire un accompagnant</button>';
+                    btn += '<button class="btn btn-small btn-outline" style="margin-top:6px;font-size:12px" onclick="handleInscrire(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">Inscrire un accompagnant</button>';
                 }
             } else {
                 // Vérifier si l'utilisateur est déjà inscrit sur une AUTRE table du même créneau
@@ -613,10 +613,17 @@ function renderProgramme(items) {
             });
             var inscritsHtml = '';
             if (inscritsTable.length > 0) {
-                var noms = inscritsTable.map(function(i) {
-                    var nom = escHtml(i.type_inscrit === 'accompagnant' && i.nom_accompagnant ? i.nom_accompagnant : i.nom);
-                    if (i.type_inscrit === 'accompagnant') nom += ' <span style="font-size:12px;color:var(--text-muted)">(acc.)</span>';
-                    return nom;
+                // Dédupliquer par nom + type pour éviter les doublons d'affichage
+                var seen = {};
+                var noms = [];
+                inscritsTable.forEach(function(i) {
+                    var nom = i.type_inscrit === 'accompagnant' && i.nom_accompagnant ? i.nom_accompagnant : i.nom;
+                    var dedupKey = nom + '||' + (i.type_inscrit || 'principal');
+                    if (seen[dedupKey]) return; // ignorer les doublons
+                    seen[dedupKey] = true;
+                    var nomHtml = escHtml(nom);
+                    if (i.type_inscrit === 'accompagnant') nomHtml += ' <span style="font-size:12px;color:var(--text-muted)">(acc.)</span>';
+                    noms.push(nomHtml);
                 });
                 inscritsHtml = '<div style="margin-top:8px;font-size:13px;color:var(--text-muted)">👥 ' + noms.join(', ') + '</div>';
             }
