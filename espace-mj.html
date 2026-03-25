@@ -131,12 +131,12 @@
                         </select>
                     </div>
                     <div class="mj-form-group">
-                        <label class="mj-label">Nombre total de places * (1-8)</label>
-                        <input type="number" id="mjPlaces" class="mj-input" min="1" max="8" value="5" onchange="updatePlacesWeb()">
+                        <label class="mj-label">Nombre total de places * (1-5)</label>
+                        <input type="number" id="mjPlaces" class="mj-input" min="1" max="5" value="5" onchange="updatePlacesWeb()">
                     </div>
                     <div class="mj-form-group">
                         <label class="mj-label">Dont places en ligne *</label>
-                        <input type="number" id="mjPlacesWeb" class="mj-input" min="0" max="8" value="3">
+                        <input type="number" id="mjPlacesWeb" class="mj-input" min="0" max="5" value="3">
                         <p style="font-size:12px;color:var(--text-muted);margin-top:4px">Les places restantes seront réservées pour l'inscription sur place le jour J.</p>
                     </div>
                     <div class="mj-form-group">
@@ -267,6 +267,8 @@ async function proposerTable() {
     if (!jeu) { toast('Le nom du jeu est requis', 'error'); return; }
     if (!mj) { toast('Votre nom de MJ est requis', 'error'); return; }
     if (!creneau) { toast('Choisissez un créneau', 'error'); return; }
+    if (parseInt(places) < 1 || parseInt(places) > 5) { toast('Le nombre de places doit être entre 1 et 5', 'error'); return; }
+    if (parseInt(placesWeb) < 0 || parseInt(placesWeb) > parseInt(places)) { toast('Le nombre de places en ligne doit être entre 0 et le nombre total de places', 'error'); return; }
 
     // Protection double-clic : désactiver le bouton pendant l'envoi
     var btn = document.querySelector('.mj-form-actions .btn');
@@ -345,6 +347,8 @@ async function loadMesPropositions() {
 // Synchronise le max de places_web avec le total de places
 function updatePlacesWeb() {
     var total = parseInt(document.getElementById('mjPlaces').value) || 5;
+    if (total > 5) { document.getElementById('mjPlaces').value = 5; total = 5; }
+    if (total < 1) { document.getElementById('mjPlaces').value = 1; total = 1; }
     var webInput = document.getElementById('mjPlacesWeb');
     webInput.max = total;
     if (parseInt(webInput.value) > total) webInput.value = total;
