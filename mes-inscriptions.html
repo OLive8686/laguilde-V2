@@ -363,9 +363,10 @@ async function loadMesInscriptionsJdr(allData) {
         if (allData && allData.mes_inscriptions) {
             inscriptions = allData.mes_inscriptions;
         } else {
-            // Fallback : charger directement depuis Supabase
+            // Fallback : charger directement depuis Supabase (uniquement les actives)
             var { data } = await APP.supabase.from('inscriptions').select('*')
-                .eq('email', user.email);
+                .eq('email', user.email)
+                .in('statut', ['inscrit', 'attente']);
             inscriptions = data || [];
         }
         var grid = document.getElementById('mesJdrGrid');
@@ -512,9 +513,10 @@ async function loadAccompagnants(allData) {
             } else {
                 try {
                     var { data: rJdr } = await APP.supabase.from('inscriptions').select('*')
-                        .eq('email', user.email);
+                        .eq('email', user.email)
+                        .in('statut', ['inscrit', 'attente']);
                     insJdr = (rJdr || []).filter(function(i) {
-                        return i.type_inscrit === 'accompagnant' && (i.statut === 'inscrit' || i.statut === 'attente');
+                        return i.type_inscrit === 'accompagnant';
                     });
                 } catch(e) {}
             }
