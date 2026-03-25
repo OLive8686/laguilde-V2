@@ -171,7 +171,7 @@ window.onUserLogin = async function() {
     try {
         var { data, error } = await APP.supabase.from('inscriptions').select('*')
             .eq('email', APP.currentUser.email);
-        if (error) throw error;
+        if (error) throw new Error(error.message || error.details || error.hint || 'Erreur serveur');
         _mesInscriptions = data || [];
     } catch(e) { _mesInscriptions = []; }
     refreshProgramme();
@@ -249,7 +249,7 @@ async function loadAccompagnants() {
     try {
         var { data, error } = await APP.supabase.from('accompagnants').select('*')
             .eq('email_parent', APP.currentUser.email);
-        if (error) throw error;
+        if (error) throw new Error(error.message || error.details || error.hint || 'Erreur serveur');
         APP.accompagnants = data || [];
         localStorage.setItem('melusine_accompagnants', JSON.stringify(APP.accompagnants));
     } catch(e) {
@@ -343,7 +343,7 @@ async function doInscrire(creneau, jeu, btn) {
             statut: statut,
             type_inscrit: 'principal',
         }).select();
-        if (error) throw error;
+        if (error) throw new Error(error.message || error.details || error.hint || 'Erreur serveur');
         var msg = statut === 'inscrit'
             ? 'Inscription confirmée !'
             : 'Table complète en ligne — vous êtes en liste d\'attente.';
@@ -391,7 +391,7 @@ async function doInscrireAccompagnant(creneau, jeu, nomAccompagnant) {
             nom_accompagnant: nomAccompagnant,
             statut: statut,
         }).select();
-        if (error) throw error;
+        if (error) throw new Error(error.message || error.details || error.hint || 'Erreur serveur');
         var msg = statut === 'inscrit'
             ? 'Inscription confirmée pour ' + nomAccompagnant + ' !'
             : nomAccompagnant + ' est en liste d\'attente.';
@@ -428,7 +428,7 @@ async function annulerInscription(creneau, jeu, nomAccompagnant) {
             query = query.eq('type_inscrit', 'principal');
         }
         var { error } = await query;
-        if (error) throw error;
+        if (error) throw new Error(error.message || error.details || error.hint || 'Erreur serveur');
         toast('Inscription annulée', 'success');
         await reloadInscriptionsAndRefresh();
     } catch(e) {
