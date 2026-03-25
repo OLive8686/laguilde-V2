@@ -589,10 +589,22 @@ function renderProgramme(items) {
                 if (APP.accompagnants && APP.accompagnants.length > 0) {
                     btn += '<button class="btn btn-small" style="margin-top:6px;border:1px solid var(--teal);color:var(--teal);background:transparent;font-size:12px" onclick="handleInscrire(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">Inscrire un accompagnant</button>';
                 }
-            } else if (fullWeb) {
-                btn = '<button class="btn btn-small btn-gold" onclick="handleInscrire(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">Liste d\'attente</button>';
             } else {
-                btn = '<button class="btn btn-small btn-green" onclick="handleInscrire(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">S\'inscrire</button>';
+                // Vérifier si l'utilisateur est déjà inscrit sur une AUTRE table du même créneau
+                var dejaOccupe = APP.currentUser && _mesInscriptions.some(function(mi) {
+                    return mi.creneau === item.creneau && mi.jeu !== item.jeu
+                        && (mi.statut === 'inscrit' || mi.statut === 'attente')
+                        && (!mi.nom_accompagnant || mi.nom_accompagnant.trim() === '');
+                });
+
+                if (dejaOccupe) {
+                    // Déjà pris sur ce créneau → bouton grisé avec explication
+                    btn = '<span class="badge badge-attente" style="font-size:11px">Créneau déjà pris</span>';
+                } else if (fullWeb) {
+                    btn = '<button class="btn btn-small btn-gold" onclick="handleInscrire(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">Liste d\'attente</button>';
+                } else {
+                    btn = '<button class="btn btn-small btn-green" onclick="handleInscrire(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">S\'inscrire</button>';
+                }
             }
 
             // Liste des inscrits à cette table (pseudos publics)
