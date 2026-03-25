@@ -350,8 +350,15 @@ async function doInscrire(creneau, jeu, btn) {
         toast(msg, statut === 'inscrit' ? 'success' : 'info', { linkText: 'Mes inscriptions', linkHref: 'mes-inscriptions.html' });
         await reloadInscriptionsAndRefresh();
     } catch(e) {
-        toast(e.message, 'error');
-        // Restaurer le bouton en cas d'erreur
+        // Traduire les erreurs PostgreSQL courantes en français
+        var msg = e.message || e.details || 'Erreur lors de l\'inscription';
+        if (msg.includes('Déjà inscrit')) msg = msg; // déjà en français
+        else if (msg.includes('bénévole')) msg = msg;
+        else if (msg.includes('MJ')) msg = msg;
+        else if (msg.includes('duplicate') || msg.includes('unique')) msg = 'Vous êtes déjà inscrit·e à cette table.';
+        toast(msg, 'error');
+    } finally {
+        // Toujours restaurer le bouton, même en cas d'erreur
         if (btn) {
             btn.disabled = false;
             btn.classList.remove('btn-loading', 'btn-click-pulse');
