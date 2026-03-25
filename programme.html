@@ -578,9 +578,20 @@ function renderProgramme(items) {
                 });
             }
 
+            // Vérifier si l'utilisateur est MJ de cette table
+            var estMJ = APP.currentUser && item.email_mj &&
+                item.email_mj.toLowerCase() === APP.currentUser.email.toLowerCase();
+
             // Bouton d'inscription adapté au statut
             var btn;
-            if (monInscription) {
+            if (estMJ) {
+                // L'utilisateur est MJ de cette table → pas de bouton d'inscription
+                btn = '<span class="badge badge-inscrit" style="background:var(--accent-light);color:var(--accent)">🎲 Vous êtes MJ</span>';
+                // Mais il peut inscrire un accompagnant
+                if (APP.accompagnants && APP.accompagnants.length > 0) {
+                    btn += '<button class="btn btn-small btn-outline" style="margin-top:6px;font-size:12px" onclick="handleInscrire(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">Inscrire un accompagnant</button>';
+                }
+            } else if (monInscription) {
                 // Déjà inscrit → afficher statut + bouton annuler
                 var statutLabel = monInscription.statut === 'inscrit' ? '✅ Inscrit·e' : '⏳ En attente';
                 btn = '<span class="badge badge-inscrit">' + statutLabel + '</span>'
