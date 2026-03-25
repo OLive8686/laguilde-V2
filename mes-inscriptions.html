@@ -750,10 +750,14 @@ async function loadMesPropositionsMj(allData) {
         }
         var grid = document.getElementById('mesPropositionsGrid');
 
+        var section = document.getElementById('sectionPropositionsMj');
         if (!propositions || propositions.length === 0) {
-            grid.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:16px;padding:20px 0">Aucune proposition de table pour le moment.</p>';
+            // Pas de propositions → masquer la section complètement
+            if (section) section.style.display = 'none';
             return;
         }
+        // Afficher la section si le MJ a des propositions
+        if (section) section.style.display = 'block';
 
         // Correspondance statut -> badge CSS et libelle affiche
         var statusLabels = {
