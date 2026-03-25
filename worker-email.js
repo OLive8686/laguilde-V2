@@ -689,47 +689,62 @@ function validateRequest(body) {
 
 
 // =============================================================================
-// ENVOI — Appel à l'API Resend
+// ENVOI — Appel à l'API MailerSend
+// =============================================================================
+// MailerSend offre 3000 emails/mois gratuits avec un domaine trial inclus.
+// Contrairement à Resend, pas besoin de vérifier un domaine pour envoyer
+// à n'importe quel destinataire.
+//
+// Variable d'environnement requise : MAILERSEND_API_KEY
+// Variable optionnelle : FROM_EMAIL (défaut: env variable ou fallback)
 // =============================================================================
 
 /**
- * Envoie un email via l'API Resend (https://resend.com/docs/api-reference/emails/send-email).
+ * Envoie un email via l'API MailerSend.
+ * Doc : https://developers.mailersend.com/api/v1/email.html#send-an-email
  *
- * @param {string} apiKey    - Clé API Resend (depuis la variable d'environnement)
- * @param {string} fromEmail - Adresse d'expédition (ex: "melusine@votredomaine.fr")
+ * @param {string} apiKey    - Clé API MailerSend
+ * @param {string} fromEmail - Adresse d'expédition (ex: "Mélusine <melusine@trial-xxx.mlsender.net>")
  * @param {string} to        - Adresse du destinataire
  * @param {string} subject   - Objet de l'email
  * @param {string} html      - Contenu HTML de l'email
  * @returns {Object} { ok: boolean, id?: string, error?: string }
  */
-async function sendViaResend(apiKey, fromEmail, to, subject, html) {
+async function sendViaMailerSend(apiKey, fromEmail, to, subject, html) {
   try {
-    const response = await fetch('https://api.resend.com/emails', {
+    // Extraire le nom et l'email depuis le format "Nom <email>"
+    var fromName = 'Mélusine';
+    var fromAddr = fromEmail;
+    var match = fromEmail.match(/^(.+?)\s*<(.+?)>$/);
+    if (match) {
+      fromName = match[1].trim();
+      fromAddr = match[2].trim();
+    }
+
+    const response = await fetch('https://api.mailersend.com/v1/email', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': 'Bearer ' + apiKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: fromEmail,
-        to: [to],
+        from: { email: fromAddr, name: fromName },
+        to: [{ email: to }],
         subject: subject,
         html: html,
       }),
     });
 
-    const result = await response.json();
-
-    if (!response.ok) {
-      // On log l'erreur côté serveur mais on ne renvoie pas le détail technique
-      console.error('Resend API error:', response.status, JSON.stringify(result));
-      return { ok: false, error: 'Erreur envoi email' };
+    // MailerSend retourne 202 Accepted en cas de succès (pas 200)
+    if (response.status === 202 || response.status === 200) {
+      return { ok: true, id: response.headers.get('x-message-id') || 'ok' };
     }
 
-    return { ok: true, id: result.id };
+    const result = await response.json().catch(function() { return {}; });
+    console.error('MailerSend API error:', response.status, JSON.stringify(result));
+    return { ok: false, error: 'Erreur envoi email (' + response.status + ')' };
   } catch (err) {
-    // Erreur réseau ou autre — on ne bloque pas l'opération principale
-    console.error('Resend fetch error:', err.message);
+    console.error('MailerSend fetch error:', err.message);
     return { ok: false, error: 'Erreur réseau envoi email' };
   }
 }
@@ -801,10 +816,10 @@ export default {
       );
     }
 
-    // ── Vérifier que la clé API Resend est configurée ──
-    const apiKey = env.RESEND_API_KEY;
+    // ── Vérifier que la clé API MailerSend est configurée ──
+    const apiKey = env.MAILERSEND_API_KEY;
     if (!apiKey) {
-      console.error('RESEND_API_KEY non configurée dans les variables d\'environnement.');
+      console.error('MAILERSEND_API_KEY non configurée dans les variables d\'environnement.');
       return new Response(
         JSON.stringify({ error: 'Service email non configuré.' }),
         { status: 500, headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) } }
@@ -842,12 +857,9 @@ export default {
       );
     }
 
-    // ── Envoyer via Resend ──
-    // FROM_EMAIL : si vous avez un domaine vérifié sur Resend, mettez par ex.
-    // "Mélusine <convention@votredomaine.fr>". Sinon, Resend fournit "onboarding@resend.dev"
-    // qui fonctionne pour les tests (mais les emails arrivent parfois en spam).
-    const fromEmail = env.FROM_EMAIL || 'Mélusine <onboarding@resend.dev>';
-    const result = await sendViaResend(apiKey, fromEmail, body.to, email.subject, email.html);
+    // ── Envoyer via MailerSend ──
+    const fromEmail = env.FROM_EMAIL || 'Melusine <melusine@test-vz9dlem9n864kj50.mlsender.net>';
+    const result = await sendViaMailerSend(apiKey, fromEmail, body.to, email.subject, email.html);
 
     if (!result.ok) {
       // On retourne 200 quand même — l'email est un bonus, pas un blocage
