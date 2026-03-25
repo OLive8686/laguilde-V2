@@ -74,6 +74,7 @@ const ALLOWED_EMAIL_TYPES = [
   'accompagnant_supprime',
   'table_validee',
   'table_refusee',
+  'nouvelle_proposition',
   'recap',
 ];
 
@@ -469,6 +470,32 @@ function buildTableRefuseeEmail(data) {
 }
 
 /**
+ * Génère l'email de notification admin pour une nouvelle proposition de table MJ.
+ * @param {Object} data - { jeu, mj, email_mj, creneau, places }
+ * @returns {Object} { subject, html }
+ */
+function buildNouvellePropositionEmail(data) {
+  const { jeu, mj, email_mj, creneau, places } = data;
+
+  return {
+    subject: `📋 Nouvelle proposition de table — ${jeu}`,
+    html: buildEmailHtml({
+      titreBloc: '📋 Nouvelle proposition de table',
+      couleurTitre: DEFAULT_COLORS.accent,
+      champs: [
+        { label: 'Table', valeur: jeu || 'Non précisé' },
+        { label: 'MJ', valeur: (mj || '') + (email_mj ? ' (' + email_mj + ')' : '') },
+        { label: 'Créneau', valeur: creneau || 'Non précisé' },
+        { label: 'Places', valeur: String(places || '5') },
+      ],
+      paragraphe: 'Un MJ a proposé une nouvelle table pour la convention. '
+        + 'Connectez-vous au <a href="' + SITE_URL + 'admin.html" style="color:' + DEFAULT_COLORS.accent + '">panneau admin</a> pour la valider ou la refuser.',
+      pied: '',
+    }),
+  };
+}
+
+/**
  * Génère l'email récapitulatif complet des inscriptions d'un utilisateur.
  * Inclut : tables JDR (joueur + accompagnants), bénévolat, tables MJ.
  *
@@ -574,6 +601,7 @@ function buildEmail(type, data) {
     case 'accompagnant_supprime': return buildAccompagnantSupprimeEmail(data);
     case 'table_validee':         return buildTableValideeEmail(data);
     case 'table_refusee':         return buildTableRefuseeEmail(data);
+    case 'nouvelle_proposition':  return buildNouvellePropositionEmail(data);
     case 'recap':                 return buildRecapEmail(data);
     default:
       throw new Error(`Type d'email inconnu : ${type}`);
@@ -645,8 +673,9 @@ function validateRequest(body) {
 
     case 'table_validee':
     case 'table_refusee':
-      if (!data.jeu || !data.creneau) {
-        return 'Données manquantes pour table_validee/refusee : jeu, creneau requis.';
+    case 'nouvelle_proposition':
+      if (!data.jeu) {
+        return 'Données manquantes : jeu requis.';
       }
       break;
 
