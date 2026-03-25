@@ -460,7 +460,7 @@ async function annulerJdr(creneau, jeu, nomAccompagnant) {
         if (nomAccompagnant) {
             query = query.eq('nom_accompagnant', nomAccompagnant);
         } else {
-            query = query.or('nom_accompagnant.is.null,nom_accompagnant.eq.');
+            query = query.eq('type_inscrit', 'principal');
         }
         var { error } = await query;
         if (error) throw error;
@@ -714,7 +714,7 @@ async function annulerBenevole(creneau, nomAccompagnant) {
         if (nomAccompagnant) {
             query = query.eq('nom_accompagnant', nomAccompagnant);
         } else {
-            query = query.or('nom_accompagnant.is.null,nom_accompagnant.eq.');
+            query = query.eq('type_inscrit', 'principal');
         }
         var { error } = await query;
         if (error) throw error;
@@ -840,7 +840,7 @@ async function annulerRepas(nomAccompagnant) {
         if (nomAccompagnant) {
             query = query.eq('nom_accompagnant', nomAccompagnant);
         } else {
-            query = query.or('nom_accompagnant.is.null,nom_accompagnant.eq.');
+            query = query.eq('type_inscrit', 'principal');
         }
         var { error } = await query;
         if (error) throw error;
