@@ -689,62 +689,56 @@ function validateRequest(body) {
 
 
 // =============================================================================
-// ENVOI — Appel à l'API MailerSend
+// ENVOI — Appel à l'API EmailJS
 // =============================================================================
-// MailerSend offre 3000 emails/mois gratuits avec un domaine trial inclus.
-// Contrairement à Resend, pas besoin de vérifier un domaine pour envoyer
-// à n'importe quel destinataire.
+// EmailJS envoie des emails via Gmail (connecté au compte de l'asso).
+// Pas besoin de domaine vérifié, pas de limite de destinataires.
+// 200 emails/mois sur le plan gratuit — suffisant pour une convention.
 //
-// Variable d'environnement requise : MAILERSEND_API_KEY
-// Variable optionnelle : FROM_EMAIL (défaut: env variable ou fallback)
+// Variables d'environnement requises :
+//   - EMAILJS_SERVICE_ID  : ID du service Gmail dans EmailJS
+//   - EMAILJS_TEMPLATE_ID : ID du template (avec {{subject}}, {{to_email}}, {{{html_body}}})
+//   - EMAILJS_PUBLIC_KEY  : Clé publique EmailJS
+//   - EMAILJS_PRIVATE_KEY : Clé privée EmailJS
 // =============================================================================
 
 /**
- * Envoie un email via l'API MailerSend.
- * Doc : https://developers.mailersend.com/api/v1/email.html#send-an-email
+ * Envoie un email via l'API EmailJS.
+ * Doc : https://www.emailjs.com/docs/rest-api/send/
  *
- * @param {string} apiKey    - Clé API MailerSend
- * @param {string} fromEmail - Adresse d'expédition (ex: "Mélusine <melusine@trial-xxx.mlsender.net>")
- * @param {string} to        - Adresse du destinataire
- * @param {string} subject   - Objet de l'email
- * @param {string} html      - Contenu HTML de l'email
- * @returns {Object} { ok: boolean, id?: string, error?: string }
+ * @param {Object} env     - Variables d'environnement du Worker
+ * @param {string} to      - Adresse du destinataire
+ * @param {string} subject - Objet de l'email
+ * @param {string} html    - Contenu HTML de l'email
+ * @returns {Object} { ok: boolean, error?: string }
  */
-async function sendViaMailerSend(apiKey, fromEmail, to, subject, html) {
+async function sendViaEmailJS(env, to, subject, html) {
   try {
-    // Extraire le nom et l'email depuis le format "Nom <email>"
-    var fromName = 'Mélusine';
-    var fromAddr = fromEmail;
-    var match = fromEmail.match(/^(.+?)\s*<(.+?)>$/);
-    if (match) {
-      fromName = match[1].trim();
-      fromAddr = match[2].trim();
-    }
-
-    const response = await fetch('https://api.mailersend.com/v1/email', {
+    const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
       method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + apiKey,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        from: { email: fromAddr, name: fromName },
-        to: [{ email: to }],
-        subject: subject,
-        html: html,
+        service_id: env.EMAILJS_SERVICE_ID,
+        template_id: env.EMAILJS_TEMPLATE_ID,
+        user_id: env.EMAILJS_PUBLIC_KEY,
+        accessToken: env.EMAILJS_PRIVATE_KEY,
+        template_params: {
+          to_email: to,
+          subject: subject,
+          html_body: html,
+        }
       }),
     });
 
-    // MailerSend retourne 202 Accepted en cas de succès (pas 200)
-    if (response.status === 202 || response.status === 200) {
-      return { ok: true, id: response.headers.get('x-message-id') || 'ok' };
+    if (response.ok || response.status === 200) {
+      return { ok: true };
     }
 
-    const result = await response.json().catch(function() { return {}; });
-    console.error('MailerSend API error:', response.status, JSON.stringify(result));
-    return { ok: false, error: 'Erreur envoi email (' + response.status + ')' };
+    const result = await response.text();
+    console.error('EmailJS API error:', response.status, result);
+    return { ok: false, error: 'EmailJS ' + response.status + ': ' + result };
   } catch (err) {
-    console.error('MailerSend fetch error:', err.message);
+    console.error('EmailJS fetch error:', err.message);
     return { ok: false, error: 'Erreur réseau envoi email' };
   }
 }
@@ -816,10 +810,9 @@ export default {
       );
     }
 
-    // ── Vérifier que la clé API MailerSend est configurée ──
-    const apiKey = env.MAILERSEND_API_KEY;
-    if (!apiKey) {
-      console.error('MAILERSEND_API_KEY non configurée dans les variables d\'environnement.');
+    // ── Vérifier que les clés EmailJS sont configurées ──
+    if (!env.EMAILJS_SERVICE_ID || !env.EMAILJS_PUBLIC_KEY) {
+      console.error('EMAILJS_SERVICE_ID ou EMAILJS_PUBLIC_KEY non configurées.');
       return new Response(
         JSON.stringify({ error: 'Service email non configuré.' }),
         { status: 500, headers: { 'Content-Type': 'application/json', ...getCorsHeaders(request) } }
@@ -857,9 +850,8 @@ export default {
       );
     }
 
-    // ── Envoyer via MailerSend ──
-    const fromEmail = env.FROM_EMAIL || 'Melusine <melusine@test-vz9dlem9n864kj50.mlsender.net>';
-    const result = await sendViaMailerSend(apiKey, fromEmail, body.to, email.subject, email.html);
+    // ── Envoyer via EmailJS ──
+    const result = await sendViaEmailJS(env, body.to, email.subject, email.html);
 
     if (!result.ok) {
       // On retourne 200 quand même — l'email est un bonus, pas un blocage
