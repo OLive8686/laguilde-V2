@@ -305,6 +305,9 @@ function renderRestauration(items) {
     var html = '';
     var currentCat = null;
 
+    // Trier par catégorie pour regrouper les items de même catégorie
+    items.sort(function(a, b) { return (a.categorie || '').localeCompare(b.categorie || ''); });
+
     items.forEach(function(i) {
         // Titre de catégorie quand la catégorie change
         if (i.categorie && i.categorie !== currentCat) {
