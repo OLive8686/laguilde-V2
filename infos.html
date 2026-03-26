@@ -289,7 +289,10 @@ function renderConfig(c) {
  */
 function formatPrix(prix) {
     if (!prix) return '';
-    var n = parseFloat(prix);
+    // Si le prix contient déjà un €, le retourner tel quel
+    if (String(prix).includes('€') || String(prix).toLowerCase() === 'gratuit') return String(prix);
+    // Sinon formater (remplacer virgule par point pour parseFloat)
+    var n = parseFloat(String(prix).replace(',', '.'));
     if (isNaN(n)) return prix;
     return n.toFixed(2).replace('.', ',') + '€';
 }
