@@ -211,7 +211,7 @@ window.onPageInit = async function() {
         });
         // Si aucun créneau trouvé, utiliser des créneaux par défaut
         if (creneaux.length === 0) {
-            creneaux = ['Samedi 10h-13h', 'Samedi 14h-17h', 'Samedi 21h-00h', 'Dimanche 10h-13h', 'Dimanche 13h-17h'];
+            creneaux = ['Samedi 10h15-13h15', 'Samedi 13h45-18h45', 'Samedi 14h-16h (enfants)', 'Samedi 16h30-18h30 (enfants)', 'Samedi 21h30-2h', 'Dimanche 3h-8h', 'Dimanche 10h30-12h30', 'Dimanche 14h-16h'];
         }
         var select = document.getElementById('mjCreneau');
         select.innerHTML = '<option value="">Choisir un cr\u00e9neau...</option>' +
