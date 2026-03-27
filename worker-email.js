@@ -47,6 +47,7 @@
 
 // ── Origines autorisées (CORS) — identiques à worker.js ──
 const ALLOWED_ORIGINS = [
+  'https://sousloeildemelusine.fr',
   'https://olive8686.github.io',
   'http://localhost:8080',
   'http://127.0.0.1:8080',
@@ -79,7 +80,7 @@ const ALLOWED_EMAIL_TYPES = [
 ];
 
 // ── URL du site (pour les liens dans les emails) ──
-const SITE_URL = 'https://olive8686.github.io/laguilde-V2/';
+const SITE_URL = 'https://sousloeildemelusine.fr/';
 
 // ── Dates de la convention (pour les liens agenda) ──
 const DATE_SAMEDI   = '2026-05-16';
