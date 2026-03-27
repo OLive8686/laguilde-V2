@@ -194,25 +194,30 @@ window.onPageInit = async function() {
                 creneaux.push(p.creneau);
             }
         });
-        // Aussi ajouter les créneaux bénévoles (ils représentent les créneaux de la convention)
-        if (allData.creneaux_benevoles) {
-            allData.creneaux_benevoles.forEach(function(c) {
-                if (c.creneau && !creneauxSet[c.creneau]) {
-                    creneauxSet[c.creneau] = true;
-                    creneaux.push(c.creneau);
-                }
-            });
-        }
+        // Créneaux JDR officiels (ne pas mélanger avec les créneaux bénévoles)
+        var creneauxJDR = [
+            'Samedi 10h15-13h15',
+            'Samedi 13h45-18h45',
+            'Samedi 14h-16h (enfants)',
+            'Samedi 16h30-18h30 (enfants)',
+            'Samedi 21h30-2h',
+            'Dimanche 3h-8h',
+            'Dimanche 10h30-12h30',
+            'Dimanche 14h-16h'
+        ];
+        // Ajouter les créneaux JDR qui ne sont pas déjà dans la liste (depuis le programme existant)
+        creneauxJDR.forEach(function(c) {
+            if (!creneauxSet[c]) {
+                creneauxSet[c] = true;
+                creneaux.push(c);
+            }
+        });
         // Trier chronologiquement (samedi < dimanche, par heure)
         creneaux.sort(function(a, b) {
             var ka = (a.toLowerCase().indexOf('dimanche') !== -1 ? 100 : 0) + (parseInt((a.match(/(\d+)h/) || [])[1]) || 99);
             var kb = (b.toLowerCase().indexOf('dimanche') !== -1 ? 100 : 0) + (parseInt((b.match(/(\d+)h/) || [])[1]) || 99);
             return ka - kb;
         });
-        // Si aucun créneau trouvé, utiliser des créneaux par défaut
-        if (creneaux.length === 0) {
-            creneaux = ['Samedi 10h15-13h15', 'Samedi 13h45-18h45', 'Samedi 14h-16h (enfants)', 'Samedi 16h30-18h30 (enfants)', 'Samedi 21h30-2h', 'Dimanche 3h-8h', 'Dimanche 10h30-12h30', 'Dimanche 14h-16h'];
-        }
         var select = document.getElementById('mjCreneau');
         select.innerHTML = '<option value="">Choisir un cr\u00e9neau...</option>' +
             creneaux.map(function(c) { return '<option value="' + escHtml(c) + '">' + escHtml(c) + '</option>'; }).join('');
