@@ -508,7 +508,7 @@ function buildNouvellePropositionEmail(data) {
  * @returns {Object} { subject, html }
  */
 function buildRecapEmail(data) {
-  const { inscriptions = [], benevoles = [], tablesMJ = [] } = data;
+  const { inscriptions = [], benevoles = [], tablesMJ = [], repas = [] } = data;
   const c = DEFAULT_COLORS;
 
   let sections = '';
@@ -565,6 +565,16 @@ function buildRecapEmail(data) {
     for (const b of benAcc) {
       sections += `<p style="color:${c.text};margin:0 0 4px">• ${b.nom_accompagnant} → <strong>${b.creneau}</strong></p>`;
     }
+  }
+
+  // --- Section Repas ---
+  if (repas.length > 0) {
+    sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">🍽️ Repas du samedi soir</h3>`;
+    for (const r of repas) {
+      var nom = r.nom_accompagnant || r.nom || 'Vous';
+      sections += `<p style="color:${c.text};margin:0 0 4px">• ${nom} — inscrit·e</p>`;
+    }
+    sections += `<p style="color:${c.muted};font-size:13px;margin-top:8px">Paiement en ligne : <a href="https://www.helloasso.com/associations/foyer-du-porteau/evenements/repas-du-soir-convention-sous-l-oeil-de-melusine-2026" style="color:${c.accent};text-decoration:underline">HelloAsso</a></p>`;
   }
 
   return {
