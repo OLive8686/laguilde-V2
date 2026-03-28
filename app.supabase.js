@@ -1363,25 +1363,7 @@ function closeChoixModal() {
 // INITIALISATION
 // =============================================================================
 
-/**
- * Charge le thème depuis la config Supabase et l'applique sur <html>.
- * Valeurs possibles : "dark" (défaut) ou "clair".
- * Le thème est appliqué via data-theme qui switch les CSS variables.
- */
-async function loadTheme() {
-    try {
-        var allData = await fetchAllData();
-        var config = allData ? allData.config : await fetchConfig();
-        if (config && config.theme) {
-            var theme = config.theme.trim().toLowerCase();
-            if (theme === 'clair' || theme === 'dark') {
-                document.documentElement.setAttribute('data-theme', theme);
-                // Sauvegarder en localStorage pour éviter le flash au reload
-                localStorage.setItem('melusine_theme', theme);
-            }
-        }
-    } catch(e) { /* silencieux — reste en dark par défaut */ }
-}
+// Thème : supprimé — le site utilise uniquement le thème clair (défaut CSS).
 
 /**
  * Point d'entrée principal de l'application.
@@ -1464,9 +1446,6 @@ async function initApp() {
     // Mettre à jour la navigation avec l'état actuel
     updateNavUser();
     updateNavForRole();
-
-    // Charger le thème depuis la config
-    await loadTheme();
 
     // Initialiser l'UI commune (scroll, menu mobile, modals, animations)
     initCommonUI();

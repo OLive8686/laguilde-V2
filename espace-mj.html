@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400&family=Lora:wght@400;600&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400&family=Lora:wght@400;600&display=swap"></noscript>
     <link rel="icon" type="image/png" href="logo.png">
-    <script>var t=localStorage.getItem('melusine_theme');if(t)document.documentElement.setAttribute('data-theme',t);document.addEventListener('DOMContentLoaded',function(){var u=localStorage.getItem('melusine_user');var il=document.getElementById('navInscriptionsLink');if(il)il.style.display=u&&u!=='null'?'':'none';});</script>
+    <script>document.addEventListener('DOMContentLoaded',function(){var u=localStorage.getItem('melusine_user');var il=document.getElementById('navInscriptionsLink');if(il)il.style.display=u&&u!=='null'?'':'none';});</script>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -113,8 +113,8 @@
             <div class="mj-form" id="mjForm">
                 <div class="mj-form-grid">
                     <div class="mj-form-group">
-                        <label class="mj-label">Nom du jeu *</label>
-                        <input type="text" id="mjJeu" class="mj-input" placeholder="Ex: La Malédiction de Strahd" maxlength="100">
+                        <label class="mj-label">Nom du jeu + titre du scénario *</label>
+                        <input type="text" id="mjJeu" class="mj-input" placeholder="Ex: Donjons &amp; Dragons : La Malédiction de Strahd" maxlength="100">
                     </div>
                     <div class="mj-form-group">
                         <label class="mj-label">Votre pseudo</label>
