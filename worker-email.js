@@ -76,6 +76,7 @@ const ALLOWED_EMAIL_TYPES = [
   'table_validee',
   'table_refusee',
   'nouvelle_proposition',
+  'proposition_recue',
   'recap',
 ];
 
@@ -497,6 +498,32 @@ function buildNouvellePropositionEmail(data) {
 }
 
 /**
+ * Génère l'email de confirmation de prise en compte d'une proposition MJ.
+ * Envoyé au MJ quand sa table est en attente de validation par les admins.
+ * @param {Object} data - { nom, jeu, creneau }
+ * @returns {Object} { subject, html }
+ */
+function buildPropositionRecueEmail(data) {
+  const { nom, jeu, creneau } = data;
+
+  return {
+    subject: `📋 Proposition reçue — ${jeu}`,
+    html: buildEmailHtml({
+      titreBloc: '📋 Proposition reçue',
+      couleurTitre: DEFAULT_COLORS.accent,
+      champs: [
+        { label: 'MJ', valeur: nom },
+        { label: 'Table', valeur: jeu },
+        { label: 'Créneau', valeur: creneau },
+      ],
+      paragraphe: `Votre proposition de table a bien été prise en compte. Elle est en attente de validation par l'équipe organisatrice. `
+        + `Vous recevrez un email dès qu'elle sera validée ou si nous avons des questions.`,
+      pied: 'Merci pour votre participation ! 🎲',
+    }),
+  };
+}
+
+/**
  * Génère l'email récapitulatif complet des inscriptions d'un utilisateur.
  * Inclut : tables JDR (joueur + accompagnants), bénévolat, tables MJ.
  *
@@ -613,6 +640,7 @@ function buildEmail(type, data) {
     case 'table_validee':         return buildTableValideeEmail(data);
     case 'table_refusee':         return buildTableRefuseeEmail(data);
     case 'nouvelle_proposition':  return buildNouvellePropositionEmail(data);
+    case 'proposition_recue':     return buildPropositionRecueEmail(data);
     case 'recap':                 return buildRecapEmail(data);
     default:
       throw new Error(`Type d'email inconnu : ${type}`);
@@ -685,6 +713,7 @@ function validateRequest(body) {
     case 'table_validee':
     case 'table_refusee':
     case 'nouvelle_proposition':
+    case 'proposition_recue':
       if (!data.jeu) {
         return 'Données manquantes : jeu requis.';
       }
