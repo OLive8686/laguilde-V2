@@ -171,9 +171,9 @@ a{color:var(--gold);text-decoration:none;transition:color var(--transition)} a:h
 .tab{font-family:var(--font-heading);font-size:14px;letter-spacing:1px;text-transform:uppercase;padding:10px 20px;border-radius:8px;border:1px solid rgba(43,127,181,0.2);background:transparent;color:var(--text-light);cursor:pointer;transition:all var(--transition)}
 .tab:hover,.tab.active{background:rgba(43,127,181,0.15);color:var(--teal);border-color:var(--teal)}
 .programme-grid{display:grid;gap:16px}
-.creneau{background:var(--dark-card);border-radius:12px;padding:24px;display:grid;grid-template-columns:auto 1fr auto;gap:20px;align-items:center;border:1px solid rgba(43,127,181,0.08);transition:all var(--transition)}
+.creneau{background:var(--dark-card);border-radius:12px;padding:24px;display:grid;grid-template-columns:180px 1fr 140px;gap:20px;align-items:center;border:1px solid rgba(43,127,181,0.08);transition:all var(--transition)}
 .creneau:hover{border-color:rgba(43,127,181,0.2)}
-.creneau-time{font-family:var(--font-heading);font-size:16px;color:var(--gold);text-align:center;min-width:100px;padding:8px 12px;background:rgba(212,168,67,0.08);border-radius:8px}
+.creneau-time{font-family:var(--font-heading);font-size:14px;color:var(--gold);text-align:center;width:180px;padding:8px 12px;background:rgba(212,168,67,0.08);border-radius:8px}
 .creneau-info h4{font-family:var(--font-heading);font-size:18px;color:var(--cream);margin-bottom:4px}
 .creneau-info .mj{font-size:16px;color:var(--teal);margin-bottom:4px}
 .creneau-info .desc{font-size:16px;color:var(--text-light);margin-bottom:6px}
