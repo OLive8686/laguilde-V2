@@ -325,6 +325,35 @@ var supabaseProxy = {
             }
         }
     },
+    // ── RPC (PostgreSQL stored procedures) ───────────────────────────────
+    // Permet d'appeler les fonctions définies en SQL côté Supabase.
+    // Exemple : APP.supabase.rpc('annuler_presence', { p_email: '...', p_jour: 'samedi' })
+    // Retourne { data, error } comme les autres méthodes.
+    rpc: async function(fnName, params) {
+        try {
+            var url = SUPABASE_URL + '/rest/v1/rpc/' + encodeURIComponent(fnName);
+            var body = JSON.stringify(params || {});
+            var r = await fetch(url, {
+                method: 'POST',
+                headers: sbHeaders(),
+                body: body
+            });
+            // Si 401 (token expiré), tenter un refresh et réessayer
+            if (r.status === 401 && _accessToken) {
+                var refreshed = await refreshSession();
+                if (refreshed) {
+                    r = await fetch(url, { method: 'POST', headers: sbHeaders(), body: body });
+                }
+            }
+            var data = await r.json().catch(function() { return null; });
+            if (!r.ok) {
+                return { data: null, error: data || { message: r.statusText } };
+            }
+            return { data: data, error: null };
+        } catch(e) {
+            return { data: null, error: { message: e.message } };
+        }
+    },
     auth: {
         // Placeholder — l'auth est gérée par les fonctions loginGoogle/loginDiscord/etc.
         getUser: async function() {
@@ -439,6 +468,8 @@ let pendingInscription = null;
 let pendingSSOUser = null;
 
 // Exposer l'état global en lecture pour les pages spécifiques
+// Note : setPresence/annulerPresence sont exposées plus bas (après leur définition)
+// car elles ne sont pas encore déclarées à ce stade du fichier.
 window.APP = {
     get currentUser() { return currentUser; },
     get currentRole() { return currentRole; },
@@ -577,6 +608,7 @@ async function _fetchAllDataImpl() {
             /* 10 */ queries.push(supabase.from('benevoles').select('*').eq('email', currentUser.email).eq('statut', 'inscrit'));
             /* 11 */ queries.push(supabase.from('programme').select('*').eq('email_mj', currentUser.email));
             /* 12 */ queries.push(supabase.from('repas').select('*').eq('email', currentUser.email).eq('statut', 'inscrit'));
+            /* 13 */ queries.push(supabase.from('presences').select('*').eq('email', currentUser.email));
         }
 
         var results = await Promise.all(queries);
@@ -657,6 +689,8 @@ async function _fetchAllDataImpl() {
             allData.mes_benevoles = (results[privateStart + 2] || {}).data || [];
             allData.mes_propositions = (results[privateStart + 3] || {}).data || [];
             allData.mes_repas = (results[privateStart + 4] || {}).data || [];
+            // Présences à la convention (samedi/dimanche, principal + accompagnants)
+            allData.mes_presences = (results[privateStart + 5] || {}).data || [];
         }
 
         // Stocker dans le cache mémoire pour éviter le double-fetch
@@ -734,6 +768,274 @@ async function fetchSheetData(table) {
 async function fetchAllPublic() {
     return fetchAllData();
 }
+
+
+// =============================================================================
+// PRÉSENCES À LA CONVENTION
+// =============================================================================
+// Helpers pour gérer la présence d'un utilisateur (et de ses accompagnants)
+// à la convention, indépendamment de ses inscriptions à des tables.
+//
+// Voir presences.sql pour la structure de la table et les triggers.
+//
+// LOGIQUE :
+//   - setPresence(jour, opts) : crée une présence pour le jour donné.
+//     Auto-créée par trigger SQL si on s'inscrit à une table/repas/bénévolat
+//     ce jour-là, donc cet helper est utilisé uniquement pour la déclaration
+//     "explicite" de présence (cases à cocher dans mes-inscriptions.html
+//     ou modal post-login).
+//   - annulerPresence(jour, opts) : appelle la RPC annuler_presence qui
+//     supprime la présence ET annule les inscriptions/repas/bénévolats du jour.
+//     ATTENTION : opération destructive, à confirmer côté UI.
+//
+// SÉCURITÉ :
+//   - Les deux helpers utilisent currentUser.email comme email cible
+//     (jamais une valeur arbitraire).
+//   - Le RLS Supabase impose le filtre côté DB (ceinture-bretelles).
+
+/**
+ * Crée une présence à la convention pour un jour donné.
+ * Si la présence existe déjà, ne fait rien (le RLS + l'index unique côté DB
+ * garantissent l'idempotence ; on traite l'erreur de doublon comme un succès).
+ *
+ * @param {string} jour - 'samedi' ou 'dimanche'
+ * @param {Object} [opts] - Options
+ * @param {string} [opts.nom_accompagnant] - Si défini, crée la présence pour
+ *   un accompagnant (sinon pour le user principal).
+ * @returns {Promise<{ok: boolean, error: string|null}>}
+ */
+async function setPresence(jour, opts) {
+    opts = opts || {};
+
+    // Validations basiques côté client (la DB re-vérifiera)
+    if (!currentUser || !currentUser.email) {
+        return { ok: false, error: 'Non connecté' };
+    }
+    if (jour !== 'samedi' && jour !== 'dimanche') {
+        return { ok: false, error: 'Jour invalide (samedi ou dimanche attendu)' };
+    }
+
+    // Construire la ligne à insérer
+    var row = {
+        email: currentUser.email,
+        nom: currentUser.nom || currentUser.email,
+        jour: jour,
+        type_inscrit: opts.nom_accompagnant ? 'accompagnant' : 'principal',
+        nom_accompagnant: opts.nom_accompagnant || null
+    };
+
+    var res = await supabaseProxy.from('presences').insert(row);
+
+    if (res.error) {
+        // Code 23505 = unique_violation = présence déjà existante → on considère ok
+        // (idempotence : "set" doit être no-op si déjà set)
+        var code = res.error.code || '';
+        var msg  = (res.error.message || '').toLowerCase();
+        if (code === '23505' || msg.indexOf('duplicate') !== -1 || msg.indexOf('unique') !== -1) {
+            return { ok: true, error: null, alreadyExists: true };
+        }
+        return { ok: false, error: res.error.message || 'Erreur lors de la création de la présence' };
+    }
+
+    // Invalider le cache pour que le prochain fetchAllData() récupère la nouvelle présence
+    invalidateCache();
+    return { ok: true, error: null };
+}
+
+/**
+ * Annule la présence d'un utilisateur (ou d'un accompagnant) pour un jour donné.
+ * Appelle la RPC annuler_presence qui :
+ *   1. Annule (statut='annulé') toutes les inscriptions tables du jour
+ *   2. Annule les bénévolats du jour (si principal)
+ *   3. Annule les repas du jour
+ *   4. Supprime la ligne presences correspondante
+ *
+ * ATTENTION : opération destructive. À CONFIRMER côté UI avant l'appel
+ * (un dialog "vos inscriptions tables/repas/bénévolat seront annulées").
+ *
+ * @param {string} jour - 'samedi' ou 'dimanche'
+ * @param {Object} [opts]
+ * @param {string} [opts.nom_accompagnant] - Si défini, annule pour un accompagnant
+ * @returns {Promise<{ok: boolean, error: string|null, stats: Object}>}
+ */
+async function annulerPresence(jour, opts) {
+    opts = opts || {};
+
+    if (!currentUser || !currentUser.email) {
+        return { ok: false, error: 'Non connecté' };
+    }
+    if (jour !== 'samedi' && jour !== 'dimanche') {
+        return { ok: false, error: 'Jour invalide (samedi ou dimanche attendu)' };
+    }
+
+    var res = await supabaseProxy.rpc('annuler_presence', {
+        p_email: currentUser.email,
+        p_jour: jour,
+        p_nom_accompagnant: opts.nom_accompagnant || null
+    });
+
+    if (res.error) {
+        return { ok: false, error: res.error.message || 'Erreur lors de l\'annulation' };
+    }
+
+    // La RPC retourne { ok, nb_inscriptions_annulees, nb_benevoles_annules, nb_repas_annules }
+    // ou { error: '...' } si validation côté DB a échoué
+    var data = res.data || {};
+    if (data.error) {
+        return { ok: false, error: data.error };
+    }
+
+    invalidateCache();
+    return {
+        ok: true,
+        error: null,
+        stats: {
+            nb_inscriptions: data.nb_inscriptions_annulees || 0,
+            nb_benevoles:    data.nb_benevoles_annules     || 0,
+            nb_repas:        data.nb_repas_annules         || 0
+        }
+    };
+}
+
+// Exposer les helpers présences pour les pages HTML.
+// Utilisation depuis une page :
+//   await APP.setPresence('samedi');
+//   await APP.annulerPresence('dimanche', { nom_accompagnant: 'Lucie' });
+window.APP.setPresence     = setPresence;
+window.APP.annulerPresence = annulerPresence;
+
+
+// =============================================================================
+// MODAL DE PRÉSENCE POST-LOGIN
+// =============================================================================
+// À la première connexion, on demande à l'utilisateur quels jours il vient
+// à la convention. Modal affiché APRÈS login complet, uniquement si :
+//   - L'utilisateur n'a aucune présence enregistrée (ni manuelle ni auto-trigger)
+//   - L'utilisateur n'a pas cliqué "Plus tard" dans cette session navigateur
+//
+// Le modal n'est PAS persistant (sessionStorage) : à la prochaine connexion
+// dans une nouvelle fenêtre, il réapparaît si toujours sans présence.
+
+/**
+ * Décide s'il faut afficher le modal de présence et l'affiche le cas échéant.
+ * Appelée après chaque login réussi (loginEmail, confirmPseudo après SSO).
+ */
+async function maybeShowPresenceModal() {
+    // Pas connecté → rien à faire
+    if (!currentUser || !currentUser.email) return;
+
+    // Déjà refusé dans cette session → ne pas re-spammer
+    if (sessionStorage.getItem('melusine_presence_modal_dismissed') === '1') return;
+
+    // Charger les présences actuelles via le cache (1 appel max grâce à _allDataCache)
+    try {
+        var allData = await fetchAllData();
+        var presences = (allData && allData.mes_presences) || [];
+
+        // Déjà au moins une présence → l'utilisateur s'est déjà déclaré (ou auto-trigger
+        // depuis une inscription table/repas/bénévolat)
+        if (presences.length > 0) return;
+
+        // Sinon → afficher le modal
+        showPresenceModal();
+    } catch(e) {
+        // En cas d'erreur (ex: réseau), on ne bloque pas l'utilisateur
+        console.warn('maybeShowPresenceModal:', e.message);
+    }
+}
+
+/**
+ * Construit et insère le modal dans le DOM.
+ * Réutilise les classes CSS existantes (.modal-overlay, .modal) pour rester
+ * cohérent avec le style du site.
+ */
+function showPresenceModal() {
+    // Sécurité : éviter le doublon si déjà affiché
+    if (document.getElementById('presenceModalOverlay')) return;
+
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay active';
+    overlay.id = 'presenceModalOverlay';
+    overlay.style.display = 'flex';
+    // Sur le HTML : on inline les styles utilitaires pour éviter de toucher styles.css
+    // pour ce one-shot. Les classes principales (.modal, .btn) viennent de styles.css.
+    overlay.innerHTML =
+          '<div class="modal" style="max-width:480px">'
+        +   '<h3>Bienvenue !</h3>'
+        +   '<p style="margin-bottom:8px">Quels jours comptes-tu venir &agrave; la convention&nbsp;?</p>'
+        +   '<div style="margin:20px 0;text-align:left">'
+        +     '<label class="presence-toggle" style="display:flex;align-items:center;gap:10px;padding:8px 0;font-size:16px">'
+        +       '<input type="checkbox" id="presenceModalSamedi" style="width:20px;height:20px;accent-color:var(--gold)">'
+        +       '<span>Samedi 16 mai</span>'
+        +     '</label>'
+        +     '<label class="presence-toggle" style="display:flex;align-items:center;gap:10px;padding:8px 0;font-size:16px">'
+        +       '<input type="checkbox" id="presenceModalDimanche" style="width:20px;height:20px;accent-color:var(--gold)">'
+        +       '<span>Dimanche 17 mai</span>'
+        +     '</label>'
+        +   '</div>'
+        +   '<div style="display:flex;gap:12px;justify-content:space-between;margin-top:8px">'
+        +     '<button class="btn btn-small" onclick="dismissPresenceModal()" style="background:transparent;border:1px solid rgba(212,168,67,0.3);color:var(--text-light);padding:10px 20px">Plus tard</button>'
+        +     '<button class="btn btn-primary" onclick="confirmPresenceModal()" id="presenceModalConfirmBtn">Confirmer</button>'
+        +   '</div>'
+        +   '<p style="font-size:13px;color:var(--text-muted);text-align:center;margin-top:20px;margin-bottom:0">Tu peux modifier &agrave; tout moment depuis <em>Mes inscriptions</em>.</p>'
+        + '</div>';
+
+    document.body.appendChild(overlay);
+}
+
+/**
+ * Handler "Plus tard" : ferme sans rien faire et marque la session
+ * comme refusée pour ne pas re-afficher le modal cette session.
+ */
+window.dismissPresenceModal = function() {
+    sessionStorage.setItem('melusine_presence_modal_dismissed', '1');
+    var el = document.getElementById('presenceModalOverlay');
+    if (el) el.remove();
+};
+
+/**
+ * Handler "Confirmer" : enregistre les jours cochés via setPresence,
+ * ferme le modal et rafraîchit l'affichage de la page courante si possible.
+ */
+window.confirmPresenceModal = async function() {
+    var btn = document.getElementById('presenceModalConfirmBtn');
+    if (btn) btn.disabled = true;
+
+    try {
+        var samedi   = document.getElementById('presenceModalSamedi').checked;
+        var dimanche = document.getElementById('presenceModalDimanche').checked;
+
+        // Appels en série (et non parallèle) pour respecter d'éventuels rate limits
+        if (samedi)   await setPresence('samedi');
+        if (dimanche) await setPresence('dimanche');
+
+        // Toast adapté au choix
+        if (samedi && dimanche) {
+            toast('Présence enregistrée pour samedi et dimanche', 'success');
+        } else if (samedi) {
+            toast('Présence enregistrée pour samedi 16 mai', 'success');
+        } else if (dimanche) {
+            toast('Présence enregistrée pour dimanche 17 mai', 'success');
+        }
+        // Si aucun jour coché : pas de toast (l'utilisateur a explicitement dit "rien")
+
+        // Marquer comme dismissed pour la session (et fermer)
+        sessionStorage.setItem('melusine_presence_modal_dismissed', '1');
+        var el = document.getElementById('presenceModalOverlay');
+        if (el) el.remove();
+
+        // Si une présence a été créée, rafraîchir l'affichage de la page courante
+        // (les pages qui définissent onUserLogin l'utilisent pour rendre les données)
+        if ((samedi || dimanche) && window.onUserLogin) {
+            window.onUserLogin();
+        }
+    } catch(e) {
+        toast('Erreur : ' + (e.message || e), 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+};
+
 
 // =============================================================================
 // RÔLES
@@ -857,6 +1159,9 @@ async function finalizeLogin() {
     // Appeler le callback de la page si défini
     if (window.onUserLogin) window.onUserLogin();
     closeAuthModal();
+
+    // Modal de saisie initiale de présence (1ère connexion sans présence enregistrée)
+    maybeShowPresenceModal();
 }
 
 /**
@@ -878,6 +1183,9 @@ async function logout() {
     localStorage.removeItem('melusine_accompagnants');
     localStorage.removeItem('melusine_pending');
     localStorage.removeItem('melusine_return_page');
+    // Réinitialiser le flag du modal de présence pour qu'il puisse réapparaître
+    // si l'utilisateur se reconnecte avec un autre compte dans la même session.
+    sessionStorage.removeItem('melusine_presence_modal_dismissed');
     invalidateCache();
     updateNavUser();
     updateNavForRole();
@@ -1046,6 +1354,9 @@ async function confirmPseudo() {
 
         // Appeler le callback de la page pour rafraîchir l'affichage
         if (window.onUserLogin) window.onUserLogin();
+
+        // Modal de saisie initiale de présence (1ère connexion sans présence enregistrée)
+        maybeShowPresenceModal();
     } catch(e) {
         toast('Erreur : ' + e.message, 'error');
     }
@@ -1466,7 +1777,7 @@ async function initApp() {
 function prefetchAllPages() {
     // Attendre 1 seconde après le rendu pour ne pas concurrencer le contenu visible
     setTimeout(function() {
-        var pages = ['index.html', 'programme.html', 'infos.html', 'benevoles.html', 'mes-inscriptions.html', 'espace-mj.html', 'aide.html', 'styles.css', 'app.supabase.js?v=1'];
+        var pages = ['index.html', 'programme.html', 'infos.html', 'benevoles.html', 'mes-inscriptions.html', 'espace-mj.html', 'aide.html', 'styles.css', 'app.supabase.js?v=3'];
         var current = location.pathname.split('/').pop() || 'index.html';
         pages.forEach(function(page) {
             if (page === current) return;

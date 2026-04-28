@@ -126,7 +126,7 @@
 <footer class="footer"><div class="footer-inner"><div><div class="footer-brand">Sous l'Œil de Mélusine</div><div class="footer-sub">Organisé par La Guilde · Foyer du Porteau · Poitiers</div></div><div class="footer-right">16 & 17 mai 2026</div></div></footer>
 <button class="scroll-top" id="scrollTop" aria-label="Retour en haut">↑</button>
 
-<script src="app.supabase.js?v=1"></script>
+<script src="app.supabase.js?v=3"></script>
 <script>
 (function() {
 'use strict';
@@ -160,15 +160,26 @@ function updateAdminView() {
 async function loadAdminPanel() {
     try {
         // Charger toutes les données admin en parallèle via Supabase
-        var [insResult, progResult] = await Promise.all([
+        // - inscriptions, programme : tables (ouvertes en lecture pour admin via RLS)
+        // - get_presences_stats : RPC qui renvoie les stats agrégées de présence
+        //   (fonction SECURITY DEFINER qui vérifie elle-même le rôle admin)
+        var [insResult, progResult, presResult] = await Promise.all([
             APP.supabase.from('inscriptions').select('*'),
-            APP.supabase.from('programme').select('*')
+            APP.supabase.from('programme').select('*'),
+            APP.supabase.rpc('get_presences_stats')
         ]);
 
         var inscriptions = (insResult.data || []).filter(function(i) {
             return i.statut !== 'supprimé' && i.statut !== 'annulé';
         });
         var programme = progResult.data || [];
+
+        // Stats de présence (peut être absente si la RPC n'est pas encore déployée
+        // ou si l'utilisateur n'est pas admin côté DB — on ignore silencieusement
+        // pour ne pas casser le panneau admin)
+        var presenceStats = (presResult && presResult.data && !presResult.data.error)
+            ? presResult.data
+            : null;
 
         // Calculer les stats
         var totalInscrits = inscriptions.filter(function(i) { return i.statut === 'inscrit'; }).length;
@@ -193,7 +204,13 @@ async function loadAdminPanel() {
             };
         });
 
-        renderAdminPanel({ inscriptions: insResult.data || [], stats: stats, total_inscrits: totalInscrits, total_attente: totalAttente });
+        renderAdminPanel({
+            inscriptions: insResult.data || [],
+            stats: stats,
+            total_inscrits: totalInscrits,
+            total_attente: totalAttente,
+            presence_stats: presenceStats
+        });
     } catch(e) {
         toast('Erreur chargement admin : ' + e.message, 'error');
     }
@@ -202,12 +219,28 @@ async function loadAdminPanel() {
 // ── Rendu du panneau admin ──────────────────────────────────────────────────
 
 function renderAdminPanel(data) {
+    // Bloc stats de présence à la convention (rendu uniquement si la RPC a renvoyé des données)
+    // L'absence de ce bloc indique probablement que presences_admin_stats.sql n'a pas été déployé
+    var ps = data.presence_stats;
+    var presenceStatsHtml = '';
+    if (ps) {
+        presenceStatsHtml = `
+        <h3 class="admin-subtitle" style="margin-top:32px">Présence à la convention</h3>
+        <div class="admin-stats">
+            <div class="admin-stat"><div class="admin-stat-value">${ps.total_samedi||0}</div><div class="admin-stat-label">Présents samedi</div></div>
+            <div class="admin-stat"><div class="admin-stat-value">${ps.total_dimanche||0}</div><div class="admin-stat-label">Présents dimanche</div></div>
+            <div class="admin-stat"><div class="admin-stat-value">${ps.total_both||0}</div><div class="admin-stat-label">Les deux jours</div></div>
+            <div class="admin-stat"><div class="admin-stat-value">${ps.total_unique||0}</div><div class="admin-stat-label">Total unique</div></div>
+        </div>`;
+    }
+
     document.getElementById('adminContent').innerHTML = `
         <div class="admin-stats">
             <div class="admin-stat"><div class="admin-stat-value">${data.total_inscrits||0}</div><div class="admin-stat-label">Inscrits</div></div>
             <div class="admin-stat"><div class="admin-stat-value">${data.total_attente||0}</div><div class="admin-stat-label">En attente</div></div>
             <div class="admin-stat"><div class="admin-stat-value">${(data.total_inscrits||0)+(data.total_attente||0)}</div><div class="admin-stat-label">Total</div></div>
         </div>
+        ${presenceStatsHtml}
 
         <h3 class="admin-subtitle">Remplissage</h3>
         <div class="admin-fill-section">${(data.stats||[]).map(s => `

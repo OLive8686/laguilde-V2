@@ -125,6 +125,27 @@
     </div>
 
     <!-- ============================================================= -->
+    <!-- SECTION PRÉSENCE : Ma présence à la convention (samedi/dim)   -->
+    <!-- ============================================================= -->
+    <!-- Permet à l'utilisateur de déclarer explicitement qu'il vient   -->
+    <!-- à la convention, indépendamment des inscriptions tables. Une   -->
+    <!-- inscription à une table/repas/bénévolat crée automatiquement   -->
+    <!-- la présence pour le jour correspondant (trigger SQL).          -->
+    <section class="section section-dark" id="sectionPresence" style="display:none">
+        <div class="section-inner">
+            <div class="section-header">
+                <p class="section-label">Convention</p>
+                <h2 class="section-title">Ma pr&eacute;sence</h2>
+                <div class="section-sep"></div>
+            </div>
+            <p class="mj-intro">Indiquez quels jours vous comptez venir &agrave; la convention. Vos inscriptions &agrave; des tables, repas ou b&eacute;n&eacute;volat marquent automatiquement votre pr&eacute;sence ce jour-l&agrave;.</p>
+            <div id="presenceGrid">
+                <div class="loading-shimmer" style="height:80px"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================= -->
     <!-- SECTION 1 : Mes inscriptions JDR (tables en tant que joueur)  -->
     <!-- ============================================================= -->
     <section class="section section-dark" id="sectionMesJdr" style="display:none">
@@ -219,7 +240,7 @@
 <button class="scroll-top" id="scrollTop" aria-label="Retour en haut">&uarr;</button>
 
 <!-- Scripts : app.js (partage) puis code specifique a cette page -->
-<script src="app.supabase.js?v=1"></script>
+<script src="app.supabase.js?v=3"></script>
 <script>
 // =============================================================================
 // CODE SPECIFIQUE A LA PAGE "MES INSCRIPTIONS" (mes-inscriptions.html)
@@ -317,6 +338,7 @@ function updateDashboardView(allData) {
     document.getElementById('inscriptionsLoginPrompt').style.display = !user ? 'block' : 'none';
 
     // Sections connectees
+    document.getElementById('sectionPresence').style.display = user ? 'block' : 'none';
     document.getElementById('sectionMesJdr').style.display = user ? 'block' : 'none';
     document.getElementById('sectionAccompagnants').style.display = user ? 'block' : 'none';
     document.getElementById('sectionBenevoles').style.display = user ? 'block' : 'none';
@@ -335,6 +357,7 @@ function updateDashboardView(allData) {
     // Si allData est fourni (premier chargement), utiliser ses données (0 appel API).
     // Sinon (login/logout callback), faire les appels individuels.
     if (user) {
+        loadMesPresences(allData);
         loadMesInscriptionsJdr(allData);
         loadAccompagnants(allData);
         loadMesBenevoles(allData);
@@ -344,6 +367,151 @@ function updateDashboardView(allData) {
         }
     }
 }
+
+// =========================================================================
+// SECTION PRÉSENCE : Ma présence à la convention
+// =========================================================================
+// Affiche un encart par personne (utilisateur + accompagnants) avec deux
+// cases à cocher (samedi 16 mai / dimanche 17 mai). Cocher → setPresence,
+// décocher → confirm + annulerPresence (qui annule en cascade les inscriptions
+// tables/repas/bénévolat du jour).
+
+/**
+ * Construit l'encart "Ma présence" à partir des données chargées.
+ * @param {Object} allData - Résultat de fetchAllPublic()
+ *   Doit contenir mes_presences (array) et mes_accompagnants (array).
+ */
+async function loadMesPresences(allData) {
+    var user = APP.currentUser;
+    if (!user) return;
+
+    // Récupérer les présences et accompagnants depuis allData
+    // (fallback : tableaux vides si pas chargé — ne pas planter)
+    var presences = (allData && allData.mes_presences) || [];
+    var mesAcc = (allData && allData.mes_accompagnants) || APP.accompagnants || [];
+
+    var grid = document.getElementById('presenceGrid');
+    if (!grid) return;
+
+    // Helper interne : pour une personne donnée (null = principal, sinon nom acc),
+    // retourne l'état { samedi, dimanche } booléens.
+    function getEtat(nomAcc) {
+        return {
+            samedi: presences.some(function(p) {
+                return p.jour === 'samedi'
+                    && (p.nom_accompagnant || null) === (nomAcc || null);
+            }),
+            dimanche: presences.some(function(p) {
+                return p.jour === 'dimanche'
+                    && (p.nom_accompagnant || null) === (nomAcc || null);
+            })
+        };
+    }
+
+    // Helper interne : génère le HTML d'un bloc personne
+    function blocPersonne(nomAffiche, nomAcc, badge) {
+        var etat = getEtat(nomAcc);
+        // Pour passer le nom de l'accompagnant en argument JS d'onclick,
+        // on utilise esc() qui échappe les apostrophes.
+        var accArg = nomAcc ? "'" + esc(nomAcc) + "'" : 'null';
+        var html = '<div class="presence-bloc">';
+        html += '<div class="presence-personne">' + escHtml(nomAffiche);
+        if (badge) html += ' <span class="presence-badge">' + escHtml(badge) + '</span>';
+        html += '</div>';
+        html += '<div class="presence-toggles">';
+        html += '<label class="presence-toggle">';
+        html += '<input type="checkbox" ' + (etat.samedi ? 'checked' : '')
+             + ' onchange="onPresenceToggle(\'samedi\',' + accArg + ',this)">';
+        html += '<span>Samedi 16 mai</span></label>';
+        html += '<label class="presence-toggle">';
+        html += '<input type="checkbox" ' + (etat.dimanche ? 'checked' : '')
+             + ' onchange="onPresenceToggle(\'dimanche\',' + accArg + ',this)">';
+        html += '<span>Dimanche 17 mai</span></label>';
+        html += '</div>';
+        html += '</div>';
+        return html;
+    }
+
+    // Construire le HTML : utilisateur principal + un sous-bloc par accompagnant
+    // Note : la table accompagnants utilise le champ `nom_accompagnant` (pas `nom`)
+    var html = blocPersonne(user.nom || user.email, null, null);
+    mesAcc.forEach(function(acc) {
+        var nomAcc = acc.nom_accompagnant;
+        if (!nomAcc) return; // Skip si nom manquant (sécurité)
+        html += blocPersonne(nomAcc, nomAcc, 'accompagnant·e');
+    });
+
+    grid.innerHTML = html;
+}
+
+/**
+ * Handler appelé quand l'utilisateur coche/décoche une case de présence.
+ * - Cocher → setPresence (additif, sans confirmation)
+ * - Décocher → confirm + annulerPresence (destructif : annule les inscriptions/repas/bénévolat du jour)
+ *
+ * @param {string} jour - 'samedi' ou 'dimanche'
+ * @param {string|null} nomAcc - Nom de l'accompagnant, ou null pour le principal
+ * @param {HTMLInputElement} checkbox - L'élément checkbox modifié (pour rollback UI si erreur)
+ */
+window.onPresenceToggle = async function(jour, nomAcc, checkbox) {
+    // Anti double-clic
+    if (_isProcessing) {
+        checkbox.checked = !checkbox.checked;
+        return;
+    }
+    _isProcessing = true;
+
+    var checked = checkbox.checked;
+    var jourLib = jour === 'samedi' ? 'samedi 16 mai' : 'dimanche 17 mai';
+
+    try {
+        if (checked) {
+            // ── Activation : créer la présence ──
+            var res = await APP.setPresence(jour, { nom_accompagnant: nomAcc || undefined });
+            if (!res.ok) {
+                checkbox.checked = false; // rollback UI
+                toast(res.error || 'Erreur lors de l\'enregistrement', 'error');
+                return;
+            }
+            toast('Présence enregistrée pour ' + jourLib, 'success');
+        } else {
+            // ── Désactivation : confirm + annuler en cascade ──
+            var qui = nomAcc ? nomAcc : 'votre';
+            var quiInscrit = nomAcc ? nomAcc + ' est inscrit·e' : 'vous êtes inscrit·e';
+            var msg = 'Annuler la présence de ' + qui + ' pour ' + jourLib + ' ?\n\n'
+                    + 'Si ' + quiInscrit + ' à des tables, repas ou bénévolat ce jour-là, ces inscriptions seront aussi annulées.';
+            if (!confirm(msg)) {
+                checkbox.checked = true; // rollback UI
+                return;
+            }
+            var res2 = await APP.annulerPresence(jour, { nom_accompagnant: nomAcc || undefined });
+            if (!res2.ok) {
+                checkbox.checked = true; // rollback UI
+                toast(res2.error || 'Erreur lors de l\'annulation', 'error');
+                return;
+            }
+            // Construire un message détaillé avec les stats de cascade
+            var s = res2.stats || {};
+            var totalAnnul = (s.nb_inscriptions || 0) + (s.nb_benevoles || 0) + (s.nb_repas || 0);
+            var detail = '';
+            if (totalAnnul > 0) {
+                var parts = [];
+                if (s.nb_inscriptions) parts.push(s.nb_inscriptions + ' table' + (s.nb_inscriptions > 1 ? 's' : ''));
+                if (s.nb_benevoles)    parts.push(s.nb_benevoles + ' bénévolat' + (s.nb_benevoles > 1 ? 's' : ''));
+                if (s.nb_repas)        parts.push(s.nb_repas + ' repas');
+                detail = ' (' + parts.join(', ') + ' annul' + (totalAnnul > 1 ? 'és' : 'é') + ')';
+            }
+            toast('Présence annulée' + detail, 'success');
+        }
+
+        // Recharger toutes les sections de la page pour refléter les changements
+        // (notamment les inscriptions tables/repas/bénévolat qui ont pu être annulées)
+        var allData = await fetchAllPublic();
+        updateDashboardView(allData);
+    } finally {
+        _isProcessing = false;
+    }
+};
 
 // =========================================================================
 // SECTION 1 : Mes inscriptions JDR
@@ -372,7 +540,16 @@ async function loadMesInscriptionsJdr(allData) {
         var grid = document.getElementById('mesJdrGrid');
 
         if (!inscriptions || inscriptions.length === 0) {
-            grid.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:16px;padding:20px 0">Vous n\'&ecirc;tes inscrit&middot;e &agrave; aucune table pour le moment. <a href="programme.html" style="color:var(--gold)">Voir le programme</a></p>';
+            // Wording adapté au rôle : un MJ qui voit "aucune table" peut être troublé
+            // car il a peut-être des tables MJ visibles plus bas dans la page.
+            var role = APP.currentRole;
+            var msg;
+            if (role === 'mj' || role === 'admin') {
+                msg = 'Vous n\'&ecirc;tes inscrit&middot;e &agrave; aucune table en tant que joueur&middot;euse. <a href="programme.html" style="color:var(--gold)">Voir le programme</a><br><span style="font-size:14px;color:var(--text-muted)">Vos tables en tant que MJ sont affich&eacute;es plus bas.</span>';
+            } else {
+                msg = 'Vous n\'&ecirc;tes inscrit&middot;e &agrave; aucune table pour le moment. <a href="programme.html" style="color:var(--gold)">Voir le programme</a>';
+            }
+            grid.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:16px;padding:20px 0">' + msg + '</p>';
             return;
         }
 
