@@ -266,6 +266,29 @@ a{color:var(--gold);text-decoration:none;transition:color var(--transition)} a:h
 .accompagnant-group-title{font-family:var(--font-heading);font-size:15px;color:var(--gold);letter-spacing:1px;margin-bottom:8px}
 .mi-sub{font-size:15px;color:var(--text-muted)}
 
+/* Vue admin par table — inscrits + liste d'attente avec ordre */
+.admin-table-bloc{background:rgba(212,168,67,0.05);border:1px solid rgba(212,168,67,0.15);border-radius:10px;padding:14px 18px;margin-bottom:14px}
+.admin-table-title{font-family:var(--font-heading);font-size:17px;color:var(--gold);margin:0 0 4px;letter-spacing:0.5px}
+.admin-table-creneau{font-size:14px;color:var(--text-muted);font-weight:normal}
+.admin-table-section{font-family:var(--font-heading);font-size:13px;color:var(--accent);text-transform:uppercase;letter-spacing:1.5px;margin:12px 0 6px}
+.admin-attente-list{list-style:none;padding:0;margin:0}
+.admin-attente-row{display:grid;grid-template-columns:32px 1.2fr 1.5fr 130px auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px dashed rgba(212,168,67,0.1);font-size:14px}
+.admin-attente-row:last-child{border-bottom:none}
+.admin-attente-position{font-family:var(--font-heading);color:var(--gold);font-weight:600;text-align:right}
+.admin-attente-nom{color:var(--text-light);font-weight:500}
+.admin-attente-acc{color:var(--text-muted);font-weight:normal;font-size:13px}
+.admin-attente-email{color:var(--text-muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-attente-date{color:var(--text-muted);font-size:12px;text-align:right}
+.admin-attente-actions{display:flex;gap:6px;justify-content:flex-end}
+@media(max-width:700px){
+  .admin-attente-row{grid-template-columns:28px 1fr auto;grid-template-areas:'pos nom actions' 'pos email actions' 'pos date actions';gap:4px 8px}
+  .admin-attente-position{grid-area:pos}
+  .admin-attente-nom{grid-area:nom}
+  .admin-attente-email{grid-area:email}
+  .admin-attente-date{grid-area:date;text-align:left}
+  .admin-attente-actions{grid-area:actions}
+}
+
 /* Présence à la convention — encart sur mes-inscriptions.html */
 .presence-bloc{background:rgba(212,168,67,0.05);border:1px solid rgba(212,168,67,0.2);border-radius:12px;padding:16px 20px;margin-bottom:12px}
 .presence-personne{font-family:var(--font-heading);font-size:17px;color:var(--gold);margin-bottom:12px;letter-spacing:0.5px}

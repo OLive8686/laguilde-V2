@@ -234,6 +234,75 @@ function renderAdminPanel(data) {
         </div>`;
     }
 
+    // ── Vue par table : inscrits + liste d'attente avec ordre ──
+    // Permet à l'admin de voir d'un coup d'œil la composition de chaque table
+    // et d'agir manuellement le jour J (promouvoir hors ordre, retirer).
+    // Les inscrits actifs sont triés par id (ordre d'inscription).
+    var allInscriptions = (data.inscriptions || []).filter(function(i) {
+        return i.statut === 'inscrit' || i.statut === 'attente';
+    });
+    // sortById : id ASC = ordre chronologique d'inscription (même garantie que le trigger)
+    function sortById(a, b) { return (a.id || 0) - (b.id || 0); }
+
+    // Helper : récupère une date lisible quel que soit le nom de colonne dans inscriptions
+    function dateLisible(i) {
+        var d = i.date_inscription || i.timestamp || i.created_at;
+        return d ? new Date(d).toLocaleString('fr', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+    }
+
+    // Helper : rendu d'une ligne d'inscrit ou attente
+    function renderLigne(i, position, withPromouvoir) {
+        var nomAcc = (i.type_inscrit === 'accompagnant' && i.nom_accompagnant)
+            ? ' <span class="admin-attente-acc">(acc. ' + escHtml(i.nom_accompagnant) + ')</span>'
+            : '';
+        var posBadge = position ? '<span class="admin-attente-position">' + position + '.</span>' : '';
+        var promouvoirBtn = withPromouvoir
+            ? '<button class="btn btn-small btn-green" onclick="adminPromouvoir(' + i.id + ')" title="Promouvoir vers inscrit">↑</button>'
+            : '';
+        return '<li class="admin-attente-row">'
+             +   posBadge
+             +   '<span class="admin-attente-nom">' + escHtml(i.nom || '') + nomAcc + '</span>'
+             +   '<span class="admin-attente-email">' + escHtml(i.email || '') + '</span>'
+             +   '<span class="admin-attente-date">' + dateLisible(i) + '</span>'
+             +   '<span class="admin-attente-actions">'
+             +     promouvoirBtn
+             +     '<button class="btn btn-small btn-red" onclick="adminSupprimer(' + i.id + ')" title="Retirer de la table">✕</button>'
+             +   '</span>'
+             + '</li>';
+    }
+
+    // Construire la vue : une carte par table, avec inscrits + liste d'attente
+    var tablesViewHtml = '';
+    if ((data.stats || []).length > 0) {
+        tablesViewHtml = '<h3 class="admin-subtitle" style="margin-top:32px">Inscriptions par table</h3>';
+        tablesViewHtml += (data.stats || []).map(function(s) {
+            var inscrits = allInscriptions
+                .filter(function(i) { return i.creneau === s.creneau && i.jeu === s.jeu && i.statut === 'inscrit'; })
+                .sort(sortById);
+            var attente = allInscriptions
+                .filter(function(i) { return i.creneau === s.creneau && i.jeu === s.jeu && i.statut === 'attente'; })
+                .sort(sortById);
+
+            var inscritsHtml = inscrits.length === 0
+                ? '<p class="mi-sub" style="margin:4px 0 12px">Aucun inscrit pour le moment.</p>'
+                : '<ul class="admin-attente-list">' + inscrits.map(function(i) { return renderLigne(i, null, false); }).join('') + '</ul>';
+
+            var attenteHtml = attente.length === 0
+                ? ''
+                : '<p class="admin-table-section">Liste d\'attente</p>'
+                  + '<ul class="admin-attente-list">' + attente.map(function(i, idx) { return renderLigne(i, idx + 1, true); }).join('') + '</ul>';
+
+            return '<div class="admin-table-bloc">'
+                 +   '<h4 class="admin-table-title">' + escHtml(s.jeu)
+                 +     ' <span class="admin-table-creneau">— ' + escHtml(s.creneau) + ' (' + inscrits.length + '/' + s.max + ')</span>'
+                 +   '</h4>'
+                 +   '<p class="admin-table-section">Inscrit·e·s</p>'
+                 +   inscritsHtml
+                 +   attenteHtml
+                 + '</div>';
+        }).join('');
+    }
+
     document.getElementById('adminContent').innerHTML = `
         <div class="admin-stats">
             <div class="admin-stat"><div class="admin-stat-value">${data.total_inscrits||0}</div><div class="admin-stat-label">Inscrits</div></div>
@@ -253,7 +322,9 @@ function renderAdminPanel(data) {
             </div>`).join('')}
         </div>
 
-        <h3 class="admin-subtitle">Inscriptions</h3>
+        ${tablesViewHtml}
+
+        <h3 class="admin-subtitle">Inscriptions (vue à plat)</h3>
         <div style="overflow-x:auto"><table class="admin-table">
             <thead><tr><th>Date</th><th>Nom</th><th>Email</th><th>Type</th><th>Créneau</th><th>Jeu</th><th>Statut</th><th>Actions</th></tr></thead>
             <tbody>${(data.inscriptions||[]).filter(i=>i.statut!=='supprimé'&&i.statut!=='annulé').map(i=>`

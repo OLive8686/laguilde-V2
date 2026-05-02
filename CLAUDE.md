@@ -32,6 +32,7 @@ Site d'inscription pour une convention de jeu de rôle à Poitiers (16-17 mai 20
 - `email-triggers.sql` : Triggers PostgreSQL qui déclenchent les emails transactionnels via `pg_net` → Worker
 - `presences.sql` : Table `presences` + triggers d'auto-création + RPC `annuler_presence` + RLS
 - `presences_admin_stats.sql` : RPC `get_presences_stats` (réservée admin)
+- `inscription_promotion.sql` : Trigger `trg_promote_first_waiting` qui promeut auto le 1er en attente quand une place se libère
 
 ### Documentation
 - `CLAUDE.md` : Ce fichier
@@ -93,7 +94,7 @@ Site d'inscription pour une convention de jeu de rôle à Poitiers (16-17 mai 20
 7. Trigger PostgreSQL → email de confirmation via le Worker
 8. Trigger PostgreSQL → auto-création de la présence pour le jour du créneau (`presences`)
 9. Si table pleine → liste d'attente automatique
-10. En cas d'annulation, le premier en liste d'attente est promu (logique côté admin/futur)
+10. En cas d'annulation (statut `inscrit` → `annulé`/`supprimé`), le **trigger SQL `trg_promote_first_waiting`** promeut automatiquement le plus ancien en attente (tri par `id ASC`). L'admin peut aussi promouvoir manuellement quelqu'un hors ordre via le panneau `admin.html`.
 
 ## Présences à la convention
 Une couche **explicite** au-dessus des inscriptions tables : un utilisateur peut être "inscrit à la convention" un jour donné (samedi 16 mai et/ou dimanche 17 mai) **indépendamment** de ses inscriptions à des tables.
