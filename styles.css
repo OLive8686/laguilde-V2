@@ -272,13 +272,13 @@ a{color:var(--gold);text-decoration:none;transition:color var(--transition)} a:h
 .admin-table-creneau{font-size:14px;color:var(--text-muted);font-weight:normal}
 .admin-table-section{font-family:var(--font-heading);font-size:13px;color:var(--accent);text-transform:uppercase;letter-spacing:1.5px;margin:12px 0 6px}
 .admin-attente-list{list-style:none;padding:0;margin:0}
-.admin-attente-row{display:grid;grid-template-columns:32px 1.2fr 1.5fr 130px auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px dashed rgba(212,168,67,0.1);font-size:14px}
+.admin-attente-row{display:grid;grid-template-columns:30px minmax(140px,1.2fr) minmax(180px,1.6fr) 140px auto;gap:16px;align-items:center;padding:8px 0;border-bottom:1px dashed rgba(212,168,67,0.12);font-size:14px}
 .admin-attente-row:last-child{border-bottom:none}
 .admin-attente-position{font-family:var(--font-heading);color:var(--gold);font-weight:600;text-align:right}
-.admin-attente-nom{color:var(--text-light);font-weight:500}
+.admin-attente-nom{color:var(--text-light);font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .admin-attente-acc{color:var(--text-muted);font-weight:normal;font-size:13px}
-.admin-attente-email{color:var(--text-muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.admin-attente-date{color:var(--text-muted);font-size:12px;text-align:right}
+.admin-attente-email{color:var(--text-muted);font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-attente-date{color:var(--text-muted);font-size:12px;text-align:right;white-space:nowrap}
 .admin-attente-actions{display:flex;gap:6px;justify-content:flex-end}
 @media(max-width:700px){
   .admin-attente-row{grid-template-columns:28px 1fr auto;grid-template-areas:'pos nom actions' 'pos email actions' 'pos date actions';gap:4px 8px}
