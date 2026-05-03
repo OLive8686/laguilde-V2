@@ -266,6 +266,9 @@ a{color:var(--gold);text-decoration:none;transition:color var(--transition)} a:h
 .accompagnant-group-title{font-family:var(--font-heading);font-size:15px;color:var(--gold);letter-spacing:1px;margin-bottom:8px}
 .mi-sub{font-size:15px;color:var(--text-muted)}
 
+/* Bandeau d'actions admin (rappel, export...) */
+.admin-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px;padding:12px;background:rgba(212,168,67,0.04);border:1px dashed rgba(212,168,67,0.2);border-radius:10px}
+
 /* Vue admin par table — inscrits + liste d'attente avec ordre */
 .admin-table-bloc{background:rgba(212,168,67,0.05);border:1px solid rgba(212,168,67,0.15);border-radius:10px;padding:14px 18px;margin-bottom:14px}
 .admin-table-title{font-family:var(--font-heading);font-size:17px;color:var(--gold);margin:0 0 4px;letter-spacing:0.5px}

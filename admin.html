@@ -116,6 +116,13 @@
         <div class="section-inner">
             <div class="section-header"><p class="section-label">Administration</p><h2 class="section-title">Panneau admin</h2><div class="section-sep"></div></div>
 
+            <!-- Actions admin globales (rappel J-3, export CSV) -->
+            <div class="admin-actions">
+                <button class="btn btn-small" onclick="adminTestRappel()" title="Envoie un email de rappel uniquement à votre adresse pour vérifier le rendu">&#128231; Tester le rappel sur mon email</button>
+                <button class="btn btn-small btn-gold" onclick="adminEnvoyerRappels()" title="Envoie un email de rappel à toutes les personnes inscrites à la convention">&#128231; Envoyer les rappels J-3</button>
+                <button class="btn btn-small btn-green" onclick="adminExportCsv()" title="Télécharge 4 fichiers CSV : tables, bénévoles, repas, présences">&#128202; Exporter en CSV</button>
+            </div>
+
             <!-- Contenu admin (chargé automatiquement si le rôle est admin) -->
             <div id="adminContent"></div>
         </div>
@@ -476,6 +483,258 @@ window.changeRole = async function(email, newRole) {
         if (window.invalidateCache) invalidateCache();
         toast('Rôle modifié : ' + email + ' → ' + newRole, 'success');
     } catch(e) { toast(e.message, 'error'); }
+};
+
+
+// =========================================================================
+// EMAIL DE RAPPEL J-3
+// =========================================================================
+// Deux boutons : "Tester sur mon email" (envoie 1 mail à l'admin connecté
+// pour valider le rendu sans spam) et "Envoyer les rappels J-3" (envoi à
+// tous les inscrits, avec confirm dialog).
+//
+// Backend : RPC send_reminders(p_test_email TEXT) côté Supabase, qui itère
+// sur les présences et appelle send_email_via_worker pour chaque destinataire.
+
+/**
+ * Envoie un email de rappel UNIQUEMENT à l'admin connecté (pour vérifier le rendu).
+ */
+window.adminTestRappel = async function() {
+    var user = APP.currentUser;
+    if (!user || !user.email) { toast('Non connecté', 'error'); return; }
+    if (!confirm('Envoyer un email de rappel test sur votre adresse (' + user.email + ') ?')) return;
+    try {
+        var { data, error } = await APP.supabase.rpc('send_reminders', { p_test_email: user.email });
+        if (error) throw error;
+        if (data && data.error) throw new Error(data.error);
+        var sent = (data && data.sent) || 0;
+        if (sent === 0) {
+            toast('Aucun email envoyé. Vérifiez que vous avez au moins une présence enregistrée à la convention.', 'info');
+        } else {
+            toast('Email de rappel envoyé à ' + user.email + ' (mode test)', 'success');
+        }
+    } catch(e) {
+        toast('Erreur : ' + (e.message || e), 'error');
+    }
+};
+
+/**
+ * Envoie le rappel à TOUTES les personnes inscrites à la convention.
+ * Double confirmation pour éviter un envoi accidentel.
+ */
+window.adminEnvoyerRappels = async function() {
+    // 1ère confirmation : description complète de l'action
+    var msg1 = 'ATTENTION — Envoyer le rappel J-3 ?\n\n'
+             + 'Cela enverra un email à TOUTES les personnes inscrites à la convention.\n\n'
+             + 'Cette action n\'est pas réversible. Vérifiez d\'abord avec "Tester sur mon email".';
+    if (!confirm(msg1)) return;
+
+    // 2ème confirmation : on tape "ENVOYER" pour valider
+    var typed = prompt('Pour confirmer, tapez exactement : ENVOYER');
+    if (typed !== 'ENVOYER') { toast('Envoi annulé', 'info'); return; }
+
+    try {
+        var { data, error } = await APP.supabase.rpc('send_reminders');
+        if (error) throw error;
+        if (data && data.error) throw new Error(data.error);
+        var sent = (data && data.sent) || 0;
+        toast('Rappels envoyés à ' + sent + ' destinataire(s)', 'success');
+    } catch(e) {
+        toast('Erreur : ' + (e.message || e), 'error');
+    }
+};
+
+
+// =========================================================================
+// EXPORT CSV
+// =========================================================================
+// Génère 4 fichiers CSV téléchargés en série :
+//   - melusine-tables-YYYY-MM-DD.csv     (inscriptions tables)
+//   - melusine-benevoles-YYYY-MM-DD.csv  (créneaux bénévoles)
+//   - melusine-repas-YYYY-MM-DD.csv      (repas du soir)
+//   - melusine-presences-YYYY-MM-DD.csv  (présences à la convention)
+//
+// Backend : RPC get_admin_export_data() côté Supabase qui retourne tout
+// en une seule requête (SECURITY DEFINER, admin only).
+
+/**
+ * Échappe une valeur pour CSV (RFC 4180 simplifié).
+ */
+function csvEscape(v) {
+    if (v === null || v === undefined) return '';
+    var s = String(v);
+    // Si contient une virgule, un guillemet ou un saut de ligne, il faut entourer de guillemets
+    // et doubler les guillemets internes.
+    if (/[",\n\r]/.test(s)) {
+        return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+}
+
+/**
+ * Convertit headers + lignes en string CSV avec BOM UTF-8 pour Excel.
+ */
+function buildCsv(headers, rows) {
+    var lines = [headers.map(csvEscape).join(',')];
+    rows.forEach(function(row) {
+        lines.push(row.map(csvEscape).join(','));
+    });
+    // BOM UTF-8 = '﻿' pour qu'Excel reconnaisse correctement l'encodage
+    // CRLF entre lignes pour la compatibilité Windows/Excel
+    return '﻿' + lines.join('\r\n');
+}
+
+/**
+ * Déclenche le téléchargement d'un fichier CSV côté navigateur.
+ */
+function downloadCsv(filename, csvContent) {
+    var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    // Petit délai avant de révoquer l'URL pour laisser le temps au navigateur
+    setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+}
+
+/**
+ * Helper : extrait une date lisible depuis un objet, peu importe le nom de colonne.
+ */
+function dateFr(obj) {
+    var d = obj.date_inscription || obj.timestamp || obj.created_at;
+    if (!d) return '';
+    try { return new Date(d).toLocaleString('fr', { dateStyle: 'short', timeStyle: 'short' }); }
+    catch(e) { return String(d); }
+}
+
+/**
+ * Handler du bouton "Exporter en CSV". Récupère les données via la RPC,
+ * construit 4 fichiers CSV et déclenche les téléchargements en série.
+ */
+window.adminExportCsv = async function() {
+    try {
+        var { data, error } = await APP.supabase.rpc('get_admin_export_data');
+        if (error) throw error;
+        if (data && data.error) throw new Error(data.error);
+
+        var inscriptions = (data && data.inscriptions) || [];
+        var benevoles    = (data && data.benevoles)    || [];
+        var repas        = (data && data.repas)        || [];
+        var presences    = (data && data.presences)    || [];
+
+        // Date pour les noms de fichiers (YYYY-MM-DD)
+        var today = new Date();
+        var dateStr = today.getFullYear() + '-'
+                    + ('0' + (today.getMonth() + 1)).slice(-2) + '-'
+                    + ('0' + today.getDate()).slice(-2);
+
+        // ── Fichier 1 : tables (inscrits + attente, avec position calculée) ──
+        // On filtre les inscriptions actives, puis on calcule la position dans
+        // la liste d'attente par table.
+        var actives = inscriptions.filter(function(i) {
+            return i.statut === 'inscrit' || i.statut === 'attente';
+        });
+        // Tri par jeu, créneau, statut (inscrit avant attente), id
+        actives.sort(function(a, b) {
+            if (a.creneau !== b.creneau) return (a.creneau || '').localeCompare(b.creneau || '');
+            if (a.jeu !== b.jeu) return (a.jeu || '').localeCompare(b.jeu || '');
+            if (a.statut !== b.statut) return a.statut === 'inscrit' ? -1 : 1;
+            return (a.id || 0) - (b.id || 0);
+        });
+        // Calcul position dans la liste d'attente par (creneau, jeu)
+        var attentePosByTable = {};
+        var rowsTables = actives.map(function(i) {
+            var key = (i.creneau || '') + '|' + (i.jeu || '');
+            var position = '';
+            if (i.statut === 'attente') {
+                attentePosByTable[key] = (attentePosByTable[key] || 0) + 1;
+                position = attentePosByTable[key];
+            }
+            return [
+                i.jeu || '',
+                i.creneau || '',
+                i.statut || '',
+                position,
+                i.nom || '',
+                i.email || '',
+                i.type_inscrit || 'principal',
+                i.nom_accompagnant || '',
+                dateFr(i)
+            ];
+        });
+        downloadCsv('melusine-tables-' + dateStr + '.csv', buildCsv(
+            ['Jeu', 'Creneau', 'Statut', 'Position attente', 'Nom', 'Email', 'Type', 'Nom accompagnant', 'Date inscription'],
+            rowsTables
+        ));
+
+        // ── Fichier 2 : bénévoles ──
+        // Petit délai entre downloads pour ne pas que le navigateur bloque
+        setTimeout(function() {
+            var benActifs = benevoles.filter(function(b) { return b.statut === 'inscrit'; });
+            benActifs.sort(function(a, b) {
+                if (a.creneau !== b.creneau) return (a.creneau || '').localeCompare(b.creneau || '');
+                return (a.id || 0) - (b.id || 0);
+            });
+            var rowsBen = benActifs.map(function(b) {
+                return [
+                    b.creneau || '',
+                    b.nom || '',
+                    b.email || '',
+                    b.type_inscrit || 'principal',
+                    b.nom_accompagnant || '',
+                    dateFr(b)
+                ];
+            });
+            downloadCsv('melusine-benevoles-' + dateStr + '.csv', buildCsv(
+                ['Creneau', 'Nom', 'Email', 'Type', 'Nom accompagnant', 'Date inscription'],
+                rowsBen
+            ));
+        }, 300);
+
+        // ── Fichier 3 : repas ──
+        setTimeout(function() {
+            var repasActifs = repas.filter(function(r) { return r.statut === 'inscrit'; });
+            var rowsRepas = repasActifs.map(function(r) {
+                return [
+                    r.nom || '',
+                    r.email || '',
+                    r.type_inscrit || 'principal',
+                    r.nom_accompagnant || '',
+                    dateFr(r)
+                ];
+            });
+            downloadCsv('melusine-repas-' + dateStr + '.csv', buildCsv(
+                ['Nom', 'Email', 'Type', 'Nom accompagnant', 'Date inscription'],
+                rowsRepas
+            ));
+        }, 600);
+
+        // ── Fichier 4 : présences à la convention ──
+        setTimeout(function() {
+            var rowsPres = presences.map(function(p) {
+                return [
+                    p.jour || '',
+                    p.nom || '',
+                    p.email || '',
+                    p.type_inscrit || 'principal',
+                    p.nom_accompagnant || '',
+                    dateFr(p)
+                ];
+            });
+            downloadCsv('melusine-presences-' + dateStr + '.csv', buildCsv(
+                ['Jour', 'Nom', 'Email', 'Type', 'Nom accompagnant', 'Date inscription'],
+                rowsPres
+            ));
+        }, 900);
+
+        toast('4 fichiers CSV téléchargés', 'success');
+    } catch(e) {
+        toast('Erreur export : ' + (e.message || e), 'error');
+    }
 };
 
 })();

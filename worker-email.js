@@ -78,6 +78,7 @@ const ALLOWED_EMAIL_TYPES = [
   'nouvelle_proposition',
   'proposition_recue',
   'recap',
+  'rappel',  // J-3 : rappel envoyé 3 jours avant la convention
 ];
 
 // ── URL du site (pour les liens dans les emails) ──
@@ -620,6 +621,108 @@ function buildRecapEmail(data) {
 }
 
 
+/**
+ * Génère l'email de rappel J-3.
+ * Envoyé manuellement par l'admin 3 jours avant la convention pour rappeler
+ * le programme aux inscrits. Inclut le récap personnel (tables, repas,
+ * bénévolat), les jours de présence, et les infos pratiques.
+ *
+ * @param {Object} data - {
+ *   nom: string,
+ *   jours: string[]  ('samedi', 'dimanche'),
+ *   inscriptions: [{ jeu, creneau, statut, nom_accompagnant? }],
+ *   benevolats:   [{ creneau }],
+ *   repas:        [{ nom_accompagnant? }]
+ * }
+ * @returns {Object} { subject, html }
+ */
+function buildRappelEmail(data) {
+  const { nom = '', jours = [], inscriptions = [], benevolats = [], repas = [] } = data;
+  const c = DEFAULT_COLORS;
+
+  // Phrase d'introduction adaptée au(x) jour(s) de présence
+  let joursTexte;
+  if (jours.includes('samedi') && jours.includes('dimanche')) {
+    joursTexte = `<strong>samedi 16 et dimanche 17 mai</strong>`;
+  } else if (jours.includes('samedi')) {
+    joursTexte = `<strong>samedi 16 mai</strong>`;
+  } else if (jours.includes('dimanche')) {
+    joursTexte = `<strong>dimanche 17 mai</strong>`;
+  } else {
+    joursTexte = `<strong>les 16 et 17 mai</strong>`;
+  }
+
+  let sections = '';
+
+  // --- Section Tables joueur ---
+  const perso = inscriptions.filter(i => !i.nom_accompagnant || i.nom_accompagnant.trim() === '');
+  if (perso.length > 0) {
+    sections += `<h3 style="color:${c.success};font-size:16px;margin:16px 0 8px">🎲 Vos tables</h3>`;
+    for (const i of perso) {
+      const statut = i.statut === 'inscrit' ? '✅ Inscrit·e' : '⏳ En attente';
+      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${i.jeu}</strong> — ${i.creneau} (${statut})</p>`;
+    }
+  }
+
+  // --- Section Accompagnants ---
+  const accs = inscriptions.filter(i => i.nom_accompagnant && i.nom_accompagnant.trim() !== '');
+  if (accs.length > 0) {
+    sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">👤 Vos accompagnant·e·s</h3>`;
+    for (const i of accs) {
+      const statut = i.statut === 'inscrit' ? '✅' : '⏳';
+      sections += `<p style="color:${c.text};margin:0 0 4px">• ${i.nom_accompagnant} → <strong>${i.jeu}</strong> — ${i.creneau} ${statut}</p>`;
+    }
+  }
+
+  // --- Section Bénévolat ---
+  if (benevolats.length > 0) {
+    sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">🤝 Bénévolat</h3>`;
+    for (const b of benevolats) {
+      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${b.creneau}</strong></p>`;
+    }
+  }
+
+  // --- Section Repas ---
+  if (repas.length > 0) {
+    sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">🍽️ Repas du samedi soir</h3>`;
+    sections += `<p style="color:${c.text};margin:0 0 4px">${repas.length} repas réservé(s).</p>`;
+    sections += `<p style="color:${c.muted};font-size:13px;margin-top:4px">Si pas encore réglé : paiement en ligne sur <a href="https://www.helloasso.com/associations/foyer-du-porteau/evenements/repas-du-soir-convention-sous-l-oeil-de-melusine-2026" style="color:${c.accent};text-decoration:underline">HelloAsso</a>.</p>`;
+  }
+
+  // Si pas d'inscription, message court
+  if (sections === '') {
+    sections = `<p style="color:${c.text};margin:0 0 4px">Vous n'êtes inscrit·e à aucune table pour le moment, mais vous êtes attendu·e à la convention !</p>`;
+  }
+
+  // --- Infos pratiques ---
+  const infosPratiques = ''
+    + `<h3 style="color:${c.accent};font-size:16px;margin:20px 0 8px">📍 Infos pratiques</h3>`
+    + `<p style="color:${c.text};margin:0 0 4px"><strong>Lieu :</strong> ${LIEU_NOM}, ${LIEU_ADRESSE}</p>`
+    + `<p style="color:${c.text};margin:0 0 4px"><strong>Horaires :</strong> samedi 9h-00h, dimanche 9h-17h</p>`
+    + `<p style="color:${c.muted};font-size:13px;margin-top:8px">Programme complet : <a href="${SITE_URL}programme.html" style="color:${c.accent}">${SITE_URL}programme.html</a></p>`;
+
+  const intro = `Bonjour ${nom},<br><br>`
+    + `La convention <strong>Sous l'Œil de Mélusine</strong> approche : c'est ${joursTexte} ! `
+    + `Voici un rappel de votre programme :`;
+
+  return {
+    subject: `🎲 J-3 : Rappel pour la convention Mélusine`,
+    html: buildEmailHtml({
+      titreBloc: '🎲 Plus que 3 jours !',
+      couleurTitre: c.success,
+      champs: [],
+      paragraphe: intro
+        + sections
+        + infosPratiques
+        + `<p style="color:${c.muted};font-size:13px;margin-top:20px">`
+        + `Modifier vos inscriptions : <a href="${SITE_URL}mes-inscriptions.html" style="color:${c.accent}">${SITE_URL}mes-inscriptions.html</a>`
+        + `</p>`,
+      pied: 'À très vite aux tables ! 🐉',
+    }),
+  };
+}
+
+
 // =============================================================================
 // DISPATCHER — Sélectionne le bon générateur selon le type d'email
 // =============================================================================
@@ -642,6 +745,7 @@ function buildEmail(type, data) {
     case 'nouvelle_proposition':  return buildNouvellePropositionEmail(data);
     case 'proposition_recue':     return buildPropositionRecueEmail(data);
     case 'recap':                 return buildRecapEmail(data);
+    case 'rappel':                return buildRappelEmail(data);
     default:
       throw new Error(`Type d'email inconnu : ${type}`);
   }
@@ -721,6 +825,14 @@ function validateRequest(body) {
 
     case 'recap':
       // Le récap peut avoir des listes vides, pas de validation stricte
+      break;
+
+    case 'rappel':
+      // Le rappel peut avoir des listes vides (utilisateur sans inscription
+      // mais avec présence à la convention) ; validation seulement du nom.
+      if (!data.nom) {
+        return 'Données manquantes pour rappel : nom requis.';
+      }
       break;
   }
 

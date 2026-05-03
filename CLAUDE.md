@@ -33,6 +33,8 @@ Site d'inscription pour une convention de jeu de rôle à Poitiers (16-17 mai 20
 - `presences.sql` : Table `presences` + triggers d'auto-création + RPC `annuler_presence` + RLS
 - `presences_admin_stats.sql` : RPC `get_presences_stats` (réservée admin)
 - `inscription_promotion.sql` : Trigger `trg_promote_first_waiting` qui promeut auto le 1er en attente quand une place se libère
+- `email_rappels.sql` : RPC `send_reminders(p_test_email)` qui envoie le rappel J-3 à toutes les personnes présentes (mode test = un seul destinataire)
+- `admin_export.sql` : RPC `get_admin_export_data` qui retourne toutes les données pour l'export CSV admin
 
 ### Documentation
 - `CLAUDE.md` : Ce fichier
@@ -148,7 +150,7 @@ Les joueurs peuvent ajouter jusqu'à 3 accompagnants liés à leur compte :
 
 ## Emails transactionnels
 - Triggers PostgreSQL → `pg_net.http_post` → Cloudflare Worker (`worker-email.js`) → MailerSend
-- Types : confirmation, promotion, annulation, accompagnant_supprime, table_validee, table_refusee, recap (RPC à la demande)
+- Types : confirmation, promotion, annulation, accompagnant_supprime, table_validee, table_refusee, recap (RPC à la demande), rappel (J-3, déclenché manuellement par l'admin via le bouton dans admin.html)
 - Asynchrone (fire-and-forget) — n'impacte jamais la transaction principale
 - **À surveiller** : si MailerSend retourne 401 → vérifier `MAILERSEND_API_KEY` dans Cloudflare. Si erreur 422 → vérifier DNS du domaine.
 
