@@ -637,7 +637,7 @@ function buildRecapEmail(data) {
  * @returns {Object} { subject, html }
  */
 function buildRappelEmail(data) {
-  const { nom = '', jours = [], inscriptions = [], benevolats = [], repas = [] } = data;
+  const { nom = '', jours = [], tablesMJ = [], inscriptions = [], benevolats = [], repas = [] } = data;
   const c = DEFAULT_COLORS;
 
   // Phrase d'introduction adaptée au(x) jour(s) de présence
@@ -654,10 +654,19 @@ function buildRappelEmail(data) {
 
   let sections = '';
 
+  // --- Section Tables MJ (si l'utilisateur est MJ sur des tables) ---
+  if (tablesMJ.length > 0) {
+    sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">🎲 Vos tables en tant que MJ</h3>`;
+    for (const t of tablesMJ) {
+      const statut = t.statut_table === 'validé' ? '✅ Validée' : '⏳ En attente de validation';
+      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${t.jeu}</strong> — ${t.creneau} (${statut})</p>`;
+    }
+  }
+
   // --- Section Tables joueur ---
   const perso = inscriptions.filter(i => !i.nom_accompagnant || i.nom_accompagnant.trim() === '');
   if (perso.length > 0) {
-    sections += `<h3 style="color:${c.success};font-size:16px;margin:16px 0 8px">🎲 Vos tables</h3>`;
+    sections += `<h3 style="color:${c.success};font-size:16px;margin:16px 0 8px">🧑 Vos tables en tant que joueur·euse</h3>`;
     for (const i of perso) {
       const statut = i.statut === 'inscrit' ? '✅ Inscrit·e' : '⏳ En attente';
       sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${i.jeu}</strong> — ${i.creneau} (${statut})</p>`;

@@ -35,6 +35,7 @@ DECLARE
     v_benevolats   JSONB;
     v_repas        JSONB;
     v_jours        JSONB;
+    v_tables_mj    JSONB;
 BEGIN
     -- ── 1. Vérifier que l'appelant est admin ──
     v_caller_email := lower(trim(coalesce(auth.jwt()->>'email', '')));
@@ -98,6 +99,17 @@ BEGIN
             v_repas := '[]'::jsonb;
         END;
 
+        -- Tables proposées en tant que MJ (statut validé ou en_attente)
+        -- Exclut les refusées car elles ne se tiendront pas le jour J.
+        SELECT COALESCE(jsonb_agg(jsonb_build_object(
+            'jeu',          pr.jeu,
+            'creneau',      pr.creneau,
+            'statut_table', pr.statut_table
+        )), '[]'::jsonb) INTO v_tables_mj
+        FROM programme pr
+        WHERE lower(trim(pr.email_mj)) = lower(trim(v_user.email))
+          AND COALESCE(pr.statut_table, '') != 'refusé';
+
         -- Jours de présence (samedi, dimanche, ou les deux)
         SELECT COALESCE(jsonb_agg(DISTINCT p.jour ORDER BY p.jour), '[]'::jsonb)
         INTO v_jours
@@ -112,6 +124,7 @@ BEGIN
             jsonb_build_object(
                 'nom',          v_user.nom,
                 'jours',        v_jours,
+                'tablesMJ',     v_tables_mj,
                 'inscriptions', v_inscriptions,
                 'benevolats',   v_benevolats,
                 'repas',        v_repas
