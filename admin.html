@@ -119,6 +119,7 @@
             <!-- Actions admin globales (rappel J-3, export CSV) -->
             <div class="admin-actions">
                 <button class="btn btn-small" onclick="adminTestRappel()" title="Envoie un email de rappel uniquement à votre adresse pour vérifier le rendu">&#128231; Tester le rappel sur mon email</button>
+                <button class="btn btn-small" onclick="adminPreviewRappel()" title="Vous recevez le rappel rendu pour un autre inscrit (sans le notifier lui-même)">&#128065; Prévisualiser pour un inscrit</button>
                 <button class="btn btn-small btn-gold" onclick="adminEnvoyerRappels()" title="Envoie un email de rappel à toutes les personnes inscrites à la convention">&#128231; Envoyer les rappels J-3</button>
                 <button class="btn btn-small btn-green" onclick="adminExportCsv()" title="Télécharge 4 fichiers CSV : tables, bénévoles, repas, présences">&#128202; Exporter en CSV</button>
             </div>
@@ -513,6 +514,30 @@ window.adminTestRappel = async function() {
         } else {
             toast('Email de rappel envoyé à ' + user.email + ' (mode test)', 'success');
         }
+    } catch(e) {
+        toast('Erreur : ' + (e.message || e), 'error');
+    }
+};
+
+/**
+ * Prévisualise le rappel pour un autre inscrit : l'admin reçoit dans sa boîte
+ * mail le rendu personnalisé pour cet utilisateur (avec ses tables, repas, etc.).
+ * La cible n'est PAS notifiée. Utile pour vérifier le rendu sur des cas
+ * particuliers (joueur sans inscription, MJ avec plusieurs tables, etc.).
+ */
+window.adminPreviewRappel = async function() {
+    var user = APP.currentUser;
+    if (!user || !user.email) { toast('Non connecté', 'error'); return; }
+    var target = prompt('Email de l\'inscrit à prévisualiser :\n\n(Vous recevrez le mail rendu pour cette personne. La personne ne sera PAS notifiée.)');
+    if (!target) return;
+    target = target.trim();
+    if (target.indexOf('@') === -1) { toast('Email invalide', 'error'); return; }
+
+    try {
+        var { data, error } = await APP.supabase.rpc('send_reminders', { p_preview_for_email: target });
+        if (error) throw error;
+        if (data && data.error) throw new Error(data.error);
+        toast('Aperçu envoyé à ' + user.email + ' (rendu pour ' + target + ')', 'success');
     } catch(e) {
         toast('Erreur : ' + (e.message || e), 'error');
     }
