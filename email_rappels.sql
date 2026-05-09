@@ -22,6 +22,65 @@
 --   - Type 'rappel' supporté par le worker (worker-email.js)
 -- =============================================================================
 
+-- =============================================================================
+-- HELPER : tri chronologique d'un créneau
+-- =============================================================================
+-- Retourne une clé numérique permettant de trier les créneaux par jour
+-- (samedi avant dimanche) puis par heure de début (HHMM).
+--
+-- Exemples :
+--   "Samedi 10h15-13h15"  → 1_010_015 (jour=1, heure=10, minute=15)
+--   "Samedi 14h-16h"      → 1_014_000
+--   "Samedi 21h30-2h"     → 1_021_030
+--   "Dimanche 10h-13h"    → 2_010_000
+--   "Animation libre"     →   9_999_999 (créneau non parsable, en fin de tri)
+-- =============================================================================
+CREATE OR REPLACE FUNCTION creneau_sort_key(creneau TEXT)
+RETURNS INT
+LANGUAGE plpgsql
+IMMUTABLE
+AS $$
+DECLARE
+    v_jour    TEXT;
+    v_match   TEXT[];
+    v_heure   INT := 0;
+    v_minute  INT := 0;
+    v_jour_n  INT;
+BEGIN
+    IF creneau IS NULL OR creneau = '' THEN
+        RETURN 9999999;
+    END IF;
+
+    -- jour_from_creneau renvoie 'samedi', 'dimanche' ou NULL
+    v_jour := jour_from_creneau(creneau);
+    v_jour_n := CASE v_jour
+        WHEN 'samedi'   THEN 1
+        WHEN 'dimanche' THEN 2
+        ELSE 9
+    END;
+
+    -- Extraire heure et minutes du début de créneau via regex.
+    -- Pattern : "10h15" ou "10h" — capture (heure, minute optionnelle)
+    v_match := regexp_match(creneau, '(\d{1,2})h(\d{2})?');
+    IF v_match IS NOT NULL THEN
+        BEGIN
+            v_heure  := v_match[1]::INT;
+            v_minute := COALESCE(NULLIF(v_match[2], '')::INT, 0);
+        EXCEPTION WHEN OTHERS THEN
+            v_heure := 0; v_minute := 0;
+        END;
+    END IF;
+
+    RETURN v_jour_n * 1000000 + v_heure * 1000 + v_minute;
+END;
+$$;
+
+COMMENT ON FUNCTION creneau_sort_key(TEXT) IS
+  'Clé numérique pour trier un créneau (ex: "Samedi 14h-16h") par '
+  'ordre chronologique. Utilisé dans send_reminders pour ordonner '
+  'les tables/bénévolats par jour puis heure.';
+
+
 -- Supprimer l'ancienne signature (TEXT) si elle existe.
 -- Postgres considère que send_reminders(TEXT) et send_reminders(TEXT, TEXT)
 -- sont deux fonctions différentes, donc CREATE OR REPLACE ne remplace pas
@@ -94,22 +153,22 @@ BEGIN
                 'Aucun utilisateur trouvé avec cet email : ' || p_preview_for_email);
         END IF;
 
-        -- Inscriptions actives de la cible
+        -- Inscriptions actives de la cible (triées chronologiquement)
         SELECT COALESCE(jsonb_agg(jsonb_build_object(
             'jeu',              i.jeu,
             'creneau',          i.creneau,
             'statut',           i.statut,
             'nom_accompagnant', COALESCE(i.nom_accompagnant, '')
-        )), '[]'::jsonb) INTO v_inscriptions
+        ) ORDER BY creneau_sort_key(i.creneau), i.jeu), '[]'::jsonb) INTO v_inscriptions
         FROM inscriptions i
         WHERE lower(trim(i.email)) = v_preview_email
           AND i.statut IN ('inscrit', 'attente');
 
-        -- Bénévolats de la cible
+        -- Bénévolats de la cible (triés chronologiquement)
         BEGIN
             SELECT COALESCE(jsonb_agg(jsonb_build_object(
                 'creneau', b.creneau
-            )), '[]'::jsonb) INTO v_benevolats
+            ) ORDER BY creneau_sort_key(b.creneau)), '[]'::jsonb) INTO v_benevolats
             FROM benevoles b
             WHERE lower(trim(b.email)) = v_preview_email
               AND b.statut = 'inscrit';
@@ -129,12 +188,12 @@ BEGIN
             v_repas := '[]'::jsonb;
         END;
 
-        -- Tables MJ de la cible
+        -- Tables MJ de la cible (triées chronologiquement)
         SELECT COALESCE(jsonb_agg(jsonb_build_object(
             'jeu',          pr.jeu,
             'creneau',      pr.creneau,
             'statut_table', pr.statut_table
-        )), '[]'::jsonb) INTO v_tables_mj
+        ) ORDER BY creneau_sort_key(pr.creneau), pr.jeu), '[]'::jsonb) INTO v_tables_mj
         FROM programme pr
         WHERE lower(trim(pr.email_mj)) = v_preview_email
           AND COALESCE(pr.statut_table, '') != 'refusé';
@@ -186,22 +245,22 @@ BEGIN
         WHERE p.type_inscrit = 'principal'
           AND (v_test_email = '' OR lower(trim(p.email)) = v_test_email)
     LOOP
-        -- Inscriptions actives (joueur principal + accompagnants)
+        -- Inscriptions actives (joueur principal + accompagnants), triées chronologiquement
         SELECT COALESCE(jsonb_agg(jsonb_build_object(
             'jeu',              i.jeu,
             'creneau',          i.creneau,
             'statut',           i.statut,
             'nom_accompagnant', COALESCE(i.nom_accompagnant, '')
-        )), '[]'::jsonb) INTO v_inscriptions
+        ) ORDER BY creneau_sort_key(i.creneau), i.jeu), '[]'::jsonb) INTO v_inscriptions
         FROM inscriptions i
         WHERE lower(trim(i.email)) = lower(trim(v_user.email))
           AND i.statut IN ('inscrit', 'attente');
 
-        -- Bénévolats actifs
+        -- Bénévolats actifs (triés chronologiquement)
         BEGIN
             SELECT COALESCE(jsonb_agg(jsonb_build_object(
                 'creneau', b.creneau
-            )), '[]'::jsonb) INTO v_benevolats
+            ) ORDER BY creneau_sort_key(b.creneau)), '[]'::jsonb) INTO v_benevolats
             FROM benevoles b
             WHERE lower(trim(b.email)) = lower(trim(v_user.email))
               AND b.statut = 'inscrit';
@@ -221,13 +280,13 @@ BEGIN
             v_repas := '[]'::jsonb;
         END;
 
-        -- Tables proposées en tant que MJ (statut validé ou en_attente)
+        -- Tables proposées en tant que MJ (statut validé ou en_attente), triées chronologiquement
         -- Exclut les refusées car elles ne se tiendront pas le jour J.
         SELECT COALESCE(jsonb_agg(jsonb_build_object(
             'jeu',          pr.jeu,
             'creneau',      pr.creneau,
             'statut_table', pr.statut_table
-        )), '[]'::jsonb) INTO v_tables_mj
+        ) ORDER BY creneau_sort_key(pr.creneau), pr.jeu), '[]'::jsonb) INTO v_tables_mj
         FROM programme pr
         WHERE lower(trim(pr.email_mj)) = lower(trim(v_user.email))
           AND COALESCE(pr.statut_table, '') != 'refusé';
