@@ -714,6 +714,16 @@ function buildRappelEmail(data) {
     + `La convention <strong>Sous l'Œil de Mélusine</strong> approche : c'est ${joursTexte} ! `
     + `Voici un rappel de votre programme :`;
 
+  // --- Invitation à partager l'événement Facebook ---
+  // Ajouté en bas du mail (avant le pied) pour booster la visibilité
+  // de la convention dans les jours qui précèdent.
+  const FB_EVENT_URL = 'https://www.facebook.com/events/1271855161045499/';
+  const partage = ''
+    + `<p style="color:${c.text};font-size:14px;margin-top:24px;padding-top:16px;border-top:1px solid ${c.muted}33">`
+    + `📣 <strong>Aidez-nous à faire connaître Mélusine !</strong><br>`
+    + `Partagez l'<a href="${FB_EVENT_URL}" style="color:${c.accent};text-decoration:underline">événement Facebook</a> avec vos amis et invitez-les à venir.`
+    + `</p>`;
+
   return {
     subject: `🎲 J-3 : Rappel pour la convention Mélusine`,
     html: buildEmailHtml({
@@ -725,7 +735,8 @@ function buildRappelEmail(data) {
         + infosPratiques
         + `<p style="color:${c.muted};font-size:13px;margin-top:20px">`
         + `Modifier vos inscriptions : <a href="${SITE_URL}mes-inscriptions.html" style="color:${c.accent}">${SITE_URL}mes-inscriptions.html</a>`
-        + `</p>`,
+        + `</p>`
+        + partage,
       pied: 'À très vite aux tables ! 🐉',
     }),
   };
