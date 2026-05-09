@@ -720,7 +720,7 @@ function buildRappelEmail(data) {
   const FB_EVENT_URL = 'https://www.facebook.com/events/1271855161045499/';
   const partage = ''
     + `<p style="color:${c.text};font-size:14px;margin-top:24px;padding-top:16px;border-top:1px solid ${c.muted}33">`
-    + `📣 <strong>Aidez-nous à faire connaître Mélusine !</strong><br>`
+    + `📣 <strong>Aidez-nous à faire connaître la convention Sous l'Œil de Mélusine !</strong><br>`
     + `Partagez l'<a href="${FB_EVENT_URL}" style="color:${c.accent};text-decoration:underline">événement Facebook</a> avec vos amis et invitez-les à venir.`
     + `</p>`;
 
