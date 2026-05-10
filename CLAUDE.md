@@ -35,6 +35,7 @@ Site d'inscription pour une convention de jeu de rôle à Poitiers (16-17 mai 20
 - `inscription_promotion.sql` : Trigger `trg_promote_first_waiting` qui promeut auto le 1er en attente quand une place se libère
 - `email_rappels.sql` : RPC `send_reminders(p_test_email)` qui envoie le rappel J-3 à toutes les personnes présentes (mode test = un seul destinataire)
 - `admin_export.sql` : RPC `get_admin_export_data` qui retourne toutes les données pour l'export CSV admin
+- `programme_sync.sql` : Trigger `trg_sync_inscriptions_on_programme_rename` qui propage automatiquement un renommage de table (`programme.jeu` ou `creneau`) aux inscriptions liées
 
 ### Documentation
 - `CLAUDE.md` : Ce fichier
