@@ -28,6 +28,7 @@ DECLARE
     v_benevoles    JSONB;
     v_repas        JSONB;
     v_presences    JSONB;
+    v_programme    JSONB;
 BEGIN
     -- ── Vérification admin ──
     v_caller_email := lower(trim(coalesce(auth.jwt()->>'email', '')));
@@ -73,11 +74,20 @@ BEGIN
     INTO v_presences
     FROM presences p;
 
+    -- ── Programme (tables validées + en attente — l'admin peut filtrer côté front)
+    -- Utile pour générer le visuel programme et pour enrichir l'export
+    -- inscriptions avec le nom du MJ par table.
+    SELECT COALESCE(jsonb_agg(row_to_json(pr.*) ORDER BY pr.creneau, pr.jeu), '[]'::jsonb)
+    INTO v_programme
+    FROM programme pr
+    WHERE COALESCE(pr.statut_table, '') != 'refusé';
+
     RETURN jsonb_build_object(
         'inscriptions', v_inscriptions,
         'benevoles',    v_benevoles,
         'repas',        v_repas,
-        'presences',    v_presences
+        'presences',    v_presences,
+        'programme',    v_programme
     );
 END;
 $$;

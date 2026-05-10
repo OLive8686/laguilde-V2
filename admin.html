@@ -637,8 +637,27 @@ function dateFr(obj) {
 }
 
 /**
+ * Compare deux créneaux pour un tri chronologique côté front.
+ * Reproduit la logique SQL creneau_sort_key : samedi avant dimanche, puis HH puis MM.
+ */
+function creneauOrder(creneau) {
+    if (!creneau) return 9999999;
+    var lower = String(creneau).toLowerCase();
+    var jourN = lower.indexOf('samedi') === 0 ? 1 : (lower.indexOf('dimanche') === 0 ? 2 : 9);
+    var m = String(creneau).match(/(\d{1,2})h(\d{2})?/);
+    var h = m ? parseInt(m[1], 10) : 0;
+    var mn = (m && m[2]) ? parseInt(m[2], 10) : 0;
+    return jourN * 1000000 + h * 1000 + mn;
+}
+
+/**
  * Handler du bouton "Exporter en CSV". Récupère les données via la RPC,
- * construit 4 fichiers CSV et déclenche les téléchargements en série.
+ * construit 5 fichiers CSV et déclenche les téléchargements en série :
+ *   - melusine-programme    : tables validées (pour visuel programme)
+ *   - melusine-tables       : inscrits + attente par table (avec MJ et position)
+ *   - melusine-benevoles    : créneaux bénévoles
+ *   - melusine-repas        : repas du soir
+ *   - melusine-presences    : présences à la convention (samedi/dimanche)
  */
 window.adminExportCsv = async function() {
     try {
@@ -650,6 +669,7 @@ window.adminExportCsv = async function() {
         var benevoles    = (data && data.benevoles)    || [];
         var repas        = (data && data.repas)        || [];
         var presences    = (data && data.presences)    || [];
+        var programme    = (data && data.programme)    || [];
 
         // Date pour les noms de fichiers (YYYY-MM-DD)
         var today = new Date();
@@ -657,15 +677,52 @@ window.adminExportCsv = async function() {
                     + ('0' + (today.getMonth() + 1)).slice(-2) + '-'
                     + ('0' + today.getDate()).slice(-2);
 
-        // ── Fichier 1 : tables (inscrits + attente, avec position calculée) ──
+        // ── Index programme par (creneau, jeu) → ligne — utilisé pour
+        //    enrichir les inscriptions avec le MJ et pour l'export programme.
+        var progByKey = {};
+        programme.forEach(function(p) {
+            var key = (p.creneau || '') + '|' + (p.jeu || '');
+            progByKey[key] = p;
+        });
+
+        // ── Fichier 0 (programme) : tables validées uniquement
+        //    Format pensé pour produire un visuel programme (Canva, etc.) :
+        //    pas d'info personnelle, juste les tables qui auront lieu.
+        var validees = programme.filter(function(p) {
+            return p.statut_table === 'validé' || !p.statut_table || p.statut_table === '';
+        });
+        validees.sort(function(a, b) {
+            var ca = creneauOrder(a.creneau), cb = creneauOrder(b.creneau);
+            if (ca !== cb) return ca - cb;
+            return (a.jeu || '').localeCompare(b.jeu || '');
+        });
+        var rowsProgramme = validees.map(function(p) {
+            return [
+                p.creneau || '',
+                p.jeu || '',
+                p.mj || '',
+                p.systeme || '',
+                p.places || '',
+                p.description || '',
+                p.content_warning || ''
+            ];
+        });
+        downloadCsv('melusine-programme-' + dateStr + '.csv', buildCsv(
+            ['Creneau', 'Jeu', 'MJ', 'Systeme', 'Places', 'Description', 'Content warning'],
+            rowsProgramme
+        ));
+
+        // ── Fichier 1 : tables (inscrits + attente, avec MJ et position) ──
+        // Pour fluidifier l'organisation : qui joue à quoi, qui est en attente.
         // On filtre les inscriptions actives, puis on calcule la position dans
         // la liste d'attente par table.
         var actives = inscriptions.filter(function(i) {
             return i.statut === 'inscrit' || i.statut === 'attente';
         });
-        // Tri par jeu, créneau, statut (inscrit avant attente), id
+        // Tri par créneau (chronologique), jeu, statut (inscrit avant attente), id
         actives.sort(function(a, b) {
-            if (a.creneau !== b.creneau) return (a.creneau || '').localeCompare(b.creneau || '');
+            var ca = creneauOrder(a.creneau), cb = creneauOrder(b.creneau);
+            if (ca !== cb) return ca - cb;
             if (a.jeu !== b.jeu) return (a.jeu || '').localeCompare(b.jeu || '');
             if (a.statut !== b.statut) return a.statut === 'inscrit' ? -1 : 1;
             return (a.id || 0) - (b.id || 0);
@@ -679,9 +736,13 @@ window.adminExportCsv = async function() {
                 attentePosByTable[key] = (attentePosByTable[key] || 0) + 1;
                 position = attentePosByTable[key];
             }
+            // Récupérer le MJ depuis l'index programme (par creneau+jeu)
+            var prog = progByKey[key];
+            var mj = (prog && prog.mj) || '';
             return [
-                i.jeu || '',
                 i.creneau || '',
+                i.jeu || '',
+                mj,
                 i.statut || '',
                 position,
                 i.nom || '',
@@ -692,7 +753,7 @@ window.adminExportCsv = async function() {
             ];
         });
         downloadCsv('melusine-tables-' + dateStr + '.csv', buildCsv(
-            ['Jeu', 'Creneau', 'Statut', 'Position attente', 'Nom', 'Email', 'Type', 'Nom accompagnant', 'Date inscription'],
+            ['Creneau', 'Jeu', 'MJ', 'Statut', 'Position attente', 'Nom', 'Email', 'Type', 'Nom accompagnant', 'Date inscription'],
             rowsTables
         ));
 
@@ -756,7 +817,7 @@ window.adminExportCsv = async function() {
             ));
         }, 900);
 
-        toast('4 fichiers CSV téléchargés', 'success');
+        toast('5 fichiers CSV téléchargés (programme, tables, bénévoles, repas, présences)', 'success');
     } catch(e) {
         toast('Erreur export : ' + (e.message || e), 'error');
     }
