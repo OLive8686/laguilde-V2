@@ -88,9 +88,49 @@ td{padding:.52rem .7rem;vertical-align:middle}
 .cr{white-space:nowrap;color:var(--muted);font-size:.83em}
 .fn{color:var(--att-fg);font-weight:700}
 
+/* Toggle de visibilité des colonnes (set sur la <table> selon les prefs) */
+table.h-type   th.col-type,   table.h-type   td.col-type   {display:none}
+table.h-avec   th.col-avec,   table.h-avec   td.col-avec   {display:none}
+table.h-email  th.col-email,  table.h-email  td.col-email  {display:none}
+table.h-date   th.col-date,   table.h-date   td.col-date   {display:none}
+table.h-statut th.col-statut, table.h-statut td.col-statut {display:none}
+table.h-file   th.col-file,   table.h-file   td.col-file   {display:none}
+
+/* Menu déroulant "Colonnes" */
+.cols-wrap{position:relative;display:inline-block}
+.cols-menu{display:none;position:absolute;top:100%;right:0;z-index:50;background:var(--surface);border:1px solid var(--border);border-radius:5px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:.5rem .65rem;margin-top:.25rem;min-width:160px;font-family:'EB Garamond',serif;font-size:.88rem}
+.cols-menu.on{display:block}
+.cols-menu label{display:flex;align-items:center;gap:.45rem;padding:.2rem 0;cursor:pointer;user-select:none}
+.cols-menu label:hover{color:var(--green)}
+.cols-menu input[type=checkbox]{accent-color:var(--green);cursor:pointer}
+@media print{.cols-wrap{display:none!important}}
+
 /* MODAL */
 #mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.52);z-index:200;align-items:center;justify-content:center;padding:1rem}
 #mo.on{display:flex}
+
+/* Person-link : noms cliquables pour ouvrir le récap */
+.pl{cursor:pointer;color:var(--green);text-decoration:underline dotted rgba(30,75,58,.4);text-underline-offset:2px;transition:color .12s}
+.pl:hover{color:var(--green2);text-decoration-color:var(--green2)}
+
+/* MODAL RÉCAP — par personne (différent de #mo qui sert à l'édition) */
+#mr{display:none;position:fixed;inset:0;background:rgba(0,0,0,.52);z-index:201;align-items:center;justify-content:center;padding:1rem}
+#mr.on{display:flex}
+#mrbox{background:var(--surface);border-radius:8px;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.35);animation:su .18s ease}
+#mrhead{background:var(--green);color:#fff;padding:.9rem 1.25rem;display:flex;align-items:center;justify-content:space-between;border-radius:8px 8px 0 0;position:sticky;top:0;z-index:1}
+#mrhead h2{font-family:'Cinzel',serif;font-size:1rem;font-weight:600;letter-spacing:.04em}
+#mrclose{background:none;border:none;color:#fff;font-size:1.3rem;cursor:pointer;opacity:.7;padding:0 .3rem;line-height:1}
+#mrclose:hover{opacity:1}
+#mrbody{padding:1.25rem 1.5rem}
+.mrs{margin-bottom:1.1rem}
+.mrs:last-child{margin-bottom:0}
+.mrs h3{font-family:'Cinzel',serif;font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--green);margin-bottom:.45rem;padding-bottom:.25rem;border-bottom:1px solid var(--border)}
+.mrs ul{list-style:none;padding:0}
+.mrs li{padding:.3rem 0;font-size:.92rem;display:flex;align-items:baseline;gap:.5rem}
+.mrs li .mri{flex:1}
+.mrs .mr-empty{color:var(--muted);font-style:italic;font-size:.88em;padding:.2rem 0}
+.mr-cr{font-family:'EB Garamond',serif;color:var(--muted);font-size:.85em;margin-right:.3em;white-space:nowrap}
+.mr-tag{display:inline-block;padding:.05em .45em;border-radius:3px;font-size:.7em;font-weight:600;font-family:sans-serif;text-transform:uppercase;letter-spacing:.04em;margin-left:.4em}
 #mbox{background:var(--surface);border-radius:8px;width:100%;max-width:530px;max-height:92vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.35);animation:su .18s ease}
 @keyframes su{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 #mhead{background:var(--green);color:#fff;padding:.9rem 1.25rem;display:flex;align-items:center;justify-content:space-between;border-radius:8px 8px 0 0;position:sticky;top:0;z-index:1}
@@ -195,6 +235,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
   <div class="toolbar">
     <div class="search-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" class="search-input" id="search-samedi" placeholder="Nom, email…" oninput="render('samedi')"></div>
     <div class="stats" id="stats-samedi"></div>
+    <div class="cols-wrap"><button class="btn btn-o" onclick="toggleColMenu('samedi',event)">📊 Colonnes</button><div class="cols-menu" id="cm-samedi"></div></div>
     <button class="btn btn-o" onclick="resetChecked('samedi')">↺ Coches</button>
     <button class="btn btn-add" onclick="openModal('samedi',null)">＋ Ajouter</button>
     <button class="btn btn-g" onclick="window.print()">🖨 Imprimer</button>
@@ -202,10 +243,10 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
   <div class="table-wrap"><table id="tbl-samedi"><thead><tr>
     <th class="ns td-chk">✓</th>
     <th onclick="doSort('samedi','nom')">Nom <span class="si"></span></th>
-    <th onclick="doSort('samedi','type')">Type <span class="si"></span></th>
-    <th onclick="doSort('samedi','avec')">Avec <span class="si"></span></th>
-    <th onclick="doSort('samedi','email')">Email <span class="si"></span></th>
-    <th onclick="doSort('samedi','date')">Inscription <span class="si"></span></th>
+    <th class="col-type" onclick="doSort('samedi','type')">Type <span class="si"></span></th>
+    <th class="col-avec" onclick="doSort('samedi','avec')">Avec <span class="si"></span></th>
+    <th class="col-email" onclick="doSort('samedi','email')">Email <span class="si"></span></th>
+    <th class="col-date" onclick="doSort('samedi','date')">Inscription <span class="si"></span></th>
     <th class="ns td-act"></th>
   </tr></thead><tbody id="body-samedi"></tbody></table></div>
 </div>
@@ -215,6 +256,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
   <div class="toolbar">
     <div class="search-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" class="search-input" id="search-dimanche" placeholder="Nom, email…" oninput="render('dimanche')"></div>
     <div class="stats" id="stats-dimanche"></div>
+    <div class="cols-wrap"><button class="btn btn-o" onclick="toggleColMenu('dimanche',event)">📊 Colonnes</button><div class="cols-menu" id="cm-dimanche"></div></div>
     <button class="btn btn-o" onclick="resetChecked('dimanche')">↺ Coches</button>
     <button class="btn btn-add" onclick="openModal('dimanche',null)">＋ Ajouter</button>
     <button class="btn btn-g" onclick="window.print()">🖨 Imprimer</button>
@@ -222,8 +264,8 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
   <div class="table-wrap"><table id="tbl-dimanche"><thead><tr>
     <th class="ns td-chk">✓</th>
     <th onclick="doSort('dimanche','nom')">Nom <span class="si"></span></th>
-    <th onclick="doSort('dimanche','email')">Email <span class="si"></span></th>
-    <th onclick="doSort('dimanche','date')">Inscription <span class="si"></span></th>
+    <th class="col-email" onclick="doSort('dimanche','email')">Email <span class="si"></span></th>
+    <th class="col-date" onclick="doSort('dimanche','date')">Inscription <span class="si"></span></th>
     <th class="ns td-act"></th>
   </tr></thead><tbody id="body-dimanche"></tbody></table></div>
 </div>
@@ -233,14 +275,15 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
   <div class="toolbar">
     <div class="search-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" class="search-input" id="search-benevoles" placeholder="Nom, créneau…" oninput="render('benevoles')"></div>
     <div class="stats" id="stats-benevoles"></div>
+    <div class="cols-wrap"><button class="btn btn-o" onclick="toggleColMenu('benevoles',event)">📊 Colonnes</button><div class="cols-menu" id="cm-benevoles"></div></div>
     <button class="btn btn-add" onclick="openModal('benevoles',null)">＋ Ajouter</button>
     <button class="btn btn-g" onclick="window.print()">🖨 Imprimer</button>
   </div>
   <div class="table-wrap"><table id="tbl-benevoles"><thead><tr>
     <th onclick="doSort('benevoles','creneau')">Créneau <span class="si"></span></th>
     <th onclick="doSort('benevoles','nom')">Nom <span class="si"></span></th>
-    <th onclick="doSort('benevoles','email')">Email <span class="si"></span></th>
-    <th onclick="doSort('benevoles','date')">Inscrit le <span class="si"></span></th>
+    <th class="col-email" onclick="doSort('benevoles','email')">Email <span class="si"></span></th>
+    <th class="col-date" onclick="doSort('benevoles','date')">Inscrit le <span class="si"></span></th>
     <th class="ns td-act"></th>
   </tr></thead><tbody id="body-benevoles"></tbody></table></div>
 </div>
@@ -250,6 +293,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
   <div class="toolbar">
     <div class="search-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" class="search-input" id="search-tables" placeholder="Jeu, joueur, créneau…" oninput="render('tables')"></div>
     <div class="stats" id="stats-tables"></div>
+    <div class="cols-wrap"><button class="btn btn-o" onclick="toggleColMenu('tables',event)">📊 Colonnes</button><div class="cols-menu" id="cm-tables"></div></div>
     <button class="btn btn-g" onclick="window.print()">🖨 Imprimer</button>
   </div>
 
@@ -271,9 +315,9 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
     <th onclick="doSort('tables','creneau')">Créneau <span class="si"></span></th>
     <th onclick="doSort('tables','jeu')">Jeu <span class="si"></span></th>
     <th onclick="doSort('tables','nom')">Joueur <span class="si"></span></th>
-    <th onclick="doSort('tables','statut')">Statut <span class="si"></span></th>
-    <th onclick="doSort('tables','file')">File <span class="si"></span></th>
-    <th onclick="doSort('tables','date')">Inscrit le <span class="si"></span></th>
+    <th class="col-statut" onclick="doSort('tables','statut')">Statut <span class="si"></span></th>
+    <th class="col-file" onclick="doSort('tables','file')">File <span class="si"></span></th>
+    <th class="col-date" onclick="doSort('tables','date')">Inscrit le <span class="si"></span></th>
     <th class="ns td-act"></th>
   </tr></thead><tbody id="body-tables"></tbody></table></div>
 </div>
@@ -282,7 +326,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
 <datalist id="dl-jt"></datalist>
 <datalist id="dl-cb"></datalist>
 
-<!-- MODAL -->
+<!-- MODAL ÉDITION -->
 <div id="mo" onclick="ovClick(event)">
   <div id="mbox">
     <div id="mhead"><h2 id="mtitle">Modifier</h2><button id="mclose" onclick="closeModal()">×</button></div>
@@ -291,6 +335,14 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
       <button class="btn btn-o" onclick="closeModal()">Annuler</button>
       <button class="btn btn-add" onclick="saveModal()">✔ Enregistrer</button>
     </div>
+  </div>
+</div>
+
+<!-- MODAL RÉCAP PERSONNE — s'ouvre quand on clique sur un nom -->
+<div id="mr" onclick="if(event.target===this)closeRecap()">
+  <div id="mrbox">
+    <div id="mrhead"><h2 id="mr-title">Récap</h2><button id="mrclose" onclick="closeRecap()">×</button></div>
+    <div id="mrbody"></div>
   </div>
 </div>
 
@@ -464,7 +516,26 @@ function mapSupabaseToInit(data) {
     });
   });
 
-  // ── TABLES (inscriptions) ──
+  // ── TABLES — MJ d'abord, puis joueurs ──
+  // On ajoute une ligne par table validée pour le MJ (statut spécial 'mj'),
+  // puis les joueurs inscrits/attente. Le tri d'affichage se fait après par
+  // créneau ; le statut 'mj' est traité spécialement dans rowT.
+  const programme = data.programme || [];
+  programme
+    .filter(p => p.statut_table === 'validé' || !p.statut_table || p.statut_table === '')
+    .forEach(p => {
+      if (!p.mj) return;  // pas de MJ renseigné → on saute
+      out.tables.push({
+        creneau: p.creneau || '',
+        jeu: p.jeu || '',
+        nom: p.mj,
+        statut: 'mj',
+        file: null,
+        date: ''
+      });
+    });
+
+  // ── TABLES (inscriptions joueur) ──
   // On filtre les actives (inscrit/attente), on trie par (creneau, jeu, statut, id)
   // et on calcule la position en file pour les attente.
   const actives = inscriptions
@@ -574,6 +645,189 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
+// =============================================================================
+// RÉCAP PERSONNE — ouvert au clic sur n'importe quel nom dans l'outil
+// =============================================================================
+// Une personne est identifiée par le couple (nom, email).
+// Pour les accompagnants, l'email est celui du parent — c'est OK car on
+// distingue avec le nom (pseudo unique côté accompagnant).
+// La table `tables` n'a pas d'email dans le format INIT, donc on cherche
+// par nom (pseudo) uniquement. Risque de collision sur pseudos identiques :
+// faible en pratique sur un événement à ~50 personnes.
+
+/**
+ * Ouvre la modale récap pour une personne identifiée par (nom, email).
+ * Affiche un résumé groupé : présence(s), tables, bénévolat.
+ */
+function openRecap(nom, email) {
+  if (!nom) return;
+  nom = String(nom);
+  email = String(email || '');
+
+  // Filtres : on cherche dans chaque tableau les lignes qui correspondent
+  // à cette personne. Pour samedi/dimanche/bénévoles, on a l'email + nom.
+  // Pour tables, on a juste le nom.
+  function matchEmailNom(r) {
+    return (r.nom === nom) && (!email || !r.email || r.email === email);
+  }
+  function matchNomOnly(r) {
+    return r.nom === nom;
+  }
+
+  const samedi    = D.samedi.filter(matchEmailNom);
+  const dimanche  = D.dimanche.filter(matchEmailNom);
+  const benevoles = D.benevoles.filter(matchEmailNom);
+  const tables    = D.tables.filter(matchNomOnly);
+
+  // Pour le titre, on garde le pseudo + email si dispo
+  const titre = nom + (email ? ' — ' + email : '');
+  document.getElementById('mr-title').textContent = titre;
+
+  // Construction du contenu groupé
+  let html = '';
+
+  // ── Présence à la convention ──
+  const jours = [];
+  if (samedi.length) jours.push('Samedi 16 mai');
+  if (dimanche.length) jours.push('Dimanche 17 mai');
+  html += `<div class="mrs"><h3>📅 Présence</h3>`;
+  if (jours.length) {
+    html += '<ul>';
+    if (samedi.length) {
+      const s = samedi[0];
+      html += `<li><span class="mri"><strong>Samedi 16 mai</strong>${s.type==='accompagnant'?` <span class="mr-tag" style="background:var(--acc-bg);color:var(--acc-fg)">acc. de ${esc(s.avec||'')}</span>`:''}</span></li>`;
+    }
+    if (dimanche.length) {
+      html += `<li><span class="mri"><strong>Dimanche 17 mai</strong></span></li>`;
+    }
+    html += '</ul>';
+  } else {
+    html += '<div class="mr-empty">Aucune présence enregistrée.</div>';
+  }
+  html += '</div>';
+
+  // ── Tables (joueur + MJ) ──
+  // On trie par créneau (créneau ASC). Distingue MJ / Inscrit / Attente par couleur.
+  const tablesSorted = [...tables].sort((a, b) => creneauVal(a.creneau) - creneauVal(b.creneau));
+  html += `<div class="mrs"><h3>🎲 Tables (${tables.length})</h3>`;
+  if (tablesSorted.length) {
+    html += '<ul>';
+    tablesSorted.forEach(t => {
+      let tag;
+      if (t.statut === 'mj') {
+        tag = `<span class="mr-tag" style="background:#3c2e70;color:#fff">MJ</span>`;
+      } else if (t.statut === 'inscrit') {
+        tag = `<span class="mr-tag" style="background:var(--ins-bg);color:var(--ins-fg)">Inscrit</span>`;
+      } else {
+        tag = `<span class="mr-tag" style="background:var(--att-bg);color:var(--att-fg)">Attente${t.file?` #${t.file}`:''}</span>`;
+      }
+      html += `<li><span class="mr-cr">${esc(t.creneau)}</span><span class="mri"><strong>${esc(t.jeu)}</strong>${tag}</span></li>`;
+    });
+    html += '</ul>';
+  } else {
+    html += '<div class="mr-empty">Aucune inscription à une table.</div>';
+  }
+  html += '</div>';
+
+  // ── Bénévolat ──
+  const benSorted = [...benevoles].sort((a, b) => creneauVal(a.creneau) - creneauVal(b.creneau));
+  html += `<div class="mrs"><h3>🤝 Bénévolat (${benevoles.length})</h3>`;
+  if (benSorted.length) {
+    html += '<ul>';
+    benSorted.forEach(b => {
+      html += `<li><span class="mr-cr">${esc(b.creneau)}</span></li>`;
+    });
+    html += '</ul>';
+  } else {
+    html += '<div class="mr-empty">Aucun créneau de bénévolat.</div>';
+  }
+  html += '</div>';
+
+  document.getElementById('mrbody').innerHTML = html;
+  document.getElementById('mr').classList.add('on');
+}
+
+function closeRecap() {
+  document.getElementById('mr').classList.remove('on');
+}
+// Escape ferme aussi la modale récap
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeRecap(); });
+
+
+// =============================================================================
+// COLONNES — toggle de visibilité par onglet, persistant en localStorage
+// =============================================================================
+// Pour chaque onglet, on liste les colonnes "masquables" (Nom et Actions sont
+// toujours visibles). L'utilisateur coche/décoche dans un dropdown ; le choix
+// est stocké en localStorage et restauré au chargement.
+
+const COLS = {
+  samedi:    [{key:'type',label:'Type'},{key:'avec',label:'Avec'},{key:'email',label:'Email'},{key:'date',label:'Date'}],
+  dimanche:  [{key:'email',label:'Email'},{key:'date',label:'Date'}],
+  benevoles: [{key:'email',label:'Email'},{key:'date',label:'Date'}],
+  tables:    [{key:'statut',label:'Statut'},{key:'file',label:'File'},{key:'date',label:'Date'}]
+};
+
+function getColPrefs(t) {
+  try { return JSON.parse(localStorage.getItem('m26col_'+t) || '{}'); } catch { return {}; }
+}
+function setColPrefs(t, p) {
+  localStorage.setItem('m26col_'+t, JSON.stringify(p));
+}
+
+/**
+ * Applique les préférences de visibilité de colonnes sur la table.
+ * Ajoute/retire des classes .h-<col> sur le <table> (le CSS fait le reste).
+ */
+function applyColPrefs(t) {
+  const tbl = document.getElementById('tbl-'+t);
+  if (!tbl) return;
+  const prefs = getColPrefs(t);
+  (COLS[t] || []).forEach(c => {
+    const hide = prefs[c.key] === false;  // par défaut visible
+    tbl.classList.toggle('h-'+c.key, hide);
+  });
+}
+
+/**
+ * Reconstruit le contenu du dropdown des colonnes pour un onglet.
+ * Appelé à chaque ouverture pour refléter les prefs courantes.
+ */
+function buildColMenu(t) {
+  const prefs = getColPrefs(t);
+  const menu = document.getElementById('cm-'+t);
+  if (!menu) return;
+  menu.innerHTML = (COLS[t] || []).map(c => {
+    const checked = prefs[c.key] !== false;
+    return `<label><input type="checkbox" ${checked?'checked':''} onchange="onColChange('${t}','${c.key}',this.checked)"> ${esc(c.label)}</label>`;
+  }).join('');
+}
+
+function toggleColMenu(t, evt) {
+  if (evt) evt.stopPropagation();
+  // Fermer les autres menus ouverts
+  document.querySelectorAll('.cols-menu.on').forEach(m => {
+    if (m.id !== 'cm-'+t) m.classList.remove('on');
+  });
+  buildColMenu(t);  // refresh content au cas où les prefs ont changé ailleurs
+  document.getElementById('cm-'+t).classList.toggle('on');
+}
+
+function onColChange(t, col, visible) {
+  const prefs = getColPrefs(t);
+  prefs[col] = visible;
+  setColPrefs(t, prefs);
+  applyColPrefs(t);
+}
+
+// Fermer les menus quand on clique en dehors
+document.addEventListener('click', e => {
+  if (!e.target.closest('.cols-wrap')) {
+    document.querySelectorAll('.cols-menu.on').forEach(m => m.classList.remove('on'));
+  }
+});
+
+
 // ── ÉTAT ──────────────────────────────────────────────
 let D={}, idc=0;
 const SS={samedi:{col:'nom',dir:'asc'},dimanche:{col:'nom',dir:'asc'},benevoles:{col:'creneau',dir:'asc'},tables:{col:'creneau',dir:'asc'}};
@@ -657,27 +911,56 @@ function acts(t,id,move){
   return`<td class="td-act">${mv}<button class="ico ico-e" title="Modifier" onclick="openModal('${t}',${id})">✏</button><button class="ico ico-d" title="Supprimer" onclick="delRow('${t}',${id})">✕</button></td>`;
 }
 
+// Helper : rend un nom cliquable (ouvre la modale récap personne).
+// L'email est passé en 2e arg pour identifier précisément la personne.
+function nameLink(nom, email) {
+  const n = esc(nom);
+  const e = esc(email || '').replace(/'/g, "\\'");
+  return `<a class="pl" onclick="openRecap('${n.replace(/'/g,"\\'")}','${e}')">${n}</a>`;
+}
+
 function rowS(r,chk){
   const tb=r.type==='principal'?`<span class="badge b-p">Principal</span>`:`<span class="badge b-a">Accompagnant</span>`;
   const av=r.avec?`<span class="avec">↳ avec <strong>${esc(r.avec)}</strong></span>`:`<span class="em">—</span>`;
   return`<td class="td-chk"><input type="checkbox" data-tab="samedi" data-id="${r._id}" ${chk?'checked':''}></td>
-    <td><strong>${esc(r.nom)}</strong></td><td>${tb}</td><td>${av}</td>
-    <td><span class="em">${esc(r.email)}</span></td><td class="em">${esc(r.date)}</td>${acts('samedi',r._id,false)}`;
+    <td><strong>${nameLink(r.nom, r.email)}</strong></td>
+    <td class="col-type">${tb}</td>
+    <td class="col-avec">${av}</td>
+    <td class="col-email"><span class="em">${esc(r.email)}</span></td>
+    <td class="col-date em">${esc(r.date)}</td>${acts('samedi',r._id,false)}`;
 }
 function rowD(r,chk){
   return`<td class="td-chk"><input type="checkbox" data-tab="dimanche" data-id="${r._id}" ${chk?'checked':''}></td>
-    <td><strong>${esc(r.nom)}</strong></td>
-    <td><span class="em">${esc(r.email)}</span></td><td class="em">${esc(r.date)}</td>${acts('dimanche',r._id,false)}`;
+    <td><strong>${nameLink(r.nom, r.email)}</strong></td>
+    <td class="col-email"><span class="em">${esc(r.email)}</span></td>
+    <td class="col-date em">${esc(r.date)}</td>${acts('dimanche',r._id,false)}`;
 }
 function rowB(r){
-  return`<td class="cr">${esc(r.creneau)}</td><td><strong>${esc(r.nom)}</strong></td>
-    <td><span class="em">${esc(r.email)}</span></td><td class="em">${esc(r.date)}</td>${acts('benevoles',r._id,false)}`;
+  return`<td class="cr">${esc(r.creneau)}</td>
+    <td><strong>${nameLink(r.nom, r.email)}</strong></td>
+    <td class="col-email"><span class="em">${esc(r.email)}</span></td>
+    <td class="col-date em">${esc(r.date)}</td>${acts('benevoles',r._id,false)}`;
 }
 function rowT(r){
+  // Cas particulier MJ : on l'affiche en italique avec un badge dédié, pas
+  // d'actions (on ne supprime pas un MJ depuis cet outil).
+  if(r.statut==='mj'){
+    return`<td class="cr">${esc(r.creneau)}</td>
+      <td class="jn">${esc(r.jeu)}</td>
+      <td><em>${nameLink(r.nom, '')}</em> <span class="badge" style="background:#3c2e70;color:#fff;font-size:.65em">MJ</span></td>
+      <td class="col-statut"><span class="badge" style="background:#3c2e70;color:#fff">MJ</span></td>
+      <td class="col-file"><span class="em">—</span></td>
+      <td class="col-date em">${esc(r.date||'')}</td>
+      <td class="td-act"></td>`;
+  }
   const sb=r.statut==='inscrit'?`<span class="badge b-i">Inscrit</span>`:`<span class="badge b-w">Attente</span>`;
   const fc=r.file?`<span class="fn">#${r.file}</span>`:`<span class="em">—</span>`;
-  return`<td class="cr">${esc(r.creneau)}</td><td class="jn">${esc(r.jeu)}</td>
-    <td>${esc(r.nom)}</td><td>${sb}</td><td>${fc}</td><td class="em">${esc(r.date)}</td>${acts('tables',r._id,true)}`;
+  return`<td class="cr">${esc(r.creneau)}</td>
+    <td class="jn">${esc(r.jeu)}</td>
+    <td>${nameLink(r.nom, '')}</td>
+    <td class="col-statut">${sb}</td>
+    <td class="col-file">${fc}</td>
+    <td class="col-date em">${esc(r.date)}</td>${acts('tables',r._id,true)}`;
 }
 
 // ── RENDU PRINCIPAL ───────────────────────────────────
@@ -708,6 +991,7 @@ function render(t){
   const cnt=document.getElementById('cnt-'+t);
   if(cnt)cnt.textContent=tot;
   updateHdr(t);
+  applyColPrefs(t);  // restaure visibilité des colonnes après re-rendu
 }
 
 // ── CRUD ──────────────────────────────────────────────
