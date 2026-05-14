@@ -105,6 +105,34 @@ table.h-file   th.col-file,   table.h-file   td.col-file   {display:none}
 .cols-menu input[type=checkbox]{accent-color:var(--green);cursor:pointer}
 @media print{.cols-wrap{display:none!important}}
 
+/* Filtre pointage (samedi/dimanche) — select dans la toolbar */
+.ck-filter{padding:.4rem .6rem;border:1px solid var(--border);border-radius:5px;font-family:'EB Garamond',serif;font-size:.9rem;background:var(--surface);color:var(--text);outline:none;cursor:pointer;transition:border-color .15s}
+.ck-filter:focus{border-color:var(--green2)}
+@media print{.ck-filter{display:none!important}}
+
+/* Stats progress avec compteur pointés */
+.stats-ck{font-weight:600;color:var(--green);margin-left:.4em}
+.stats-pct{display:inline-block;min-width:2.5em;padding:.05em .4em;background:var(--ins-bg);color:var(--ins-fg);border-radius:3px;font-size:.85em;font-weight:600;margin-left:.4em}
+
+/* Vue groupée : Bouton actif */
+#btn-grouped.active{background:var(--green);color:#fff;border-color:var(--green)}
+
+/* Vue groupée : sections par table dans l'onglet Tables */
+.grp{margin:.8rem 0;border:1px solid var(--border);border-radius:6px;background:var(--surface);overflow:hidden}
+.grp-head{background:#ece7dc;padding:.55rem 1rem;font-family:'Cinzel',serif;font-size:.85rem;font-weight:600;color:var(--green);cursor:pointer;display:flex;align-items:center;gap:.6rem;user-select:none;border-bottom:1px solid var(--border)}
+.grp-head:hover{background:#e0dbd0}
+.grp-head .grp-toggle{font-size:.7em;opacity:.5;transition:transform .12s}
+.grp.collapsed .grp-toggle{transform:rotate(-90deg)}
+.grp.collapsed .grp-body{display:none}
+.grp-cr{color:var(--muted);font-weight:400;font-family:'EB Garamond',serif;font-size:.95em;margin-left:.3em}
+.grp-mj{color:var(--acc-fg);font-weight:600;font-family:'EB Garamond',serif;font-size:.92em;margin-left:.4em}
+.grp-count{margin-left:auto;font-family:'EB Garamond',serif;font-weight:400;font-size:.92em;color:var(--muted);padding:.1em .55em;background:#fdfaf5;border-radius:3px;border:1px solid var(--border)}
+.grp-count.full{background:var(--del-bg);color:var(--del-fg);border-color:transparent}
+.grp-body{padding:.4rem 0}
+.grp-body table{margin:0}
+.grp-empty{padding:.6rem 1rem;color:var(--muted);font-style:italic;font-size:.85em}
+@media print{.grp-head{cursor:default}.grp.collapsed .grp-body{display:block!important}.grp-toggle{display:none}}
+
 /* MODAL */
 #mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.52);z-index:200;align-items:center;justify-content:center;padding:1rem}
 #mo.on{display:flex}
@@ -218,7 +246,8 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
 
 <div id="unsaved-banner">
   ⚠ Des modifications locales sont actives (sauvegardées dans ce navigateur).
-  <button class="btn btn-o" onclick="reloadFromSite()" style="margin-left:auto">🔄 Recharger depuis le site</button>
+  <button class="btn btn-o" onclick="exportLocalCsv()" style="margin-left:auto">💾 Exporter modifs (CSV)</button>
+  <button class="btn btn-o" onclick="reloadFromSite()">🔄 Recharger depuis le site</button>
   <button class="btn btn-o" onclick="resetAllData()">↺ Restaurer photo initiale</button>
 </div>
 
@@ -234,6 +263,11 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
 <div class="tab-panel active" id="panel-samedi">
   <div class="toolbar">
     <div class="search-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" class="search-input" id="search-samedi" placeholder="Nom, email…" oninput="render('samedi')"></div>
+    <select class="ck-filter" id="ck-filter-samedi" onchange="render('samedi')" title="Filtrer par statut de pointage">
+      <option value="all">Tous</option>
+      <option value="checked">✓ Pointés</option>
+      <option value="unchecked">○ Non pointés</option>
+    </select>
     <div class="stats" id="stats-samedi"></div>
     <div class="cols-wrap"><button class="btn btn-o" onclick="toggleColMenu('samedi',event)">📊 Colonnes</button><div class="cols-menu" id="cm-samedi"></div></div>
     <button class="btn btn-o" onclick="resetChecked('samedi')">↺ Coches</button>
@@ -255,6 +289,11 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
 <div class="tab-panel" id="panel-dimanche">
   <div class="toolbar">
     <div class="search-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" class="search-input" id="search-dimanche" placeholder="Nom, email…" oninput="render('dimanche')"></div>
+    <select class="ck-filter" id="ck-filter-dimanche" onchange="render('dimanche')" title="Filtrer par statut de pointage">
+      <option value="all">Tous</option>
+      <option value="checked">✓ Pointés</option>
+      <option value="unchecked">○ Non pointés</option>
+    </select>
     <div class="stats" id="stats-dimanche"></div>
     <div class="cols-wrap"><button class="btn btn-o" onclick="toggleColMenu('dimanche',event)">📊 Colonnes</button><div class="cols-menu" id="cm-dimanche"></div></div>
     <button class="btn btn-o" onclick="resetChecked('dimanche')">↺ Coches</button>
@@ -293,6 +332,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
   <div class="toolbar">
     <div class="search-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" class="search-input" id="search-tables" placeholder="Jeu, joueur, créneau…" oninput="render('tables')"></div>
     <div class="stats" id="stats-tables"></div>
+    <button class="btn btn-o" id="btn-grouped" onclick="toggleGrouped()" title="Basculer entre liste à plat et groupement par table">📋 Vue groupée</button>
     <div class="cols-wrap"><button class="btn btn-o" onclick="toggleColMenu('tables',event)">📊 Colonnes</button><div class="cols-menu" id="cm-tables"></div></div>
     <button class="btn btn-g" onclick="window.print()">🖨 Imprimer</button>
   </div>
@@ -484,6 +524,19 @@ function mapSupabaseToInit(data) {
       : (row.nom || row.email || '');
   }
 
+  // ── Dictionnaire email → nom du compte parent ──
+  // Dans la table presences, pour un accompagnant, le champ `nom` peut être
+  // égal au nom de l'accompagnant lui-même (selon comment la présence a été
+  // créée). On reconstruit donc le nom du parent à partir des lignes principales.
+  // Fallback : on peut aussi piocher dans inscriptions (type_inscrit='principal').
+  const parentNames = {};
+  presences.filter(p => p.type_inscrit === 'principal').forEach(p => {
+    if (p.email && !parentNames[p.email]) parentNames[p.email] = p.nom;
+  });
+  inscriptions.filter(i => (i.type_inscrit || 'principal') === 'principal').forEach(i => {
+    if (i.email && !parentNames[i.email]) parentNames[i.email] = i.nom;
+  });
+
   // ── PRÉSENCES SAMEDI ──
   // Format : { nom, email, type, avec, date }
   presences.filter(p => p.jour === 'samedi').forEach(p => {
@@ -491,7 +544,7 @@ function mapSupabaseToInit(data) {
       nom: displayName(p),
       email: p.email || '',
       type: p.type_inscrit || 'principal',
-      avec: (p.type_inscrit === 'accompagnant') ? (p.nom || null) : null,
+      avec: (p.type_inscrit === 'accompagnant') ? (parentNames[p.email] || null) : null,
       date: fmtDate(p.date_inscription)
     });
   });
@@ -606,6 +659,9 @@ async function bootApp() {
   // 4. Lancer l'outil avec les données fraîches
   initData();
   updateDL();
+  // Restaurer l'état du bouton "Vue groupée" selon la pref localStorage
+  const btnGrp = document.getElementById('btn-grouped');
+  if (btnGrp) btnGrp.classList.toggle('active', isGroupedView());
   ['samedi','dimanche','benevoles','tables'].forEach(render);
   hideBootScreen();
 }
@@ -828,6 +884,250 @@ document.addEventListener('click', e => {
 });
 
 
+// =============================================================================
+// VUE GROUPÉE — onglet Tables, regroupement par (créneau, jeu)
+// =============================================================================
+// Au lieu de la liste à plat, chaque table apparaît dans une section dédiée
+// avec son MJ et le compteur de places. État (activé / collapsed-par-section)
+// persisté en localStorage.
+
+function isGroupedView() {
+  return localStorage.getItem('m26_grouped') === '1';
+}
+function setGroupedView(on) {
+  localStorage.setItem('m26_grouped', on ? '1' : '0');
+}
+
+function toggleGrouped() {
+  setGroupedView(!isGroupedView());
+  document.getElementById('btn-grouped').classList.toggle('active', isGroupedView());
+  render('tables');
+}
+
+// État collapsed des groupes (clé = "creneau|jeu")
+function getCollapsed() {
+  try { return JSON.parse(localStorage.getItem('m26_grp_col') || '{}'); } catch { return {}; }
+}
+function setCollapsed(key, on) {
+  const c = getCollapsed();
+  if (on) c[key] = 1; else delete c[key];
+  localStorage.setItem('m26_grp_col', JSON.stringify(c));
+}
+function toggleGroupCollapse(key) {
+  const c = getCollapsed();
+  setCollapsed(key, !c[key]);
+  document.querySelector(`[data-grp="${CSS.escape(key)}"]`)?.classList.toggle('collapsed');
+}
+window.toggleGroupCollapse = toggleGroupCollapse;
+
+/**
+ * Rendu groupé de l'onglet Tables : une carte par (créneau, jeu) avec :
+ *   - Header : Jeu — Créneau (X/Y) — MJ: Nom — [▼ collapse]
+ *   - Body : table des inscrits + attente (mêmes colonnes que la vue plate)
+ * Le MJ extrait des lignes statut='mj' n'apparaît PAS dans le body (déjà en header).
+ */
+function renderGrouped(filtered, sorted) {
+  const wrap = document.getElementById('body-tables').closest('.table-wrap');
+  if (!wrap) return;
+
+  // Grouper par clé (creneau|jeu)
+  const groups = new Map();  // key -> { creneau, jeu, mj, rows: [] }
+  sorted.forEach(r => {
+    const key = (r.creneau || '') + '|' + (r.jeu || '');
+    if (!groups.has(key)) groups.set(key, { creneau: r.creneau || '', jeu: r.jeu || '', mj: '', rows: [] });
+    const g = groups.get(key);
+    if (r.statut === 'mj') {
+      g.mj = r.nom;  // on extrait le MJ dans le header
+    } else {
+      g.rows.push(r);
+    }
+  });
+
+  // Trier les groupes par créneau chronologique puis par jeu
+  const ordered = [...groups.values()].sort((a, b) => {
+    const d = creneauVal(a.creneau) - creneauVal(b.creneau);
+    if (d) return d;
+    return (a.jeu || '').localeCompare(b.jeu || '', 'fr');
+  });
+
+  // Construire le HTML : pour chaque groupe, une <div.grp> contenant un <table>
+  const collapsed = getCollapsed();
+  const html = ordered.map(g => {
+    const key = g.creneau + '|' + g.jeu;
+    const keyEsc = key.replace(/"/g, '&quot;');
+    const nbInscrits = g.rows.filter(r => r.statut === 'inscrit').length;
+    const nbAttente = g.rows.filter(r => r.statut === 'attente').length;
+    const cntTxt = nbAttente > 0
+      ? `${nbInscrits} inscrit${nbInscrits>1?'s':''} · ${nbAttente} en attente`
+      : `${nbInscrits} inscrit${nbInscrits>1?'s':''}`;
+    const isCol = collapsed[key] ? ' collapsed' : '';
+
+    // Lignes du body — on réutilise rowT mais on retire la colonne creneau et jeu
+    // pour éviter la redondance avec le header. On garde joueur/statut/file/date/actions.
+    const bodyRows = g.rows.map(r => {
+      const sb = r.statut === 'inscrit'
+        ? `<span class="badge b-i">Inscrit</span>`
+        : `<span class="badge b-w">Attente</span>`;
+      const fc = r.file ? `<span class="fn">#${r.file}</span>` : `<span class="em">—</span>`;
+      return `<tr><td>${nameLink(r.nom, '')}</td><td class="col-statut">${sb}</td><td class="col-file">${fc}</td><td class="col-date em">${esc(r.date)}</td>${acts('tables', r._id, true)}</tr>`;
+    }).join('');
+
+    const bodyHtml = bodyRows
+      ? `<table><tbody>${bodyRows}</tbody></table>`
+      : `<div class="grp-empty">Aucun joueur inscrit pour le moment.</div>`;
+
+    return `<div class="grp${isCol}" data-grp="${keyEsc}">
+      <div class="grp-head" onclick="toggleGroupCollapse('${esc(key).replace(/'/g,"\\'")}')">
+        <span class="grp-toggle">▼</span>
+        <strong>${esc(g.jeu)}</strong>
+        <span class="grp-cr">— ${esc(g.creneau)}</span>
+        ${g.mj ? `<span class="grp-mj">🎲 MJ : ${nameLink(g.mj, '')}</span>` : ''}
+        <span class="grp-count">${cntTxt}</span>
+      </div>
+      <div class="grp-body">${bodyHtml}</div>
+    </div>`;
+  }).join('');
+
+  // On remplace l'intégralité du table-wrap par les sections groupées
+  // (mais on garde le <table> dans le DOM pour pouvoir revenir à la vue plate)
+  // → on cache la table existante et on insère un conteneur sœur
+  const tbl = wrap.querySelector('table');
+  if (tbl) tbl.style.display = 'none';
+  let gc = wrap.querySelector('.grp-container');
+  if (!gc) {
+    gc = document.createElement('div');
+    gc.className = 'grp-container';
+    wrap.appendChild(gc);
+  }
+  gc.style.display = 'block';
+  gc.innerHTML = html || '<p class="em" style="padding:1rem">Aucune table à afficher.</p>';
+}
+
+/**
+ * Bascule de l'affichage vers la vue plate : restaure la <table> et masque
+ * le conteneur de groupes.
+ */
+function showFlatTablesView() {
+  const wrap = document.getElementById('body-tables').closest('.table-wrap');
+  if (!wrap) return;
+  const tbl = wrap.querySelector('table');
+  if (tbl) tbl.style.display = '';
+  const gc = wrap.querySelector('.grp-container');
+  if (gc) gc.style.display = 'none';
+}
+
+
+// =============================================================================
+// EXPORT CSV DES MODIFS LOCALES — sauvegarde l'état D + coches dans 4 fichiers
+// =============================================================================
+// Utile pour conserver les modifications faites pendant la convention
+// (pointages, ajouts manuels, etc.) avant de fermer le navigateur ou en cas
+// de besoin de transmettre les infos à un autre admin.
+
+function csvEsc(v) {
+  if (v === null || v === undefined) return '';
+  const s = String(v);
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function buildLocalCsv(headers, rows) {
+  const lines = [headers.map(csvEsc).join(',')];
+  rows.forEach(row => lines.push(row.map(csvEsc).join(',')));
+  // BOM UTF-8 + CRLF pour compat Excel
+  return '﻿' + lines.join('\r\n');
+}
+
+function dlBlob(filename, content) {
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+window.exportLocalCsv = function() {
+  // Stamp pour les noms de fichiers
+  const now = new Date();
+  const stamp = now.getFullYear() + '-'
+              + String(now.getMonth() + 1).padStart(2, '0') + '-'
+              + String(now.getDate()).padStart(2, '0') + '_'
+              + String(now.getHours()).padStart(2, '0')
+              + String(now.getMinutes()).padStart(2, '0');
+
+  // ── 1. Samedi (avec coche de pointage) ──
+  const ckS = getChk('samedi');
+  const rowsS = D.samedi.map(r => [
+    ckS[r._id] ? 'OUI' : '',
+    r.nom || '',
+    r.type || 'principal',
+    r.avec || '',
+    r.email || '',
+    r.date || ''
+  ]);
+  dlBlob('jour-J-samedi-' + stamp + '.csv', buildLocalCsv(
+    ['Pointé', 'Nom', 'Type', 'Avec', 'Email', 'Date inscription'],
+    rowsS
+  ));
+
+  // ── 2. Dimanche (avec coche de pointage) ──
+  setTimeout(() => {
+    const ckD = getChk('dimanche');
+    const rowsD = D.dimanche.map(r => [
+      ckD[r._id] ? 'OUI' : '',
+      r.nom || '',
+      r.email || '',
+      r.date || ''
+    ]);
+    dlBlob('jour-J-dimanche-' + stamp + '.csv', buildLocalCsv(
+      ['Pointé', 'Nom', 'Email', 'Date inscription'],
+      rowsD
+    ));
+  }, 250);
+
+  // ── 3. Bénévoles ──
+  setTimeout(() => {
+    const rowsB = D.benevoles.map(r => [
+      r.creneau || '',
+      r.nom || '',
+      r.email || '',
+      r.date || ''
+    ]);
+    dlBlob('jour-J-benevoles-' + stamp + '.csv', buildLocalCsv(
+      ['Creneau', 'Nom', 'Email', 'Date inscription'],
+      rowsB
+    ));
+  }, 500);
+
+  // ── 4. Tables (MJ + inscrits + attente) ──
+  setTimeout(() => {
+    // Tri par créneau chronologique puis jeu, MJ d'abord, puis inscrits, puis attente
+    const sorted = [...D.tables].sort((a, b) => {
+      const d = creneauVal(a.creneau) - creneauVal(b.creneau);
+      if (d) return d;
+      const j = (a.jeu || '').localeCompare(b.jeu || '', 'fr');
+      if (j) return j;
+      const ord = { mj: 0, inscrit: 1, attente: 2 };
+      return (ord[a.statut] ?? 9) - (ord[b.statut] ?? 9);
+    });
+    const rowsT = sorted.map(r => [
+      r.creneau || '',
+      r.jeu || '',
+      r.nom || '',
+      r.statut || '',
+      r.file || '',
+      r.date || ''
+    ]);
+    dlBlob('jour-J-tables-' + stamp + '.csv', buildLocalCsv(
+      ['Creneau', 'Jeu', 'Joueur', 'Statut', 'Position attente', 'Date inscription'],
+      rowsT
+    ));
+  }, 750);
+};
+
+
 // ── ÉTAT ──────────────────────────────────────────────
 let D={}, idc=0;
 const SS={samedi:{col:'nom',dir:'asc'},dimanche:{col:'nom',dir:'asc'},benevoles:{col:'creneau',dir:'asc'},tables:{col:'creneau',dir:'asc'}};
@@ -967,27 +1267,59 @@ function rowT(r){
 function render(t){
   const q=(document.getElementById('search-'+t)||{}).value||'';
   const{col,dir}=SS[t];
-  const filtered=filterArr(D[t],q);
-  const sorted=sortArr(filtered,col,dir);
   const chkMap=getChk(t);
-  const tbody=document.getElementById('body-'+t);
-  const frag=document.createDocumentFragment();
-  sorted.forEach(r=>{
-    const chk=!!chkMap[r._id];
-    const tr=document.createElement('tr');
-    if(chk)tr.classList.add('chk');
-    switch(t){
-      case'samedi':tr.innerHTML=rowS(r,chk);break;
-      case'dimanche':tr.innerHTML=rowD(r,chk);break;
-      case'benevoles':tr.innerHTML=rowB(r);break;
-      case'tables':tr.innerHTML=rowT(r);break;
-    }
-    frag.appendChild(tr);
-  });
-  tbody.innerHTML='';tbody.appendChild(frag);
-  const tot=D[t].length,sh=filtered.length;
+
+  // Filtre pointage (samedi/dimanche uniquement)
+  const ckFilter = (document.getElementById('ck-filter-'+t)||{}).value || 'all';
+
+  // 1) filtre texte
+  let filtered = filterArr(D[t], q);
+  // 2) filtre pointage (samedi/dimanche)
+  if (ckFilter === 'checked') {
+    filtered = filtered.filter(r => !!chkMap[r._id]);
+  } else if (ckFilter === 'unchecked') {
+    filtered = filtered.filter(r => !chkMap[r._id]);
+  }
+
+  const sorted=sortArr(filtered,col,dir);
+
+  // Cas spécial : onglet Tables en vue groupée
+  if (t === 'tables' && isGroupedView()) {
+    renderGrouped(filtered, sorted);
+  } else {
+    if (t === 'tables') showFlatTablesView();  // restaurer si on revient de la vue groupée
+    const tbody=document.getElementById('body-'+t);
+    const frag=document.createDocumentFragment();
+    sorted.forEach(r=>{
+      const chk=!!chkMap[r._id];
+      const tr=document.createElement('tr');
+      if(chk)tr.classList.add('chk');
+      switch(t){
+        case'samedi':tr.innerHTML=rowS(r,chk);break;
+        case'dimanche':tr.innerHTML=rowD(r,chk);break;
+        case'benevoles':tr.innerHTML=rowB(r);break;
+        case'tables':tr.innerHTML=rowT(r);break;
+      }
+      frag.appendChild(tr);
+    });
+    tbody.innerHTML='';tbody.appendChild(frag);
+  }
+
+  // ── Stats : total + filtrage + pointage (samedi/dimanche) ──
+  const tot=D[t].length, sh=filtered.length;
   const el=document.getElementById('stats-'+t);
-  if(el)el.textContent=q?`${sh} résultat${sh>1?'s':''} sur ${tot}`:`${tot} entrée${tot>1?'s':''}`;
+  if(el){
+    let txt = q || ckFilter !== 'all'
+      ? `${sh} résultat${sh>1?'s':''} sur ${tot}`
+      : `${tot} entrée${tot>1?'s':''}`;
+    // Compteur pointés pour samedi/dimanche
+    if (t === 'samedi' || t === 'dimanche') {
+      const nbCk = D[t].filter(r => !!chkMap[r._id]).length;
+      const pct = tot > 0 ? Math.round((nbCk / tot) * 100) : 0;
+      txt += ` <span class="stats-ck">·</span> <span class="stats-pct">${nbCk} / ${tot} pointés (${pct}%)</span>`;
+    }
+    el.innerHTML = txt;
+  }
   const cnt=document.getElementById('cnt-'+t);
   if(cnt)cnt.textContent=tot;
   updateHdr(t);
@@ -1157,6 +1489,9 @@ document.addEventListener('change',e=>{
   if(e.target.checked)m[id]=true;else delete m[id];
   setChk(t,m);
   e.target.closest('tr').classList.toggle('chk',e.target.checked);
+  // Re-render pour mettre à jour les stats de pointage + le filtre actif
+  // (si "Pointés" / "Non pointés" est sélectionné, la ligne doit disparaître)
+  render(t);
 });
 
 // ── INIT ──────────────────────────────────────────────
