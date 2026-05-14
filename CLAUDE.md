@@ -36,6 +36,7 @@ Site d'inscription pour une convention de jeu de rôle à Poitiers (16-17 mai 20
 - `email_rappels.sql` : RPC `send_reminders(p_test_email)` qui envoie le rappel J-3 à toutes les personnes présentes (mode test = un seul destinataire)
 - `admin_export.sql` : RPC `get_admin_export_data` qui retourne toutes les données pour l'export CSV admin
 - `programme_sync.sql` : Trigger `trg_sync_inscriptions_on_programme_rename` qui propage automatiquement un renommage de table (`programme.jeu` ou `creneau`) aux inscriptions liées
+- `audit_log.sql` : Table `audit_log` + trigger générique `trg_audit` sur les tables sensibles (inscriptions, programme, benevoles, repas, presences, profiles, accompagnants) — archive automatique de toutes les modifications avec JSONB old/new + email de l'appelant
 
 ### Documentation
 - `CLAUDE.md` : Ce fichier
