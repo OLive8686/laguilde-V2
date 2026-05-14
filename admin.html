@@ -120,7 +120,11 @@
             <div class="admin-actions">
                 <button class="btn btn-small" onclick="adminTestRappel()" title="Envoie un email de rappel uniquement à votre adresse pour vérifier le rendu">&#128231; Tester le rappel sur mon email</button>
                 <button class="btn btn-small" onclick="adminPreviewRappel()" title="Vous recevez le rappel rendu pour un autre inscrit (sans le notifier lui-même)">&#128065; Prévisualiser pour un inscrit</button>
-                <button class="btn btn-small btn-gold" onclick="adminEnvoyerRappels()" title="Envoie un email de rappel à toutes les personnes inscrites à la convention">&#128231; Envoyer les rappels J-3</button>
+                <!-- Bouton "Envoyer les rappels J-3" masqué après l'envoi de mai 2026.
+                     Le rappel a déjà été envoyé à tout le monde, pas besoin d'afficher
+                     le bouton (évite un envoi accidentel). À réactiver (retirer le
+                     style="display:none") en début de cycle pour la prochaine édition. -->
+                <button class="btn btn-small btn-gold" style="display:none" onclick="adminEnvoyerRappels()" title="Envoie un email de rappel à toutes les personnes inscrites à la convention">&#128231; Envoyer les rappels J-3</button>
                 <button class="btn btn-small btn-green" onclick="adminExportCsv()" title="Télécharge 4 fichiers CSV : tables, bénévoles, repas, présences">&#128202; Exporter en CSV</button>
                 <a class="btn btn-small" href="melusine-convention-2026.html" target="_blank" rel="noopener" title="Outil autonome pour gérer les inscriptions sur place le jour J (lecture seule du site, modifications locales uniquement)" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px">&#128296; Outil convention J-J</a>
             </div>
