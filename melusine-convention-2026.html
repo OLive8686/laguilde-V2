@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mélusine 2026 — Outil Convention</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#f4f0e8;--surface:#fdfaf5;--border:#d8d0c0;
+  --green:#1d4b3a;--green2:#2a6b51;
+  --gold:#9a6e20;--gold2:#c89230;
+  --text:#1a1815;--muted:#6e675e;
+  --ins-bg:#d8ede4;--ins-fg:#1a4a32;
+  --att-bg:#fce9c4;--att-fg:#7a470e;
+  --acc-bg:#e4e0f0;--acc-fg:#3c2e70;
+  --del-bg:#fde8e8;--del-fg:#8b1a1a;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'EB Garamond',Georgia,serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.55}
+
+/* HEADER */
+header{background:var(--green);color:#fff;padding:1.25rem 2rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;border-bottom:3px solid var(--gold2)}
+header h1{font-family:'Cinzel',serif;font-size:1.4rem;font-weight:700;letter-spacing:.04em}
+header .sub{font-size:.85rem;opacity:.7;font-style:italic;margin-top:.15rem}
+header .datebadge{font-size:.8rem;white-space:nowrap;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);padding:.35rem .9rem;border-radius:20px}
+
+/* TABS */
+.tabs-nav{background:var(--green);padding:0 1.5rem;display:flex;border-bottom:2px solid var(--gold)}
+.tab-btn{font-family:'Cinzel',serif;font-size:.72rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:rgba(255,255,255,.55);background:none;border:none;padding:.7rem 1.1rem;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:color .15s}
+.tab-btn:hover{color:rgba(255,255,255,.9)}
+.tab-btn.active{color:var(--gold2);border-bottom-color:var(--gold2);background:rgba(255,255,255,.04)}
+.tab-btn .cnt{display:inline-block;background:rgba(255,255,255,.13);border-radius:10px;padding:.08em .5em;font-size:.75em;font-family:'EB Garamond',serif;font-weight:400;letter-spacing:0;margin-left:.3em}
+.tab-btn.active .cnt{background:rgba(200,146,48,.3)}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* BANNER */
+#unsaved-banner{display:none;background:#fff8e1;border-bottom:2px solid var(--gold2);padding:.5rem 2rem;font-size:.85rem;color:var(--gold);align-items:center;gap:.75rem}
+#unsaved-banner.on{display:flex}
+
+/* TOOLBAR */
+.toolbar{padding:.85rem 2rem;display:flex;align-items:center;gap:.65rem;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.search-wrap{position:relative;flex:1;min-width:180px;max-width:360px}
+.search-wrap svg{position:absolute;left:.7rem;top:50%;transform:translateY(-50%);opacity:.4;pointer-events:none}
+.search-input{width:100%;padding:.45rem .75rem .45rem 2.1rem;border:1px solid var(--border);border-radius:5px;font-family:'EB Garamond',serif;font-size:.95rem;background:var(--bg);color:var(--text);outline:none;transition:border-color .15s}
+.search-input:focus{border-color:var(--green2)}
+.stats{font-size:.82rem;color:var(--muted);font-style:italic;margin-left:auto;white-space:nowrap}
+.btn{font-family:'Cinzel',serif;font-size:.67rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;cursor:pointer;border-radius:5px;padding:.4rem .85rem;border:2px solid;transition:all .15s;white-space:nowrap}
+.btn-g{color:var(--green);border-color:var(--green);background:none}.btn-g:hover{background:var(--green);color:#fff}
+.btn-o{color:var(--gold);border-color:var(--gold);background:none}.btn-o:hover{background:var(--att-bg)}
+.btn-add{color:#fff;background:var(--green2);border-color:var(--green2)}.btn-add:hover{background:var(--green);border-color:var(--green)}
+
+/* TABLE */
+.table-wrap{overflow-x:auto;padding:.5rem 2rem 2.5rem}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+thead th{font-family:'Cinzel',serif;font-size:.67rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--green);background:#ece7dc;border-bottom:2px solid var(--green);padding:.55rem .7rem;text-align:left;cursor:pointer;user-select:none;white-space:nowrap}
+thead th:hover{background:#e0dbd0}
+thead th.ns{cursor:default}
+thead th.ns:hover{background:#ece7dc}
+th .si{margin-left:.25em;opacity:.35;font-size:.78em}
+th.sa .si::after{content:'▲';opacity:1!important}
+th.sd .si::after{content:'▼';opacity:1!important}
+th:not(.sa):not(.sd) .si::after{content:'⬍'}
+tbody tr{border-bottom:1px solid #e5dfd4;transition:background .08s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:rgba(30,75,58,.04)}
+tbody tr.chk td{color:var(--muted);text-decoration:line-through;text-decoration-color:rgba(0,0,0,.25)}
+tbody tr.chk{background:rgba(30,75,58,.03)}
+td{padding:.52rem .7rem;vertical-align:middle}
+.td-chk{width:34px;text-align:center;padding:.35rem .4rem}
+.td-chk input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--green)}
+.td-act{width:90px;text-align:right;white-space:nowrap;padding:.3rem .5rem}
+.ico{background:none;border:none;cursor:pointer;font-size:.9rem;padding:.22rem .35rem;border-radius:4px;opacity:.5;transition:opacity .12s,background .12s}
+.ico:hover{opacity:1}
+.ico-e:hover{background:var(--ins-bg)}
+.ico-d:hover{background:var(--del-bg)}
+.ico-m:hover{background:var(--att-bg)}
+.badge{display:inline-block;padding:.12em .55em;border-radius:3px;font-size:.74em;font-weight:600;font-family:sans-serif;text-transform:uppercase;letter-spacing:.04em}
+.b-p{background:var(--ins-bg);color:var(--ins-fg)}
+.b-a{background:var(--acc-bg);color:var(--acc-fg)}
+.b-i{background:var(--ins-bg);color:var(--ins-fg)}
+.b-w{background:var(--att-bg);color:var(--att-fg)}
+.avec{display:block;font-size:.78em;font-style:italic;color:var(--muted);margin-top:.04em}
+.em{color:var(--muted);font-size:.82em}
+.jn{font-weight:500}
+.cr{white-space:nowrap;color:var(--muted);font-size:.83em}
+.fn{color:var(--att-fg);font-weight:700}
+
+/* MODAL */
+#mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.52);z-index:200;align-items:center;justify-content:center;padding:1rem}
+#mo.on{display:flex}
+#mbox{background:var(--surface);border-radius:8px;width:100%;max-width:530px;max-height:92vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.35);animation:su .18s ease}
+@keyframes su{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+#mhead{background:var(--green);color:#fff;padding:.9rem 1.25rem;display:flex;align-items:center;justify-content:space-between;border-radius:8px 8px 0 0;position:sticky;top:0;z-index:1}
+#mhead h2{font-family:'Cinzel',serif;font-size:1rem;font-weight:600;letter-spacing:.04em}
+#mclose{background:none;border:none;color:#fff;font-size:1.3rem;cursor:pointer;opacity:.7;padding:0 .3rem;line-height:1}
+#mclose:hover{opacity:1}
+#mbody{padding:1.25rem 1.5rem}
+#mfoot{padding:.75rem 1.5rem 1.25rem;display:flex;justify-content:flex-end;gap:.6rem;border-top:1px solid var(--border)}
+.msect{background:var(--att-bg);border:1px solid #e5c87a;border-radius:6px;padding:.85rem 1rem;margin-bottom:.9rem}
+.msect h3{font-family:'Cinzel',serif;font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--att-fg);margin-bottom:.6rem}
+.fg{margin-bottom:.85rem}
+.fg:last-child{margin-bottom:0}
+.fg label{display:block;font-family:'Cinzel',serif;font-size:.67rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--green);margin-bottom:.22rem}
+.fg input,.fg select{width:100%;padding:.45rem .65rem;border:1px solid var(--border);border-radius:4px;font-family:'EB Garamond',serif;font-size:1rem;background:var(--bg);color:var(--text);outline:none;transition:border-color .15s}
+.fg input:focus,.fg select:focus{border-color:var(--green2)}
+.hint{font-size:.77em;color:var(--muted);margin-top:.2rem;font-style:italic}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+.hidden{display:none!important}
+hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
+
+/* PRINT */
+@media print{
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body{background:#fff;font-size:10pt}
+  header{padding:.8rem 1.2rem;background:var(--green)!important}
+  header h1{font-size:12pt}
+  header .datebadge,#unsaved-banner,#mo,.tabs-nav{display:none!important}
+  .tab-panel{display:none!important}
+  .tab-panel.active{display:block!important}
+  .toolbar{padding:.4rem 1.2rem;border-bottom:1px solid #ccc;background:none}
+  .btn,.search-wrap,.td-act,.td-chk{display:none!important}
+  .table-wrap{padding:.4rem 1.2rem 1.2rem;overflow:visible}
+  table{page-break-inside:auto}
+  tr{page-break-inside:avoid}
+  thead{display:table-header-group}
+}
+
+/* ── AJOUT RAPIDE TABLES ── */
+#qa-bar{display:flex;align-items:center;gap:.5rem;padding:.7rem 2rem;background:#f0ede4;border-bottom:2px solid var(--gold);flex-wrap:wrap}
+#qa-label{font-family:'Cinzel',serif;font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--green);white-space:nowrap;margin-right:.3rem}
+#qa-bar input,#qa-bar select{padding:.42rem .6rem;border:1px solid var(--border);border-radius:5px;font-family:'EB Garamond',serif;font-size:.95rem;background:var(--surface);color:var(--text);outline:none;transition:border-color .15s}
+#qa-bar input:focus,#qa-bar select:focus{border-color:var(--green2)}
+#qa-cr{width:190px}
+#qa-jeu{flex:1;min-width:160px}
+#qa-nom{width:160px}
+#qa-st{width:110px}
+#qa-btn{font-family:'Cinzel',serif;font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;border-radius:5px;padding:.42rem 1rem;border:none;background:var(--green2);color:#fff;transition:background .15s;white-space:nowrap}
+#qa-btn:hover{background:var(--green)}
+#qa-more{background:none;border:1px solid var(--border);border-radius:5px;padding:.35rem .55rem;cursor:pointer;color:var(--muted);font-size:1rem;line-height:1;transition:all .15s}
+#qa-more:hover{border-color:var(--green);color:var(--green)}
+@media print{#qa-bar{display:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ─────────── ÉCRAN DE GARDE ───────────
+     Affiché tant que l'auth + le chargement initial ne sont pas terminés.
+     Bloque toute interaction avec l'outil. Une fois OK, on cache cet écran.
+-->
+<div id="boot-screen" style="position:fixed;inset:0;background:#f4f0e8;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem;text-align:center;font-family:'EB Garamond',Georgia,serif">
+  <div style="max-width:480px">
+    <h1 style="font-family:'Cinzel',serif;color:#1d4b3a;font-size:1.4rem;margin-bottom:.6rem">⚔ Outil Convention — Mélusine 2026</h1>
+    <p id="boot-msg" style="color:#6e675e;font-style:italic">Vérification de l'accès…</p>
+    <div id="boot-actions" style="margin-top:1.2rem;display:none">
+      <a id="boot-link" href="https://sousloeildemelusine.fr/admin.html" style="display:inline-block;font-family:'Cinzel',serif;font-size:.75rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:#fff;background:#2a6b51;border:2px solid #2a6b51;border-radius:5px;padding:.5rem 1rem;text-decoration:none">Aller au site principal</a>
+      <button id="boot-retry" style="display:none;margin-left:.5rem;font-family:'Cinzel',serif;font-size:.75rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:#1d4b3a;background:none;border:2px solid #1d4b3a;border-radius:5px;padding:.5rem 1rem;cursor:pointer">Réessayer</button>
+    </div>
+  </div>
+</div>
+
+<header>
+  <div>
+    <h1>⚔ Sous l'Œil de Mélusine — Convention 2026</h1>
+    <div class="sub">Outil de gestion — Jour J</div>
+  </div>
+  <div class="datebadge">📅 Samedi 16 &amp; Dimanche 17 mai 2026</div>
+</header>
+
+<nav class="tabs-nav">
+  <button class="tab-btn active" onclick="switchTab('samedi')">Accueil Samedi <span class="cnt" id="cnt-samedi">0</span></button>
+  <button class="tab-btn" onclick="switchTab('dimanche')">Accueil Dimanche <span class="cnt" id="cnt-dimanche">0</span></button>
+  <button class="tab-btn" onclick="switchTab('benevoles')">Bénévoles <span class="cnt" id="cnt-benevoles">0</span></button>
+  <button class="tab-btn" onclick="switchTab('tables')">Tables <span class="cnt" id="cnt-tables">0</span></button>
+</nav>
+
+<div id="unsaved-banner">
+  ⚠ Des modifications locales sont actives (sauvegardées dans ce navigateur).
+  <button class="btn btn-o" onclick="reloadFromSite()" style="margin-left:auto">🔄 Recharger depuis le site</button>
+  <button class="btn btn-o" onclick="resetAllData()">↺ Restaurer photo initiale</button>
+</div>
+
+<!-- Petit bandeau "infos session" — connecté en tant que X + bouton recharger -->
+<div id="session-bar" style="display:none;padding:.4rem 2rem;background:#fdfaf5;border-bottom:1px solid #d8d0c0;font-size:.78rem;color:#6e675e;align-items:center;gap:.75rem">
+  <span>👤 Connecté&nbsp;: <strong id="session-email"></strong></span>
+  <span style="opacity:.5">·</span>
+  <span>📦 Données chargées le <strong id="session-loaded"></strong></span>
+  <button class="btn btn-o" style="margin-left:auto" onclick="reloadFromSite()">🔄 Recharger depuis le site</button>
+</div>
+
+<!-- SAMEDI -->
+<div class="tab-panel active" id="panel-samedi">
+  <div class="toolbar">
+    <div class="search-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" class="search-input" id="search-samedi" placeholder="Nom, email…" oninput="render('samedi')"></div>
+    <div class="stats" id="stats-samedi"></div>
+    <button class="btn btn-o" onclick="resetChecked('samedi')">↺ Coches</button>
+    <button class="btn btn-add" onclick="openModal('samedi',null)">＋ Ajouter</button>
+    <button class="btn btn-g" onclick="window.print()">🖨 Imprimer</button>
+  </div>
+  <div class="table-wrap"><table id="tbl-samedi"><thead><tr>
+    <th class="ns td-chk">✓</th>
+    <th onclick="doSort('samedi','nom')">Nom <span class="si"></span></th>
+    <th onclick="doSort('samedi','type')">Type <span class="si"></span></th>
+    <th onclick="doSort('samedi','avec')">Avec <span class="si"></span></th>
+    <th onclick="doSort('samedi','email')">Email <span class="si"></span></th>
+    <th onclick="doSort('samedi','date')">Inscription <span class="si"></span></th>
+    <th class="ns td-act"></th>
+  </tr></thead><tbody id="body-samedi"></tbody></table></div>
+</div>
+
+<!-- DIMANCHE -->
+<div class="tab-panel" id="panel-dimanche">
+  <div class="toolbar">
+    <div class="search-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" class="search-input" id="search-dimanche" placeholder="Nom, email…" oninput="render('dimanche')"></div>
+    <div class="stats" id="stats-dimanche"></div>
+    <button class="btn btn-o" onclick="resetChecked('dimanche')">↺ Coches</button>
+    <button class="btn btn-add" onclick="openModal('dimanche',null)">＋ Ajouter</button>
+    <button class="btn btn-g" onclick="window.print()">🖨 Imprimer</button>
+  </div>
+  <div class="table-wrap"><table id="tbl-dimanche"><thead><tr>
+    <th class="ns td-chk">✓</th>
+    <th onclick="doSort('dimanche','nom')">Nom <span class="si"></span></th>
+    <th onclick="doSort('dimanche','email')">Email <span class="si"></span></th>
+    <th onclick="doSort('dimanche','date')">Inscription <span class="si"></span></th>
+    <th class="ns td-act"></th>
+  </tr></thead><tbody id="body-dimanche"></tbody></table></div>
+</div>
+
+<!-- BENEVOLES -->
+<div class="tab-panel" id="panel-benevoles">
+  <div class="toolbar">
+    <div class="search-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" class="search-input" id="search-benevoles" placeholder="Nom, créneau…" oninput="render('benevoles')"></div>
+    <div class="stats" id="stats-benevoles"></div>
+    <button class="btn btn-add" onclick="openModal('benevoles',null)">＋ Ajouter</button>
+    <button class="btn btn-g" onclick="window.print()">🖨 Imprimer</button>
+  </div>
+  <div class="table-wrap"><table id="tbl-benevoles"><thead><tr>
+    <th onclick="doSort('benevoles','creneau')">Créneau <span class="si"></span></th>
+    <th onclick="doSort('benevoles','nom')">Nom <span class="si"></span></th>
+    <th onclick="doSort('benevoles','email')">Email <span class="si"></span></th>
+    <th onclick="doSort('benevoles','date')">Inscrit le <span class="si"></span></th>
+    <th class="ns td-act"></th>
+  </tr></thead><tbody id="body-benevoles"></tbody></table></div>
+</div>
+
+<!-- TABLES -->
+<div class="tab-panel" id="panel-tables">
+  <div class="toolbar">
+    <div class="search-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" class="search-input" id="search-tables" placeholder="Jeu, joueur, créneau…" oninput="render('tables')"></div>
+    <div class="stats" id="stats-tables"></div>
+    <button class="btn btn-g" onclick="window.print()">🖨 Imprimer</button>
+  </div>
+
+  <!-- AJOUT RAPIDE -->
+  <div id="qa-bar">
+    <span id="qa-label">＋ Joueur rapide</span>
+    <input id="qa-cr"  type="text" list="dl-ct" placeholder="Créneau"  title="Créneau">
+    <input id="qa-jeu" type="text" list="dl-jt" placeholder="Jeu"       title="Jeu">
+    <input id="qa-nom" type="text"              placeholder="Nom / Pseudo" title="Nom" onkeydown="if(event.key==='Enter')quickAdd()">
+    <select id="qa-st" title="Statut">
+      <option value="inscrit">Inscrit</option>
+      <option value="attente">Attente</option>
+    </select>
+    <button id="qa-btn" onclick="quickAdd()">Ajouter</button>
+    <button id="qa-more" onclick="openModal('tables',null)" title="Formulaire complet (file d'attente, date…)">⋯</button>
+  </div>
+
+  <div class="table-wrap"><table id="tbl-tables"><thead><tr>
+    <th onclick="doSort('tables','creneau')">Créneau <span class="si"></span></th>
+    <th onclick="doSort('tables','jeu')">Jeu <span class="si"></span></th>
+    <th onclick="doSort('tables','nom')">Joueur <span class="si"></span></th>
+    <th onclick="doSort('tables','statut')">Statut <span class="si"></span></th>
+    <th onclick="doSort('tables','file')">File <span class="si"></span></th>
+    <th onclick="doSort('tables','date')">Inscrit le <span class="si"></span></th>
+    <th class="ns td-act"></th>
+  </tr></thead><tbody id="body-tables"></tbody></table></div>
+</div>
+
+<datalist id="dl-ct"></datalist>
+<datalist id="dl-jt"></datalist>
+<datalist id="dl-cb"></datalist>
+
+<!-- MODAL -->
+<div id="mo" onclick="ovClick(event)">
+  <div id="mbox">
+    <div id="mhead"><h2 id="mtitle">Modifier</h2><button id="mclose" onclick="closeModal()">×</button></div>
+    <div id="mbody"></div>
+    <div id="mfoot">
+      <button class="btn btn-o" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-add" onclick="saveModal()">✔ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// =============================================================================
+// CONFIGURATION SUPABASE — chargement live des données du site (lecture seule)
+// =============================================================================
+// On lit les données via la RPC `get_admin_export_data` (SECURITY DEFINER côté
+// Supabase, qui vérifie elle-même que l'appelant a le rôle admin).
+// Aucune écriture ne sera faite vers Supabase — toutes les modifs faites dans
+// cet outil restent en localStorage du navigateur (variables m26d_*).
+const SUPABASE_URL = 'https://hdbhvwaemrjoantcecuv.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_YGImet9fG8OKLDf_H0GNyQ_SmY5Mo56';
+
+// Stockage des données à l'état "fetché du site" (avant modifs locales)
+// pour pouvoir reset rapidement sur cette photo si besoin.
+let INIT = { samedi:[], dimanche:[], benevoles:[], tables:[] };
+
+// Email de la session courante (rempli après auth)
+let SESSION_EMAIL = '';
+// Timestamp du dernier fetch (affiché dans le bandeau session)
+let LAST_FETCH = '';
+
+
+// =============================================================================
+// AUTH + FETCH INITIAL — bootApp()
+// =============================================================================
+// Étapes :
+//   1. Lire la session Supabase (localStorage.melusine_session, posée par le
+//      site principal après login)
+//   2. Décoder le JWT pour récupérer l'email (info)
+//   3. Appeler la RPC get_admin_export_data (vérifie le rôle admin côté server)
+//   4. Si succès : mapper les données vers le format INIT et démarrer l'outil
+//   5. Si échec : afficher l'écran de blocage approprié
+
+function bootMsg(msg, opts) {
+  const m = document.getElementById('boot-msg');
+  const actions = document.getElementById('boot-actions');
+  const retry = document.getElementById('boot-retry');
+  if (m) m.textContent = msg;
+  if (actions) actions.style.display = (opts && opts.actions) ? 'block' : 'none';
+  if (retry) retry.style.display = (opts && opts.retry) ? 'inline-block' : 'none';
+}
+
+function hideBootScreen() {
+  const el = document.getElementById('boot-screen');
+  if (el) el.style.display = 'none';
+}
+
+/**
+ * Récupère l'email de l'utilisateur connecté en décodant le JWT stocké
+ * par le site principal après login Supabase.
+ * Retourne null si pas de session ou token invalide.
+ */
+function getSessionEmail() {
+  try {
+    const raw = localStorage.getItem('melusine_session');
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    if (!session || !session.access_token) return null;
+    // Le JWT est de la forme header.payload.signature, on décode le payload
+    const parts = session.access_token.split('.');
+    if (parts.length < 2) return null;
+    // base64url → base64 standard puis atob
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(b64));
+    return (payload.email || '').toLowerCase();
+  } catch (e) { return null; }
+}
+
+/**
+ * Appelle la RPC Supabase get_admin_export_data.
+ * Retourne { ok, data, error }.
+ * - ok=true + data : appelant est admin, données reçues
+ * - ok=false + error : pas admin OU erreur réseau OU session expirée
+ */
+async function fetchSiteData() {
+  const session = JSON.parse(localStorage.getItem('melusine_session') || 'null');
+  if (!session || !session.access_token) {
+    return { ok: false, error: 'session_missing' };
+  }
+  try {
+    const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/get_admin_export_data', {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': 'Bearer ' + session.access_token,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify({})
+    });
+    if (r.status === 401) return { ok: false, error: 'session_expired' };
+    if (!r.ok) {
+      const txt = await r.text().catch(() => r.statusText);
+      return { ok: false, error: 'http_' + r.status + ': ' + txt };
+    }
+    const data = await r.json();
+    if (data && data.error) return { ok: false, error: data.error };
+    return { ok: true, data: data };
+  } catch (e) {
+    return { ok: false, error: 'network: ' + (e.message || e) };
+  }
+}
+
+/**
+ * Formate une date ISO en DD/MM/YYYY (format attendu par l'outil).
+ */
+function fmtDate(d) {
+  if (!d) return '';
+  try {
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return String(d).slice(0, 10);
+    return String(dt.getDate()).padStart(2, '0') + '/'
+         + String(dt.getMonth() + 1).padStart(2, '0') + '/'
+         + dt.getFullYear();
+  } catch (e) { return String(d).slice(0, 10); }
+}
+
+/**
+ * Transforme les données Supabase reçues en format INIT attendu par l'outil.
+ * Mapping :
+ *   - samedi/dimanche : depuis `presences` filtrées par jour. Pour un accompagnant,
+ *     on affiche `nom_accompagnant` et on indique `avec = presences.nom` (le pseudo du parent).
+ *   - benevoles : depuis `benevoles` filtrés sur statut='inscrit'
+ *   - tables : depuis `inscriptions` (inscrit + attente), avec position en file
+ *     calculée par groupe (creneau, jeu).
+ */
+function mapSupabaseToInit(data) {
+  const out = { samedi: [], dimanche: [], benevoles: [], tables: [] };
+  const presences = data.presences || [];
+  const benevoles = data.benevoles || [];
+  const inscriptions = data.inscriptions || [];
+
+  // ── Helper : nom affiché selon principal/accompagnant ──
+  function displayName(row) {
+    return (row.type_inscrit === 'accompagnant' && row.nom_accompagnant)
+      ? row.nom_accompagnant
+      : (row.nom || row.email || '');
+  }
+
+  // ── PRÉSENCES SAMEDI ──
+  // Format : { nom, email, type, avec, date }
+  presences.filter(p => p.jour === 'samedi').forEach(p => {
+    out.samedi.push({
+      nom: displayName(p),
+      email: p.email || '',
+      type: p.type_inscrit || 'principal',
+      avec: (p.type_inscrit === 'accompagnant') ? (p.nom || null) : null,
+      date: fmtDate(p.date_inscription)
+    });
+  });
+
+  // ── PRÉSENCES DIMANCHE ──
+  // Format simplifié : { nom, email, date }
+  presences.filter(p => p.jour === 'dimanche').forEach(p => {
+    out.dimanche.push({
+      nom: displayName(p),
+      email: p.email || '',
+      date: fmtDate(p.date_inscription)
+    });
+  });
+
+  // ── BÉNÉVOLES ──
+  benevoles.filter(b => b.statut === 'inscrit').forEach(b => {
+    out.benevoles.push({
+      creneau: b.creneau || '',
+      nom: displayName(b),
+      email: b.email || '',
+      date: fmtDate(b.date_inscription || b.timestamp || b.created_at)
+    });
+  });
+
+  // ── TABLES (inscriptions) ──
+  // On filtre les actives (inscrit/attente), on trie par (creneau, jeu, statut, id)
+  // et on calcule la position en file pour les attente.
+  const actives = inscriptions
+    .filter(i => i.statut === 'inscrit' || i.statut === 'attente')
+    .sort((a, b) => {
+      if (a.creneau !== b.creneau) return (a.creneau || '').localeCompare(b.creneau || '');
+      if (a.jeu !== b.jeu) return (a.jeu || '').localeCompare(b.jeu || '');
+      if (a.statut !== b.statut) return a.statut === 'inscrit' ? -1 : 1;
+      return (a.id || 0) - (b.id || 0);
+    });
+  const posMap = {};  // (creneau|jeu) → position courante en attente
+  actives.forEach(i => {
+    const key = (i.creneau || '') + '|' + (i.jeu || '');
+    let file = null;
+    if (i.statut === 'attente') {
+      posMap[key] = (posMap[key] || 0) + 1;
+      file = posMap[key];
+    }
+    out.tables.push({
+      creneau: i.creneau || '',
+      jeu: i.jeu || '',
+      nom: displayName(i),
+      statut: i.statut || 'inscrit',
+      file: file,
+      date: fmtDate(i.date_inscription || i.timestamp || i.created_at)
+    });
+  });
+
+  return out;
+}
+
+/**
+ * Boot principal : auth + fetch + démarrage de l'outil.
+ * Appelé au chargement de la page (en bas du script).
+ */
+async function bootApp() {
+  bootMsg('Vérification de la session…');
+
+  // 1. Email du JWT (info uniquement, le check rôle est côté serveur)
+  const email = getSessionEmail();
+  if (!email) {
+    bootMsg("Vous n'êtes pas connecté. Connectez-vous d'abord sur le site principal, puis revenez sur cette page.", { actions: true });
+    return;
+  }
+  SESSION_EMAIL = email;
+
+  // 2. Fetch des données (la RPC vérifie elle-même le rôle admin)
+  bootMsg('Chargement des données du site…');
+  const res = await fetchSiteData();
+  if (!res.ok) {
+    if (res.error === 'session_missing' || res.error === 'session_expired') {
+      bootMsg("Votre session a expiré. Reconnectez-vous sur le site principal et revenez sur cette page.", { actions: true, retry: true });
+    } else if (String(res.error).toLowerCase().includes('admin')) {
+      bootMsg("Accès refusé : cette page est réservée aux administrateurs de la convention.", { actions: true });
+    } else {
+      bootMsg("Erreur de chargement : " + res.error, { actions: true, retry: true });
+    }
+    return;
+  }
+
+  // 3. Mapping vers le format INIT et démarrage
+  INIT = mapSupabaseToInit(res.data);
+  LAST_FETCH = new Date().toLocaleTimeString('fr', { hour: '2-digit', minute: '2-digit' });
+  document.getElementById('session-email').textContent = SESSION_EMAIL;
+  document.getElementById('session-loaded').textContent = LAST_FETCH;
+  document.getElementById('session-bar').style.display = 'flex';
+
+  // 4. Lancer l'outil avec les données fraîches
+  initData();
+  updateDL();
+  ['samedi','dimanche','benevoles','tables'].forEach(render);
+  hideBootScreen();
+}
+
+/**
+ * Rechargement manuel : confirme avec l'utilisateur (perte des modifs locales)
+ * puis re-fetch et reset les données locales.
+ */
+async function reloadFromSite() {
+  if (!confirm('Recharger depuis le site ?\n\nCela va remplacer toutes vos modifications locales par la photo actuelle des inscriptions sur le site.\n\nContinuer ?')) return;
+  ['samedi','dimanche','benevoles','tables'].forEach(t => {
+    localStorage.removeItem('m26d_' + t);
+    localStorage.removeItem('m26c_' + t);  // coches aussi remises à zéro
+  });
+  document.getElementById('unsaved-banner').classList.remove('on');
+  document.getElementById('boot-screen').style.display = 'flex';
+  bootMsg('Rechargement des données…');
+  const res = await fetchSiteData();
+  if (!res.ok) {
+    bootMsg("Erreur de chargement : " + res.error, { actions: true, retry: true });
+    return;
+  }
+  INIT = mapSupabaseToInit(res.data);
+  LAST_FETCH = new Date().toLocaleTimeString('fr', { hour: '2-digit', minute: '2-digit' });
+  document.getElementById('session-loaded').textContent = LAST_FETCH;
+  idc = 0;
+  initData();
+  updateDL();
+  ['samedi','dimanche','benevoles','tables'].forEach(render);
+  hideBootScreen();
+}
+
+// Bouton "Réessayer" de l'écran de garde
+document.addEventListener('DOMContentLoaded', () => {
+  const r = document.getElementById('boot-retry');
+  if (r) r.addEventListener('click', () => { bootMsg('Vérification…'); bootApp(); });
+});
+
+
+// ── ÉTAT ──────────────────────────────────────────────
+let D={}, idc=0;
+const SS={samedi:{col:'nom',dir:'asc'},dimanche:{col:'nom',dir:'asc'},benevoles:{col:'creneau',dir:'asc'},tables:{col:'creneau',dir:'asc'}};
+let M={tab:null,id:null};
+
+// ── INIT & PERSISTANCE ────────────────────────────────
+function nid(){return ++idc}
+function dc(o){return JSON.parse(JSON.stringify(o))}
+
+function initData(){
+  let any=false;
+  ['samedi','dimanche','benevoles','tables'].forEach(t=>{
+    const raw=localStorage.getItem('m26d_'+t);
+    if(raw){try{D[t]=JSON.parse(raw);any=true}catch{D[t]=dc(INIT[t])}}
+    else D[t]=dc(INIT[t]);
+    D[t].forEach(r=>{if(!r._id)r._id=nid();else idc=Math.max(idc,r._id)});
+  });
+  document.getElementById('unsaved-banner').classList.toggle('on',any);
+}
+
+function save(t){
+  localStorage.setItem('m26d_'+t,JSON.stringify(D[t]));
+  document.getElementById('unsaved-banner').classList.add('on');
+  updateDL();
+}
+
+function resetAllData(){
+  if(!confirm('Restaurer toutes les données d\'origine ?\nToutes vos modifications seront perdues.'))return;
+  ['samedi','dimanche','benevoles','tables'].forEach(t=>localStorage.removeItem('m26d_'+t));
+  idc=0; initData();
+  ['samedi','dimanche','benevoles','tables'].forEach(render);
+}
+
+// ── COCHES ────────────────────────────────────────────
+function getChk(t){try{return JSON.parse(localStorage.getItem('m26c_'+t)||'{}')}catch{return{}}}
+function setChk(t,o){localStorage.setItem('m26c_'+t,JSON.stringify(o))}
+function resetChecked(t){if(!confirm('Remettre toutes les coches à zéro ?'))return;localStorage.removeItem('m26c_'+t);render(t)}
+
+// ── UTILS ─────────────────────────────────────────────
+function esc(v){if(v==null)return'';return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function gv(id){return(document.getElementById(id)||{}).value||''}
+function creneauVal(s){
+  if(!s)return 99999;
+  const base=s.startsWith('Dimanche')?1440:0;
+  const m=s.match(/(\d+)h(\d*)/);
+  if(!m)return base;
+  return base+parseInt(m[1])*60+parseInt(m[2]||'0');
+}
+function sortArr(arr,col,dir){
+  return[...arr].sort((a,b)=>{
+    let av=a[col]??'',bv=b[col]??'';
+    if(col==='creneau'){const d=creneauVal(String(av))-creneauVal(String(bv));return dir==='asc'?d:-d}
+    if(typeof av==='number'&&typeof bv==='number')return dir==='asc'?av-bv:bv-av;
+    av=String(av).toLowerCase();bv=String(bv).toLowerCase();
+    return dir==='asc'?av.localeCompare(bv,'fr'):bv.localeCompare(av,'fr');
+  });
+}
+function filterArr(arr,q){if(!q)return arr;q=q.toLowerCase();return arr.filter(r=>Object.values(r).some(v=>String(v??'').toLowerCase().includes(q)))}
+function updateHdr(t){
+  const tbl=document.getElementById('tbl-'+t);if(!tbl)return;
+  const{col,dir}=SS[t];
+  tbl.querySelectorAll('thead th').forEach(th=>{
+    th.classList.remove('sa','sd');
+    const oc=th.getAttribute('onclick')||'';
+    if(oc.includes(`'${col}'`))th.classList.add(dir==='asc'?'sa':'sd');
+  });
+}
+function today(){const d=new Date();return`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`}
+
+// ── DATALISTS ─────────────────────────────────────────
+function updateDL(){
+  function fill(id,vals){const dl=document.getElementById(id);if(!dl)return;dl.innerHTML=[...new Set(vals)].sort((a,b)=>a.localeCompare(b,'fr')).map(v=>`<option value="${esc(v)}">`).join('')}
+  fill('dl-ct',D.tables.map(r=>r.creneau));
+  fill('dl-jt',D.tables.map(r=>r.jeu));
+  fill('dl-cb',D.benevoles.map(r=>r.creneau));
+}
+
+// ── RENDU LIGNES ──────────────────────────────────────
+function acts(t,id,move){
+  const mv=move?`<button class="ico ico-m" title="Changer de table" onclick="openMove(${id})">⇄</button>`:'';
+  return`<td class="td-act">${mv}<button class="ico ico-e" title="Modifier" onclick="openModal('${t}',${id})">✏</button><button class="ico ico-d" title="Supprimer" onclick="delRow('${t}',${id})">✕</button></td>`;
+}
+
+function rowS(r,chk){
+  const tb=r.type==='principal'?`<span class="badge b-p">Principal</span>`:`<span class="badge b-a">Accompagnant</span>`;
+  const av=r.avec?`<span class="avec">↳ avec <strong>${esc(r.avec)}</strong></span>`:`<span class="em">—</span>`;
+  return`<td class="td-chk"><input type="checkbox" data-tab="samedi" data-id="${r._id}" ${chk?'checked':''}></td>
+    <td><strong>${esc(r.nom)}</strong></td><td>${tb}</td><td>${av}</td>
+    <td><span class="em">${esc(r.email)}</span></td><td class="em">${esc(r.date)}</td>${acts('samedi',r._id,false)}`;
+}
+function rowD(r,chk){
+  return`<td class="td-chk"><input type="checkbox" data-tab="dimanche" data-id="${r._id}" ${chk?'checked':''}></td>
+    <td><strong>${esc(r.nom)}</strong></td>
+    <td><span class="em">${esc(r.email)}</span></td><td class="em">${esc(r.date)}</td>${acts('dimanche',r._id,false)}`;
+}
+function rowB(r){
+  return`<td class="cr">${esc(r.creneau)}</td><td><strong>${esc(r.nom)}</strong></td>
+    <td><span class="em">${esc(r.email)}</span></td><td class="em">${esc(r.date)}</td>${acts('benevoles',r._id,false)}`;
+}
+function rowT(r){
+  const sb=r.statut==='inscrit'?`<span class="badge b-i">Inscrit</span>`:`<span class="badge b-w">Attente</span>`;
+  const fc=r.file?`<span class="fn">#${r.file}</span>`:`<span class="em">—</span>`;
+  return`<td class="cr">${esc(r.creneau)}</td><td class="jn">${esc(r.jeu)}</td>
+    <td>${esc(r.nom)}</td><td>${sb}</td><td>${fc}</td><td class="em">${esc(r.date)}</td>${acts('tables',r._id,true)}`;
+}
+
+// ── RENDU PRINCIPAL ───────────────────────────────────
+function render(t){
+  const q=(document.getElementById('search-'+t)||{}).value||'';
+  const{col,dir}=SS[t];
+  const filtered=filterArr(D[t],q);
+  const sorted=sortArr(filtered,col,dir);
+  const chkMap=getChk(t);
+  const tbody=document.getElementById('body-'+t);
+  const frag=document.createDocumentFragment();
+  sorted.forEach(r=>{
+    const chk=!!chkMap[r._id];
+    const tr=document.createElement('tr');
+    if(chk)tr.classList.add('chk');
+    switch(t){
+      case'samedi':tr.innerHTML=rowS(r,chk);break;
+      case'dimanche':tr.innerHTML=rowD(r,chk);break;
+      case'benevoles':tr.innerHTML=rowB(r);break;
+      case'tables':tr.innerHTML=rowT(r);break;
+    }
+    frag.appendChild(tr);
+  });
+  tbody.innerHTML='';tbody.appendChild(frag);
+  const tot=D[t].length,sh=filtered.length;
+  const el=document.getElementById('stats-'+t);
+  if(el)el.textContent=q?`${sh} résultat${sh>1?'s':''} sur ${tot}`:`${tot} entrée${tot>1?'s':''}`;
+  const cnt=document.getElementById('cnt-'+t);
+  if(cnt)cnt.textContent=tot;
+  updateHdr(t);
+}
+
+// ── CRUD ──────────────────────────────────────────────
+
+// ── AJOUT RAPIDE TABLES ──────────────────────────────
+function quickAdd(){
+  const cr  = (document.getElementById('qa-cr') ||{}).value.trim();
+  const jeu = (document.getElementById('qa-jeu')||{}).value.trim();
+  const nom = (document.getElementById('qa-nom')||{}).value.trim();
+  const st  = (document.getElementById('qa-st') ||{}).value || 'inscrit';
+  if(!cr)  { document.getElementById('qa-cr').focus();  return; }
+  if(!jeu) { document.getElementById('qa-jeu').focus(); return; }
+  if(!nom) { document.getElementById('qa-nom').focus(); return; }
+  const row = { creneau:cr, jeu, nom, statut:st, file:null, date:today(), _id:nid() };
+  D.tables.push(row);
+  save('tables');
+  render('tables');
+  // Vider seulement le nom — créneau et jeu restent pour enchaîner
+  document.getElementById('qa-nom').value = '';
+  document.getElementById('qa-nom').focus();
+}
+
+function delRow(t,id){
+  const r=D[t].find(x=>x._id===id);if(!r)return;
+  const lbl=r.nom||r.jeu||'cette entrée';
+  if(!confirm(`Supprimer "${lbl}" ?`))return;
+  D[t]=D[t].filter(x=>x._id!==id);
+  save(t);render(t);
+}
+
+// ── MODAL — OUVERTURE ─────────────────────────────────
+function openModal(t,id){
+  M={tab:t,id};
+  const r=id?D[t].find(x=>x._id===id):null;
+  const isNew=!r;
+  const titles={
+    samedi:isNew?'Ajouter — Accueil Samedi':'Modifier — Accueil Samedi',
+    dimanche:isNew?'Ajouter — Accueil Dimanche':'Modifier — Accueil Dimanche',
+    benevoles:isNew?'Ajouter — Bénévoles':'Modifier — Bénévoles',
+    tables:isNew?'Nouvelle table / joueur':'Modifier'
+  };
+  document.getElementById('mtitle').textContent=titles[t];
+  let html='';
+  if(t==='samedi')html=fPresences(r,true);
+  else if(t==='dimanche')html=fPresences(r,false);
+  else if(t==='benevoles')html=fBenev(r);
+  else html=fTable(r);
+  document.getElementById('mbody').innerHTML=html;
+  // Liaisons dynamiques
+  if(t==='samedi'){
+    const te=document.getElementById('f-type'),aw=document.getElementById('f-avec-w');
+    if(te&&aw)te.addEventListener('change',()=>aw.classList.toggle('hidden',te.value!=='accompagnant'));
+  }
+  if(t==='tables'){
+    const se=document.getElementById('f-statut'),fw=document.getElementById('f-file-w');
+    if(se&&fw)se.addEventListener('change',()=>fw.classList.toggle('hidden',se.value!=='attente'));
+  }
+  document.getElementById('mo').classList.add('on');
+}
+
+function openMove(id){
+  openModal('tables',id);
+  setTimeout(()=>{const e=document.getElementById('f-creneau');if(e){e.focus();e.select()}},80);
+}
+
+// ── FORMULAIRES ───────────────────────────────────────
+function fPresences(r,withAvec){
+  const isA=r?.type==='accompagnant';
+  return`
+    <div class="frow">
+      <div class="fg"><label>Nom / Pseudo *</label><input id="f-nom" type="text" value="${esc(r?.nom||'')}"></div>
+      <div class="fg"><label>Email</label><input id="f-email" type="email" value="${esc(r?.email||'')}"></div>
+    </div>
+    ${withAvec?`<div class="frow">
+      <div class="fg"><label>Type</label><select id="f-type"><option value="principal" ${!isA?'selected':''}>Principal</option><option value="accompagnant" ${isA?'selected':''}>Accompagnant</option></select></div>
+      <div class="fg ${isA?'':'hidden'}" id="f-avec-w"><label>Accompagnant de (pseudo)</label><input id="f-avec" type="text" value="${esc(r?.avec||'')}"></div>
+    </div>`:''}
+    <div class="fg"><label>Date d'inscription</label><input id="f-date" type="text" value="${esc(r?.date||today())}"></div>`;
+}
+
+function fBenev(r){
+  return`
+    <div class="fg"><label>Créneau *</label><input id="f-creneau" type="text" list="dl-cb" value="${esc(r?.creneau||'')}"></div>
+    <div class="frow">
+      <div class="fg"><label>Nom / Pseudo *</label><input id="f-nom" type="text" value="${esc(r?.nom||'')}"></div>
+      <div class="fg"><label>Email</label><input id="f-email" type="email" value="${esc(r?.email||'')}"></div>
+    </div>
+    <div class="fg"><label>Date d'inscription</label><input id="f-date" type="text" value="${esc(r?.date||today())}"></div>`;
+}
+
+function fTable(r){
+  const isA=r?.statut==='attente';
+  return`
+    <div class="msect">
+      <h3>⇄ Table (modifiez pour changer de table)</h3>
+      <div class="frow">
+        <div class="fg"><label>Créneau *</label><input id="f-creneau" type="text" list="dl-ct" value="${esc(r?.creneau||'')}"><p class="hint">Autocomplétion disponible</p></div>
+        <div class="fg"><label>Jeu *</label><input id="f-jeu" type="text" list="dl-jt" value="${esc(r?.jeu||'')}"></div>
+      </div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Joueur / Pseudo *</label><input id="f-nom" type="text" value="${esc(r?.nom||'')}"></div>
+      <div class="fg"><label>Statut</label><select id="f-statut"><option value="inscrit" ${!isA?'selected':''}>Inscrit</option><option value="attente" ${isA?'selected':''}>Liste d'attente</option></select></div>
+    </div>
+    <div class="frow">
+      <div class="fg ${isA?'':'hidden'}" id="f-file-w"><label>Position en file</label><input id="f-file" type="number" min="1" value="${r?.file||''}"></div>
+      <div class="fg"><label>Date d'inscription</label><input id="f-date" type="text" value="${esc(r?.date||today())}"></div>
+    </div>`;
+}
+
+// ── MODAL — SAUVEGARDE ────────────────────────────────
+function saveModal(){
+  const{tab,id}=M;
+  let row;
+  if(tab==='samedi'){
+    const nom=gv('f-nom').trim();if(!nom){alert('Nom obligatoire.');return}
+    const type=gv('f-type')||'principal';
+    row={nom,email:gv('f-email').trim(),type,avec:type==='accompagnant'?gv('f-avec').trim()||null:null,date:gv('f-date').trim()};
+  }else if(tab==='dimanche'){
+    const nom=gv('f-nom').trim();if(!nom){alert('Nom obligatoire.');return}
+    row={nom,email:gv('f-email').trim(),date:gv('f-date').trim()};
+  }else if(tab==='benevoles'){
+    const nom=gv('f-nom').trim(),cr=gv('f-creneau').trim();
+    if(!nom||!cr){alert('Créneau et nom obligatoires.');return}
+    row={creneau:cr,nom,email:gv('f-email').trim(),date:gv('f-date').trim()};
+  }else{
+    const nom=gv('f-nom').trim(),cr=gv('f-creneau').trim(),jeu=gv('f-jeu').trim();
+    if(!nom||!cr||!jeu){alert('Créneau, jeu et joueur obligatoires.');return}
+    const st=gv('f-statut')||'inscrit';
+    const fv=gv('f-file');
+    row={creneau:cr,jeu,nom,statut:st,file:st==='attente'&&fv?parseInt(fv):null,date:gv('f-date').trim()};
+  }
+  if(id){
+    const idx=D[tab].findIndex(x=>x._id===id);
+    if(idx>=0){row._id=id;D[tab][idx]=row}
+  }else{
+    row._id=nid();D[tab].push(row);
+  }
+  save(tab);render(tab);closeModal();
+}
+
+// ── MODAL — FERMETURE ─────────────────────────────────
+function closeModal(){document.getElementById('mo').classList.remove('on')}
+function ovClick(e){if(e.target===document.getElementById('mo'))closeModal()}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
+
+// ── NAV & TRI ─────────────────────────────────────────
+function switchTab(t){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.getAttribute('onclick').includes(`'${t}'`)));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+t).classList.add('active');
+  render(t);
+}
+function doSort(t,col){
+  const s=SS[t];s.dir=(s.col===col&&s.dir==='asc')?'desc':'asc';s.col=col;render(t);
+}
+
+// ── DÉLÉGATION CHECKBOXES ─────────────────────────────
+document.addEventListener('change',e=>{
+  if(e.target.type!=='checkbox'||!e.target.dataset.id)return;
+  const t=e.target.dataset.tab,id=parseInt(e.target.dataset.id);
+  const m=getChk(t);
+  if(e.target.checked)m[id]=true;else delete m[id];
+  setChk(t,m);
+  e.target.closest('tr').classList.toggle('chk',e.target.checked);
+});
+
+// ── INIT ──────────────────────────────────────────────
+// L'outil démarre uniquement après auth + fetch live (bootApp).
+// L'écran de garde reste affiché tant que ce n'est pas terminé.
+bootApp();
+</script>
+</body>
+</html>

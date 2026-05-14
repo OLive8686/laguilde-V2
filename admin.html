@@ -116,12 +116,13 @@
         <div class="section-inner">
             <div class="section-header"><p class="section-label">Administration</p><h2 class="section-title">Panneau admin</h2><div class="section-sep"></div></div>
 
-            <!-- Actions admin globales (rappel J-3, export CSV) -->
+            <!-- Actions admin globales (rappel J-3, export CSV, outil convention) -->
             <div class="admin-actions">
                 <button class="btn btn-small" onclick="adminTestRappel()" title="Envoie un email de rappel uniquement à votre adresse pour vérifier le rendu">&#128231; Tester le rappel sur mon email</button>
                 <button class="btn btn-small" onclick="adminPreviewRappel()" title="Vous recevez le rappel rendu pour un autre inscrit (sans le notifier lui-même)">&#128065; Prévisualiser pour un inscrit</button>
                 <button class="btn btn-small btn-gold" onclick="adminEnvoyerRappels()" title="Envoie un email de rappel à toutes les personnes inscrites à la convention">&#128231; Envoyer les rappels J-3</button>
                 <button class="btn btn-small btn-green" onclick="adminExportCsv()" title="Télécharge 4 fichiers CSV : tables, bénévoles, repas, présences">&#128202; Exporter en CSV</button>
+                <a class="btn btn-small" href="melusine-convention-2026.html" target="_blank" rel="noopener" title="Outil autonome pour gérer les inscriptions sur place le jour J (lecture seule du site, modifications locales uniquement)" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px">&#128296; Outil convention J-J</a>
             </div>
 
             <!-- Contenu admin (chargé automatiquement si le rôle est admin) -->
