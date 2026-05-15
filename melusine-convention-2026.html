@@ -272,7 +272,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
     <div class="cols-wrap"><button class="btn btn-o" onclick="toggleColMenu('samedi',event)">📊 Colonnes</button><div class="cols-menu" id="cm-samedi"></div></div>
     <button class="btn btn-o" onclick="resetChecked('samedi')">↺ Coches</button>
     <button class="btn btn-add" onclick="openModal('samedi',null)">＋ Ajouter</button>
-    <button class="btn btn-g" onclick="window.print()">🖨 Imprimer</button>
+    <button class="btn btn-g" onclick="doPrint(this)">🖨 Imprimer</button>
   </div>
   <div class="table-wrap"><table id="tbl-samedi"><thead><tr>
     <th class="ns td-chk">✓</th>
@@ -298,7 +298,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
     <div class="cols-wrap"><button class="btn btn-o" onclick="toggleColMenu('dimanche',event)">📊 Colonnes</button><div class="cols-menu" id="cm-dimanche"></div></div>
     <button class="btn btn-o" onclick="resetChecked('dimanche')">↺ Coches</button>
     <button class="btn btn-add" onclick="openModal('dimanche',null)">＋ Ajouter</button>
-    <button class="btn btn-g" onclick="window.print()">🖨 Imprimer</button>
+    <button class="btn btn-g" onclick="doPrint(this)">🖨 Imprimer</button>
   </div>
   <div class="table-wrap"><table id="tbl-dimanche"><thead><tr>
     <th class="ns td-chk">✓</th>
@@ -316,7 +316,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
     <div class="stats" id="stats-benevoles"></div>
     <div class="cols-wrap"><button class="btn btn-o" onclick="toggleColMenu('benevoles',event)">📊 Colonnes</button><div class="cols-menu" id="cm-benevoles"></div></div>
     <button class="btn btn-add" onclick="openModal('benevoles',null)">＋ Ajouter</button>
-    <button class="btn btn-g" onclick="window.print()">🖨 Imprimer</button>
+    <button class="btn btn-g" onclick="doPrint(this)">🖨 Imprimer</button>
   </div>
   <div class="table-wrap"><table id="tbl-benevoles"><thead><tr>
     <th onclick="doSort('benevoles','creneau')">Créneau <span class="si"></span></th>
@@ -334,7 +334,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
     <div class="stats" id="stats-tables"></div>
     <button class="btn btn-o" id="btn-grouped" onclick="toggleGrouped()" title="Basculer entre liste à plat et groupement par table">📋 Vue groupée</button>
     <div class="cols-wrap"><button class="btn btn-o" onclick="toggleColMenu('tables',event)">📊 Colonnes</button><div class="cols-menu" id="cm-tables"></div></div>
-    <button class="btn btn-g" onclick="window.print()">🖨 Imprimer</button>
+    <button class="btn btn-g" onclick="doPrint(this)">🖨 Imprimer</button>
   </div>
 
   <!-- AJOUT RAPIDE -->
@@ -1047,6 +1047,33 @@ function dlBlob(filename, content) {
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+// =============================================================================
+// IMPRESSION — injecte le titre de l'onglet courant dans le header avant print
+// =============================================================================
+// Le header affiche "Outil de gestion — Jour J" en sous-titre. Pour l'impression,
+// on remplace temporairement ce texte par le nom de l'onglet (Accueil Samedi,
+// Accueil Dimanche, Bénévoles, Tables) pour que la page imprimée soit claire.
+window.doPrint = function(btn) {
+  const labels = {
+    samedi:    'Accueil — Samedi 16 mai 2026',
+    dimanche:  'Accueil — Dimanche 17 mai 2026',
+    benevoles: 'Bénévoles',
+    tables:    'Tables de JDR'
+  };
+  // Trouver l'onglet actif à partir du bouton cliqué (qui est dans un panel)
+  const panel = btn && btn.closest('.tab-panel');
+  const tabId = panel ? panel.id.replace('panel-', '') : '';
+  const sub = document.querySelector('header .sub');
+  const orig = sub ? sub.textContent : '';
+  if (sub && labels[tabId]) sub.textContent = labels[tabId];
+  try {
+    window.print();
+  } finally {
+    // Restaurer le sous-titre original après l'impression
+    setTimeout(() => { if (sub) sub.textContent = orig; }, 100);
+  }
+};
 
 window.exportLocalCsv = function() {
   // Stamp pour les noms de fichiers
