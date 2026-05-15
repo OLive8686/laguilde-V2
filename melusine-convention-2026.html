@@ -240,6 +240,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
 <nav class="tabs-nav">
   <button class="tab-btn active" onclick="switchTab('samedi')">Accueil Samedi <span class="cnt" id="cnt-samedi">0</span></button>
   <button class="tab-btn" onclick="switchTab('dimanche')">Accueil Dimanche <span class="cnt" id="cnt-dimanche">0</span></button>
+  <button class="tab-btn" onclick="switchTab('repas')">Repas <span class="cnt" id="cnt-repas">0</span></button>
   <button class="tab-btn" onclick="switchTab('benevoles')">Bénévoles <span class="cnt" id="cnt-benevoles">0</span></button>
   <button class="tab-btn" onclick="switchTab('tables')">Tables <span class="cnt" id="cnt-tables">0</span></button>
 </nav>
@@ -307,6 +308,34 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
     <th class="col-date" onclick="doSort('dimanche','date')">Inscription <span class="si"></span></th>
     <th class="ns td-act"></th>
   </tr></thead><tbody id="body-dimanche"></tbody></table></div>
+</div>
+
+<!-- REPAS -->
+<!-- Repas du samedi soir : liste avec pointage à l'arrivée. Mêmes interactions
+     que samedi/dimanche (recherche, filtre pointage, ajouter, imprimer). -->
+<div class="tab-panel" id="panel-repas">
+  <div class="toolbar">
+    <div class="search-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" class="search-input" id="search-repas" placeholder="Nom, email…" oninput="render('repas')"></div>
+    <select class="ck-filter" id="ck-filter-repas" onchange="render('repas')" title="Filtrer par statut de pointage">
+      <option value="all">Tous</option>
+      <option value="checked">✓ Pointés</option>
+      <option value="unchecked">○ Non pointés</option>
+    </select>
+    <div class="stats" id="stats-repas"></div>
+    <div class="cols-wrap"><button class="btn btn-o" onclick="toggleColMenu('repas',event)">📊 Colonnes</button><div class="cols-menu" id="cm-repas"></div></div>
+    <button class="btn btn-o" onclick="resetChecked('repas')">↺ Coches</button>
+    <button class="btn btn-add" onclick="openModal('repas',null)">＋ Ajouter</button>
+    <button class="btn btn-g" onclick="doPrint(this)">🖨 Imprimer</button>
+  </div>
+  <div class="table-wrap"><table id="tbl-repas"><thead><tr>
+    <th class="ns td-chk">✓</th>
+    <th onclick="doSort('repas','nom')">Nom <span class="si"></span></th>
+    <th class="col-type" onclick="doSort('repas','type')">Type <span class="si"></span></th>
+    <th class="col-avec" onclick="doSort('repas','avec')">Avec <span class="si"></span></th>
+    <th class="col-email" onclick="doSort('repas','email')">Email <span class="si"></span></th>
+    <th class="col-date" onclick="doSort('repas','date')">Inscription <span class="si"></span></th>
+    <th class="ns td-act"></th>
+  </tr></thead><tbody id="body-repas"></tbody></table></div>
 </div>
 
 <!-- BENEVOLES -->
@@ -399,7 +428,7 @@ const SUPABASE_ANON_KEY = 'sb_publishable_YGImet9fG8OKLDf_H0GNyQ_SmY5Mo56';
 
 // Stockage des données à l'état "fetché du site" (avant modifs locales)
 // pour pouvoir reset rapidement sur cette photo si besoin.
-let INIT = { samedi:[], dimanche:[], benevoles:[], tables:[] };
+let INIT = { samedi:[], dimanche:[], benevoles:[], tables:[], repas:[] };
 
 // Email de la session courante (rempli après auth)
 let SESSION_EMAIL = '';
@@ -512,10 +541,11 @@ function fmtDate(d) {
  *     calculée par groupe (creneau, jeu).
  */
 function mapSupabaseToInit(data) {
-  const out = { samedi: [], dimanche: [], benevoles: [], tables: [] };
+  const out = { samedi: [], dimanche: [], benevoles: [], tables: [], repas: [] };
   const presences = data.presences || [];
   const benevoles = data.benevoles || [];
   const inscriptions = data.inscriptions || [];
+  const repas = data.repas || [];
 
   // ── Helper : nom affiché selon principal/accompagnant ──
   function displayName(row) {
@@ -566,6 +596,19 @@ function mapSupabaseToInit(data) {
       nom: displayName(b),
       email: b.email || '',
       date: fmtDate(b.date_inscription || b.timestamp || b.created_at)
+    });
+  });
+
+  // ── REPAS (du samedi soir) ──
+  // Format : { nom, email, type, avec, date }. Mêmes règles que samedi/dimanche
+  // pour le nom affiché des accompagnants (via displayName) et le "avec" (via parentNames).
+  repas.filter(r => r.statut === 'inscrit').forEach(r => {
+    out.repas.push({
+      nom: displayName(r),
+      email: r.email || '',
+      type: r.type_inscrit || 'principal',
+      avec: (r.type_inscrit === 'accompagnant') ? (parentNames[r.email] || null) : null,
+      date: fmtDate(r.date_inscription || r.timestamp || r.created_at)
     });
   });
 
@@ -662,7 +705,7 @@ async function bootApp() {
   // Restaurer l'état du bouton "Vue groupée" selon la pref localStorage
   const btnGrp = document.getElementById('btn-grouped');
   if (btnGrp) btnGrp.classList.toggle('active', isGroupedView());
-  ['samedi','dimanche','benevoles','tables'].forEach(render);
+  ['samedi','dimanche','repas','benevoles','tables'].forEach(render);
   hideBootScreen();
 }
 
@@ -672,7 +715,7 @@ async function bootApp() {
  */
 async function reloadFromSite() {
   if (!confirm('Recharger depuis le site ?\n\nCela va remplacer toutes vos modifications locales par la photo actuelle des inscriptions sur le site.\n\nContinuer ?')) return;
-  ['samedi','dimanche','benevoles','tables'].forEach(t => {
+  ['samedi','dimanche','repas','benevoles','tables'].forEach(t => {
     localStorage.removeItem('m26d_' + t);
     localStorage.removeItem('m26c_' + t);  // coches aussi remises à zéro
   });
@@ -690,7 +733,7 @@ async function reloadFromSite() {
   idc = 0;
   initData();
   updateDL();
-  ['samedi','dimanche','benevoles','tables'].forEach(render);
+  ['samedi','dimanche','repas','benevoles','tables'].forEach(render);
   hideBootScreen();
 }
 
@@ -732,6 +775,7 @@ function openRecap(nom, email) {
 
   const samedi    = D.samedi.filter(matchEmailNom);
   const dimanche  = D.dimanche.filter(matchEmailNom);
+  const repas     = (D.repas || []).filter(matchEmailNom);
   const benevoles = D.benevoles.filter(matchEmailNom);
   const tables    = D.tables.filter(matchNomOnly);
 
@@ -799,6 +843,22 @@ function openRecap(nom, email) {
   }
   html += '</div>';
 
+  // ── Repas du samedi soir ──
+  html += `<div class="mrs"><h3>🍽️ Repas du samedi soir (${repas.length})</h3>`;
+  if (repas.length) {
+    html += '<ul>';
+    repas.forEach(r => {
+      const tag = r.type === 'accompagnant'
+        ? ` <span class="mr-tag" style="background:var(--acc-bg);color:var(--acc-fg)">acc. de ${esc(r.avec||'')}</span>`
+        : '';
+      html += `<li><span class="mri">Inscrit·e${tag}</span></li>`;
+    });
+    html += '</ul>';
+  } else {
+    html += '<div class="mr-empty">Pas inscrit·e au repas.</div>';
+  }
+  html += '</div>';
+
   document.getElementById('mrbody').innerHTML = html;
   document.getElementById('mr').classList.add('on');
 }
@@ -820,6 +880,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeRecap()
 const COLS = {
   samedi:    [{key:'type',label:'Type'},{key:'avec',label:'Avec'},{key:'email',label:'Email'},{key:'date',label:'Date'}],
   dimanche:  [{key:'email',label:'Email'},{key:'date',label:'Date'}],
+  repas:     [{key:'type',label:'Type'},{key:'avec',label:'Avec'},{key:'email',label:'Email'},{key:'date',label:'Date'}],
   benevoles: [{key:'email',label:'Email'},{key:'date',label:'Date'}],
   tables:    [{key:'statut',label:'Statut'},{key:'file',label:'File'},{key:'date',label:'Date'}]
 };
@@ -1058,6 +1119,7 @@ window.doPrint = function(btn) {
   const labels = {
     samedi:    'Accueil — Samedi 16 mai 2026',
     dimanche:  'Accueil — Dimanche 17 mai 2026',
+    repas:     'Repas du samedi soir',
     benevoles: 'Bénévoles',
     tables:    'Tables de JDR'
   };
@@ -1114,7 +1176,24 @@ window.exportLocalCsv = function() {
     ));
   }, 250);
 
-  // ── 3. Bénévoles ──
+  // ── 3. Repas (avec coche de pointage) ──
+  setTimeout(() => {
+    const ckR = getChk('repas');
+    const rowsR = (D.repas || []).map(r => [
+      ckR[r._id] ? 'OUI' : '',
+      r.nom || '',
+      r.type || 'principal',
+      r.avec || '',
+      r.email || '',
+      r.date || ''
+    ]);
+    dlBlob('jour-J-repas-' + stamp + '.csv', buildLocalCsv(
+      ['Pointé', 'Nom', 'Type', 'Avec', 'Email', 'Date inscription'],
+      rowsR
+    ));
+  }, 500);
+
+  // ── 4. Bénévoles ──
   setTimeout(() => {
     const rowsB = D.benevoles.map(r => [
       r.creneau || '',
@@ -1126,9 +1205,9 @@ window.exportLocalCsv = function() {
       ['Creneau', 'Nom', 'Email', 'Date inscription'],
       rowsB
     ));
-  }, 500);
+  }, 750);
 
-  // ── 4. Tables (MJ + inscrits + attente) ──
+  // ── 5. Tables (MJ + inscrits + attente) ──
   setTimeout(() => {
     // Tri par créneau chronologique puis jeu, MJ d'abord, puis inscrits, puis attente
     const sorted = [...D.tables].sort((a, b) => {
@@ -1151,13 +1230,13 @@ window.exportLocalCsv = function() {
       ['Creneau', 'Jeu', 'Joueur', 'Statut', 'Position attente', 'Date inscription'],
       rowsT
     ));
-  }, 750);
+  }, 1000);
 };
 
 
 // ── ÉTAT ──────────────────────────────────────────────
 let D={}, idc=0;
-const SS={samedi:{col:'nom',dir:'asc'},dimanche:{col:'nom',dir:'asc'},benevoles:{col:'creneau',dir:'asc'},tables:{col:'creneau',dir:'asc'}};
+const SS={samedi:{col:'nom',dir:'asc'},dimanche:{col:'nom',dir:'asc'},benevoles:{col:'creneau',dir:'asc'},tables:{col:'creneau',dir:'asc'},repas:{col:'nom',dir:'asc'}};
 let M={tab:null,id:null};
 
 // ── INIT & PERSISTANCE ────────────────────────────────
@@ -1166,7 +1245,7 @@ function dc(o){return JSON.parse(JSON.stringify(o))}
 
 function initData(){
   let any=false;
-  ['samedi','dimanche','benevoles','tables'].forEach(t=>{
+  ['samedi','dimanche','repas','benevoles','tables'].forEach(t=>{
     const raw=localStorage.getItem('m26d_'+t);
     if(raw){try{D[t]=JSON.parse(raw);any=true}catch{D[t]=dc(INIT[t])}}
     else D[t]=dc(INIT[t]);
@@ -1183,9 +1262,9 @@ function save(t){
 
 function resetAllData(){
   if(!confirm('Restaurer toutes les données d\'origine ?\nToutes vos modifications seront perdues.'))return;
-  ['samedi','dimanche','benevoles','tables'].forEach(t=>localStorage.removeItem('m26d_'+t));
+  ['samedi','dimanche','repas','benevoles','tables'].forEach(t=>localStorage.removeItem('m26d_'+t));
   idc=0; initData();
-  ['samedi','dimanche','benevoles','tables'].forEach(render);
+  ['samedi','dimanche','repas','benevoles','tables'].forEach(render);
 }
 
 // ── COCHES ────────────────────────────────────────────
@@ -1262,6 +1341,17 @@ function rowD(r,chk){
     <td class="col-email"><span class="em">${esc(r.email)}</span></td>
     <td class="col-date em">${esc(r.date)}</td>${acts('dimanche',r._id,false)}`;
 }
+// Rendu d'une ligne Repas — même structure que samedi (avec Type/Avec)
+function rowR(r,chk){
+  const tb=r.type==='principal'?`<span class="badge b-p">Principal</span>`:`<span class="badge b-a">Accompagnant</span>`;
+  const av=r.avec?`<span class="avec">↳ avec <strong>${esc(r.avec)}</strong></span>`:`<span class="em">—</span>`;
+  return`<td class="td-chk"><input type="checkbox" data-tab="repas" data-id="${r._id}" ${chk?'checked':''}></td>
+    <td><strong>${nameLink(r.nom, r.email)}</strong></td>
+    <td class="col-type">${tb}</td>
+    <td class="col-avec">${av}</td>
+    <td class="col-email"><span class="em">${esc(r.email)}</span></td>
+    <td class="col-date em">${esc(r.date)}</td>${acts('repas',r._id,false)}`;
+}
 function rowB(r){
   return`<td class="cr">${esc(r.creneau)}</td>
     <td><strong>${nameLink(r.nom, r.email)}</strong></td>
@@ -1324,6 +1414,7 @@ function render(t){
       switch(t){
         case'samedi':tr.innerHTML=rowS(r,chk);break;
         case'dimanche':tr.innerHTML=rowD(r,chk);break;
+        case'repas':tr.innerHTML=rowR(r,chk);break;
         case'benevoles':tr.innerHTML=rowB(r);break;
         case'tables':tr.innerHTML=rowT(r);break;
       }
@@ -1339,8 +1430,8 @@ function render(t){
     let txt = q || ckFilter !== 'all'
       ? `${sh} résultat${sh>1?'s':''} sur ${tot}`
       : `${tot} entrée${tot>1?'s':''}`;
-    // Compteur pointés pour samedi/dimanche
-    if (t === 'samedi' || t === 'dimanche') {
+    // Compteur pointés pour samedi/dimanche/repas
+    if (t === 'samedi' || t === 'dimanche' || t === 'repas') {
       const nbCk = D[t].filter(r => !!chkMap[r._id]).length;
       const pct = tot > 0 ? Math.round((nbCk / tot) * 100) : 0;
       txt += ` <span class="stats-ck">·</span> <span class="stats-pct">${nbCk} / ${tot} pointés (${pct}%)</span>`;
@@ -1389,6 +1480,7 @@ function openModal(t,id){
   const titles={
     samedi:isNew?'Ajouter — Accueil Samedi':'Modifier — Accueil Samedi',
     dimanche:isNew?'Ajouter — Accueil Dimanche':'Modifier — Accueil Dimanche',
+    repas:isNew?'Ajouter — Repas':'Modifier — Repas',
     benevoles:isNew?'Ajouter — Bénévoles':'Modifier — Bénévoles',
     tables:isNew?'Nouvelle table / joueur':'Modifier'
   };
@@ -1396,11 +1488,12 @@ function openModal(t,id){
   let html='';
   if(t==='samedi')html=fPresences(r,true);
   else if(t==='dimanche')html=fPresences(r,false);
+  else if(t==='repas')html=fPresences(r,true);  // même formulaire que samedi (avec Type/Avec)
   else if(t==='benevoles')html=fBenev(r);
   else html=fTable(r);
   document.getElementById('mbody').innerHTML=html;
   // Liaisons dynamiques
-  if(t==='samedi'){
+  if(t==='samedi'||t==='repas'){
     const te=document.getElementById('f-type'),aw=document.getElementById('f-avec-w');
     if(te&&aw)te.addEventListener('change',()=>aw.classList.toggle('hidden',te.value!=='accompagnant'));
   }
@@ -1465,7 +1558,7 @@ function fTable(r){
 function saveModal(){
   const{tab,id}=M;
   let row;
-  if(tab==='samedi'){
+  if(tab==='samedi'||tab==='repas'){
     const nom=gv('f-nom').trim();if(!nom){alert('Nom obligatoire.');return}
     const type=gv('f-type')||'principal';
     row={nom,email:gv('f-email').trim(),type,avec:type==='accompagnant'?gv('f-avec').trim()||null:null,date:gv('f-date').trim()};
