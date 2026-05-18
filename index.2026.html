@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sous l'Œil de Mélusine — Convention JDR Poitiers</title>
+    <meta name="description" content="Convention de jeu de rôle à Poitiers — 16 & 17 mai 2026. Entrée gratuite.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400&family=Lora:wght@400;600&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400&family=Lora:wght@400;600&display=swap"></noscript>
+    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="apple-touch-icon" href="logo.png">
+    <script>document.addEventListener('DOMContentLoaded',function(){var u=localStorage.getItem('melusine_user');var il=document.getElementById('navInscriptionsLink');if(il)il.style.display=u&&u!=='null'?'':'none';});</script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="toast-container" id="toasts"></div>
+
+<!-- AUTH MODAL -->
+<div class="modal-overlay" id="authModal">
+    <div class="modal">
+        <button class="modal-close" onclick="closeAuthModal()">✕</button>
+        <h3>Se connecter</h3>
+        <p class="modal-game" id="modalGame"></p>
+        <p id="modalSubtext">Connectez-vous pour accéder aux inscriptions</p>
+        <div id="authOptions" class="auth-options">
+            <button class="auth-btn" onclick="loginGoogle()"><span class="auth-btn-icon">🔑</span><div><div class="auth-btn-text">Continuer avec Google</div><div class="auth-btn-sub">Connexion rapide</div></div></button>
+            <button class="auth-btn" onclick="loginDiscord()"><span class="auth-btn-icon">🎮</span><div><div class="auth-btn-text">Continuer avec Discord</div><div class="auth-btn-sub">Compte Discord</div></div></button>
+            <div class="auth-divider">ou</div>
+            <button class="auth-btn" onclick="showEmailForm()"><span class="auth-btn-icon">✉️</span><div><div class="auth-btn-text">Pseudo & email</div><div class="auth-btn-sub">Sans compte</div></div></button>
+        </div>
+        <div id="emailForm" class="auth-form">
+            <label>Email</label>
+            <input type="email" id="inputEmail" placeholder="votre@email.com">
+            <label>Mot de passe</label>
+            <input type="password" id="inputPassword" placeholder="Votre mot de passe" onkeydown="if(event.key==='Enter')loginEmail()">
+            <button class="btn btn-primary" style="width:100%" onclick="loginEmail()">Se connecter</button>
+            <p style="margin-top:10px;font-size:13px;color:var(--accent);cursor:pointer;text-align:center" onclick="showForgotForm()">Mot de passe oublié ?</p>
+            <p style="margin-top:8px;font-size:14px;color:var(--text-muted);text-align:center">Pas encore de compte ? <span style="color:var(--accent);cursor:pointer" onclick="showRegisterForm()">Créer un compte</span></p>
+            <p style="margin-top:8px;font-size:14px;color:var(--text-muted);cursor:pointer;text-align:center" onclick="showAuthOptions()">← Retour</p>
+        </div>
+        <div id="registerForm" class="auth-form">
+            <label>Pseudo / Nom</label>
+            <input type="text" id="inputRegNom" placeholder="Votre pseudo ou prénom">
+            <label>Email</label>
+            <input type="email" id="inputRegEmail" placeholder="votre@email.com">
+            <label>Mot de passe (6 caractères min.)</label>
+            <input type="password" id="inputRegPassword" placeholder="Choisissez un mot de passe">
+            <label>Confirmer le mot de passe</label>
+            <input type="password" id="inputRegConfirm" placeholder="Retapez le mot de passe" onkeydown="if(event.key==='Enter')registerEmail()">
+            <button class="btn btn-primary" style="width:100%" onclick="registerEmail()">Créer mon compte</button>
+            <p style="margin-top:8px;font-size:14px;color:var(--text-muted);text-align:center">Déjà un compte ? <span style="color:var(--accent);cursor:pointer" onclick="showEmailForm()">Se connecter</span></p>
+            <p style="margin-top:8px;font-size:14px;color:var(--text-muted);cursor:pointer;text-align:center" onclick="showAuthOptions()">← Retour</p>
+        </div>
+        <div id="forgotForm" class="auth-form">
+            <p style="font-size:15px;color:var(--text-light);text-align:center;margin-bottom:16px">Entrez votre email pour recevoir un lien de réinitialisation :</p>
+            <label>Email</label>
+            <input type="email" id="inputForgotEmail" placeholder="votre@email.com" onkeydown="if(event.key==='Enter')sendForgotPassword()">
+            <button class="btn btn-primary" style="width:100%" onclick="sendForgotPassword()">Envoyer le lien</button>
+            <p style="margin-top:12px;font-size:14px;color:var(--text-muted);cursor:pointer;text-align:center" onclick="showEmailForm()">← Retour à la connexion</p>
+        </div>
+        <div id="resetForm" class="auth-form">
+            <p style="font-size:15px;color:var(--text-light);text-align:center;margin-bottom:16px">Choisissez votre nouveau mot de passe :</p>
+            <label>Nouveau mot de passe (6 caractères min.)</label>
+            <input type="password" id="inputResetPassword" placeholder="Nouveau mot de passe">
+            <label>Confirmer</label>
+            <input type="password" id="inputResetConfirm" placeholder="Retapez le mot de passe" onkeydown="if(event.key==='Enter')submitResetPassword()">
+            <button class="btn btn-primary" style="width:100%" onclick="submitResetPassword()">Réinitialiser</button>
+        </div>
+        <div id="pseudoForm" class="auth-form">
+            <p style="font-size:15px;color:var(--text-light);text-align:center;margin-bottom:16px" id="pseudoHint">Choisissez votre pseudo :</p>
+            <label>Pseudo affiché</label>
+            <input type="text" id="inputPseudo" placeholder="Votre pseudo pour la convention" onkeydown="if(event.key==='Enter')confirmPseudo()">
+            <p style="font-size:13px;color:var(--text-muted);margin:-10px 0 16px;text-align:center">C'est ce nom qui apparaîtra sur les listes d'inscription</p>
+            <button class="btn btn-primary" style="width:100%" onclick="confirmPseudo()">Confirmer et continuer</button>
+        </div>
+    </div>
+</div>
+
+<!-- NAV -->
+<nav class="nav" id="nav">
+    <div class="nav-inner">
+        <a href="index.html" class="nav-brand"><img src="logo.png" alt="Logo" onerror="this.style.display='none'"><span>Mélusine</span></a>
+        <button class="nav-toggle" id="navToggle" aria-label="Menu"><span></span><span></span><span></span></button>
+        <ul class="nav-links" id="navLinks">
+            <li><a href="index.html" class="active">Accueil</a></li>
+            <li><a href="programme.html">Programme</a></li>
+            <li><a href="infos.html">Infos</a></li>
+            <li><a href="benevoles.html">Bénévoles</a></li>
+            <li id="navInscriptionsLink" style="display:none"><a href="mes-inscriptions.html">Mes inscriptions</a></li>
+            <li id="navUserArea"><button class="nav-user-btn" onclick="openAuthModal()">Se connecter</button></li>
+        </ul>
+    </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero" id="accueil">
+    <div class="hero-bg"></div><div class="hero-bg-image" id="heroBgImage"></div><div class="hero-bg-overlay"></div>
+    <div class="hero-decor hero-decor-1"></div><div class="hero-decor hero-decor-2"></div>
+    <div class="hero-diamond hero-diamond-1"></div><div class="hero-diamond hero-diamond-2"></div><div class="hero-diamond hero-diamond-3"></div>
+    <div class="hero-content">
+        <p class="hero-subtitle" id="heroSubtitle">Convention de Jeu de Rôle</p>
+        <h1 class="hero-title">Sous l'Œil de<span class="accent">Mélusine</span></h1>
+        <div class="hero-separator"></div>
+        <p class="hero-date" id="heroDate">16 & 17 mai 2026 — Poitiers</p>
+        <p class="hero-info" id="heroInfo">Salle Gérard Gaschet · Du samedi 10h au dimanche 16h · Entrée gratuite</p>
+        <div class="hero-buttons"><a href="programme.html" class="btn btn-primary">S'inscrire aux tables</a><a href="infos.html" class="btn btn-outline">Infos pratiques</a></div>
+    </div>
+</section>
+
+<!-- NAV CARDS -->
+<section class="section section-dark">
+    <div class="section-inner"><div class="cards-grid">
+        <div class="card animate-on-scroll" style="--card-accent:var(--teal)"><span class="card-icon">🎲</span><h3 class="card-title">Programme</h3><p class="card-text">Des créneaux de jeux tout le week-end. Inscrivez-vous en ligne !</p><a href="programme.html" class="card-btn">Voir les créneaux</a></div>
+        <div class="card animate-on-scroll" style="--card-accent:var(--orange)"><span class="card-icon">🍽️</span><h3 class="card-title">Infos & Restauration</h3><p class="card-text">Lieu, horaires, buvette et repas chaud le samedi soir.</p><a href="infos.html" class="card-btn" style="border-color:var(--orange);color:var(--orange)">En savoir plus</a></div>
+        <div class="card animate-on-scroll" style="--card-accent:var(--green)"><span class="card-icon">🤝</span><h3 class="card-title">Bénévoles</h3><p class="card-text">Aidez-nous à organiser la convention ! Inscrivez-vous sur un créneau.</p><a href="benevoles.html" class="card-btn" style="border-color:var(--green);color:var(--green)">Devenir bénévole</a></div>
+    </div></div>
+</section>
+
+<!-- COMPTEUR GLOBAL (rempli dynamiquement) -->
+<div id="globalStats" style="display:none;text-align:center;padding:24px;background:var(--dark-card);border-bottom:1px solid rgba(46,139,139,0.08)">
+    <div style="display:flex;justify-content:center;gap:40px;flex-wrap:wrap;max-width:600px;margin:0 auto">
+        <div><span id="statInscrits" style="font-family:var(--font-heading);font-size:28px;color:var(--gold)">-</span><div style="font-size:13px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px">Inscrits</div></div>
+        <div><span id="statTables" style="font-family:var(--font-heading);font-size:28px;color:var(--teal)">-</span><div style="font-size:13px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px">Tables</div></div>
+        <div><span id="statBenevoles" style="font-family:var(--font-heading);font-size:28px;color:var(--green)">-</span><div style="font-size:13px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px">Bénévoles</div></div>
+    </div>
+</div>
+
+<!-- INFOS RAPIDES -->
+<section class="section section-light" id="infos-rapides">
+    <div class="section-inner">
+        <div class="section-header animate-on-scroll"><p class="section-label">En bref</p><h2 class="section-title">Informations pratiques</h2><div class="section-sep"></div></div>
+        <div class="info-cards">
+            <div class="info-card animate-on-scroll"><div class="info-card-icon">📍</div><div class="info-card-label">Lieu</div><div class="info-card-value" id="infoLieu">Salle Gérard Gaschet<br>138 rue de la Grange Saint-Pierre</div></div>
+            <div class="info-card animate-on-scroll"><div class="info-card-icon">📅</div><div class="info-card-label">Dates</div><div class="info-card-value" id="infoDates">Sam. 16 mai 10h →<br>Dim. 17 mai 16h</div></div>
+            <div class="info-card animate-on-scroll"><div class="info-card-icon">🎟️</div><div class="info-card-label">Tarif</div><div class="info-card-value" id="infoTarif">Entrée gratuite<br>Ouverte à tous</div></div>
+        </div>
+    </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer"><div class="footer-inner"><div><div class="footer-brand">Sous l'Œil de Mélusine</div><div class="footer-sub">Organisé par La Guilde · Foyer du Porteau · Poitiers</div></div><div class="footer-right">16 & 17 mai 2026</div></div></footer>
+<button class="scroll-top" id="scrollTop" aria-label="Retour en haut">↑</button>
+
+<script src="app.supabase.js?v=3"></script>
+<script>
+// =============================================================================
+// PAGE D'ACCUEIL — Affiche le hero, les cartes de navigation et les infos rapides
+// =============================================================================
+(function() {
+'use strict';
+
+window.onUserLogin = function() {};
+window.onUserLogout = function() {};
+
+window.onPageInit = async function() {
+    // Utiliser l'endpoint groupé (partagé avec les autres pages via le cache)
+    var allData = await fetchAllPublic();
+    var config = allData ? allData.config : await fetchConfig();
+    if (config) renderConfig(config);
+
+    // Compteur global : inscrits + tables + bénévoles
+    // Utilise les données déjà présentes dans allData (0 appel API supplémentaire)
+    if (allData) {
+        var nbInscrits = (allData.inscriptions_publiques || []).filter(function(i) { return i.statut === 'inscrit'; }).length;
+        var nbTables = (allData.programme || []).length;
+        var nbBenevoles = 0;
+        (allData.creneaux_benevoles || []).forEach(function(c) { nbBenevoles += parseInt(c.inscrits) || 0; });
+
+        if (nbInscrits > 0 || nbTables > 0 || nbBenevoles > 0) {
+            document.getElementById('globalStats').style.display = 'block';
+            // Animation compteur : incrémente de 0 à N en ~800ms
+            animateCounter('statInscrits', nbInscrits);
+            animateCounter('statTables', nbTables);
+            animateCounter('statBenevoles', nbBenevoles);
+        }
+    }
+};
+
+/**
+ * Anime un compteur de 0 à la valeur cible en ~800ms.
+ * Utilise requestAnimationFrame pour une animation fluide.
+ */
+function animateCounter(elementId, target) {
+    var el = document.getElementById(elementId);
+    if (!el || target <= 0) { el.textContent = target; return; }
+    var start = 0;
+    var duration = 800;
+    var startTime = null;
+    function step(timestamp) {
+        if (!startTime) startTime = timestamp;
+        var progress = Math.min((timestamp - startTime) / duration, 1);
+        // Ease-out pour ralentir vers la fin
+        var eased = 1 - Math.pow(1 - progress, 3);
+        el.textContent = Math.round(eased * target);
+        if (progress < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+}
+
+/**
+ * Applique la config Sheet aux éléments de la page d'accueil.
+ * Seuls les champs pertinents à cette page sont traités.
+ */
+function renderConfig(c) {
+    if (!c) return;
+    if (c.sous_titre) document.getElementById('heroSubtitle').textContent = c.sous_titre;
+    if (c.dates) document.getElementById('heroDate').textContent = c.dates;
+    if (c.lieu_complet) document.getElementById('heroInfo').textContent = c.lieu_complet;
+
+    if (c.lieu_nom) {
+        var mapsUrl = c.lieu_maps && c.lieu_maps.match(/^https?:\/\//)
+            ? c.lieu_maps
+            : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent((c.lieu_nom||'') + ' ' + (c.lieu_adresse||''));
+        document.getElementById('infoLieu').innerHTML = escHtml(c.lieu_nom) + '<br>' + escHtml(c.lieu_adresse||'') + '<br><a href="' + escHtml(mapsUrl) + '" target="_blank" rel="noopener" style="color:var(--teal);font-size:14px;text-decoration:underline">📍 Voir sur Google Maps</a>';
+    }
+    if (c.dates_detail) document.getElementById('infoDates').innerHTML = escHtml(c.dates_detail).replace(/\n/g,'<br>');
+    if (c.tarif) document.getElementById('infoTarif').innerHTML = escHtml(c.tarif).replace(/\n/g,'<br>');
+    if (c.image_hero && c.image_hero.match(/^https?:\/\//)) {
+        document.getElementById('heroBgImage').style.backgroundImage = 'url(' + c.image_hero + ')';
+    }
+}
+
+})();
+</script>
+</body>
+</html>
