@@ -412,11 +412,32 @@ COMMENT ON TRIGGER trg_email_table_statut ON programme IS
 -- ATTENTION : cette fonction nécessite de lire les données de l'utilisateur.
 -- Elle utilise SECURITY DEFINER pour accéder aux tables avec les droits du créateur
 -- (bypasse les RLS). C'est nécessaire car le récap agrège plusieurs tables.
+--
+-- SÉCURITÉ (migration 003) :
+--   - l'e-mail du JWT est la seule référence d'identité : on ne peut demander
+--     le récap que pour SOI-MÊME (user_email doit lui être identique après
+--     lower(trim())) ; sans e-mail dans la session (SSO sans e-mail) : refus ;
+--   - limite d'envoi en base : 1 récap par e-mail toutes les 2 minutes
+--     (table recap_email_log) ;
+--   - EXECUTE réservé aux utilisateurs connectés.
+
+-- ── Dernier envoi de récap par e-mail (sert au rate-limit) ──
+-- Une ligne par adresse. Inaccessible depuis l'API : RLS activée sans aucune
+-- policy + droits de table retirés à anon/authenticated. Seule la fonction
+-- SECURITY DEFINER ci-dessous l'écrit. Petite table : à vider avec les données
+-- d'une édition (voir README, maintenance).
+CREATE TABLE IF NOT EXISTS recap_email_log (
+  email        TEXT PRIMARY KEY,                 -- adresse normalisée (lower/trim)
+  last_sent_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE recap_email_log ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE recap_email_log FROM PUBLIC, anon, authenticated;
 
 CREATE OR REPLACE FUNCTION send_recap_email(user_email TEXT)
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   -- Données collectées pour le récap
@@ -424,21 +445,26 @@ DECLARE
   benevoles_data    JSONB;
   tables_mj_data    JSONB;
   clean_email       TEXT;
+  v_caller_email    TEXT;
+  v_slot_email      TEXT;
 BEGIN
-  -- Nettoyer l'email
-  clean_email := lower(trim(user_email));
-
-  -- Valider l'email
-  IF clean_email IS NULL OR clean_email = '' OR position('@' IN clean_email) = 0 THEN
-    RETURN jsonb_build_object('error', 'Email invalide');
+  -- ── Identité : l'e-mail du JWT est la référence, jamais le paramètre ──
+  v_caller_email := lower(trim(coalesce(auth.jwt() ->> 'email', '')));
+  IF v_caller_email = '' THEN
+    -- Appel anonyme, ou compte SSO sans e-mail : on refuse.
+    RETURN jsonb_build_object('error', 'Aucune adresse e-mail associée à votre session : action impossible');
   END IF;
 
-  -- Protection anti-abus : maximum 1 récap par email toutes les 2 minutes.
-  -- On vérifie dans pg_net les requêtes récentes pour cet email.
-  -- Approche simple : on utilise un advisory lock basé sur le hash de l'email.
-  -- Si le lock n'est pas immédiatement disponible, quelqu'un envoie déjà un récap.
-  IF NOT pg_try_advisory_xact_lock(hashtext(clean_email)) THEN
-    RETURN jsonb_build_object('error', 'Un récap est déjà en cours d''envoi. Réessayez dans quelques instants.');
+  clean_email := lower(trim(coalesce(user_email, '')));
+
+  -- On ne peut demander le récap que pour son propre compte.
+  -- Message générique : on ne révèle rien sur l'adresse visée.
+  IF clean_email <> v_caller_email THEN
+    RETURN jsonb_build_object('error', 'Accès refusé : vous ne pouvez demander le récap que pour votre propre compte');
+  END IF;
+
+  IF position('@' IN clean_email) = 0 THEN
+    RETURN jsonb_build_object('error', 'Email invalide');
   END IF;
 
   -- 1. Collecter les inscriptions (joueur + accompagnants)
@@ -486,6 +512,22 @@ BEGIN
     RETURN jsonb_build_object('error', 'Aucune inscription trouvée pour cet email.');
   END IF;
 
+  -- ── Rate-limit : 1 récap par adresse toutes les 2 minutes ──
+  -- Un seul INSERT … ON CONFLICT décide, de façon atomique (pas de course entre
+  -- deux requêtes simultanées) : la ligne n'est mise à jour — et RETURNING ne
+  -- renvoie quelque chose — que si le dernier envoi date de plus de 2 minutes.
+  -- Placé APRÈS « rien à envoyer » : un essai à vide ne consomme pas le créneau.
+  INSERT INTO recap_email_log AS rl (email, last_sent_at)
+  VALUES (clean_email, now())
+  ON CONFLICT (email) DO UPDATE
+    SET last_sent_at = now()
+    WHERE rl.last_sent_at <= now() - interval '2 minutes'
+  RETURNING rl.email INTO v_slot_email;
+
+  IF v_slot_email IS NULL THEN
+    RETURN jsonb_build_object('error', 'Un récap a déjà été envoyé il y a moins de 2 minutes. Réessayez un peu plus tard.');
+  END IF;
+
   -- 4. Envoyer le récap via le Worker
   PERFORM send_email_via_worker(
     'recap',
@@ -503,7 +545,13 @@ $$;
 
 COMMENT ON FUNCTION send_recap_email(TEXT) IS
   'Envoie un email récapitulatif de toutes les inscriptions d''un utilisateur. '
-  'Appelable via supabase.rpc(''send_recap_email'', { user_email: ''...'' }).';
+  'Appelable via supabase.rpc(''send_recap_email'', { user_email: ''...'' }). '
+  'user_email doit être l''e-mail de la session (JWT) ; 1 envoi par 2 minutes et par adresse.';
+
+-- Droits d'exécution : utilisateurs connectés uniquement.
+-- « anon » est nommé explicitement : Supabase lui accorde EXECUTE à part.
+REVOKE ALL ON FUNCTION send_recap_email(TEXT) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION send_recap_email(TEXT) TO authenticated;
 
 
 -- =============================================================================

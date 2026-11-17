@@ -312,7 +312,9 @@ async function envoyerRecap() {
         if (error) throw error;
         toast('Récap envoyé ! Vérifiez votre boîte mail (' + user.email + ')', 'success');
     } catch(e) {
-        toast(e.message || 'Erreur lors de l\'envoi', 'error');
+        // La RPC renvoie ses erreurs métier dans « error » (ex. limite d'envoi
+        // atteinte) ; une erreur réseau/serveur arrive dans « message ».
+        toast(e.message || e.error || 'Erreur lors de l\'envoi', 'error');
     } finally {
         btn.disabled = false;
         btn.textContent = '📧 Recevoir par email le détail de mes inscriptions';

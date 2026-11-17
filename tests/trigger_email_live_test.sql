@@ -10,7 +10,7 @@
 --      worker-email.js, sa variable secrète WEBHOOK_SECRET, sa MAILERSEND_API_KEY.
 --   2. Dans le projet Supabase de test : secret Vault « melusine_webhook_secret »
 --      = même valeur que le WEBHOOK_SECRET du Worker de test (procédure :
---      docs/ROTATION_WEBHOOK_SECRET.md), migration 001 appliquée.
+--      docs/ROTATION_WEBHOOK_SECRET.md), migrations 001, 002 et 003 appliquées.
 --   3. get_email_worker_url() redéfinie pour pointer sur le Worker de TEST
 --      (elle est codée en dur sur le Worker de production dans email-triggers.sql) :
 --
@@ -57,17 +57,50 @@ ORDER BY created DESC
 LIMIT 5;
 
 
--- ── BLOC 3 — Déclencher « annulation » ──
--- Attendu : 1 e-mail « Inscription annulée ».
-UPDATE inscriptions
-SET statut = 'annulé'
-WHERE email = '__MON_ADRESSE_DE_TEST__' AND jeu = 'Test sécurité';
+-- ── BLOC 2b — « Récap » via la VRAIE RPC, en tant qu'utilisateur connecté ──
+-- On simule la session d'un utilisateur (rôle « authenticated » + JWT portant
+-- votre adresse) et on appelle send_recap_email exactement comme le site.
+-- Attendu : réponse {"ok": true, …} puis 1 e-mail récapitulatif dans votre boîte.
+-- Relancer ce bloc AUSSITÔT doit renvoyer l'erreur « moins de 2 minutes » (rate-limit).
+BEGIN;
+SELECT set_config('request.jwt.claims',
+  '{"role":"authenticated","email":"__MON_ADRESSE_DE_TEST__"}', true);
+SET LOCAL ROLE authenticated;
+SELECT send_recap_email('__MON_ADRESSE_DE_TEST__') AS reponse;
+COMMIT;   -- le COMMIT est indispensable : pg_net n'envoie qu'après
 
--- (attendre ~10 s puis relancer le SELECT du BLOC 2 : nouvelle ligne en 200)
+
+-- ── BLOC 3 — « Annulation » via la VRAIE RPC annuler_presence ──
+-- Même simulation de session. annuler_presence passe l'inscription du samedi à
+-- « annulé » ; le trigger d'annulation doit envoyer l'e-mail.
+-- Attendu : réponse {"ok": true, "nb_inscriptions_annulees": 1, …} puis 1 e-mail
+-- « Inscription annulée ». (Un e-mail de promotion n'est envoyé que s'il y avait
+-- quelqu'un en liste d'attente sur cette table : ici non.)
+BEGIN;
+SELECT set_config('request.jwt.claims',
+  '{"role":"authenticated","email":"__MON_ADRESSE_DE_TEST__"}', true);
+SET LOCAL ROLE authenticated;
+SELECT annuler_presence('__MON_ADRESSE_DE_TEST__', 'samedi', NULL) AS reponse;
+COMMIT;
+
+-- (attendre ~10 s puis relancer le SELECT du BLOC 2 : de nouvelles lignes en 200,
+--  une par e-mail déclenché)
+
+
+-- ── BLOC 3b — Contrôle négatif : A ne peut pas agir sur un autre compte ──
+-- Attendu : {"error": "Accès refusé : …"} et AUCUN e-mail envoyé à l'autre adresse.
+BEGIN;
+SELECT set_config('request.jwt.claims',
+  '{"role":"authenticated","email":"__MON_ADRESSE_DE_TEST__"}', true);
+SET LOCAL ROLE authenticated;
+SELECT annuler_presence('autre@example.invalid', 'samedi', NULL) AS reponse;
+SELECT send_recap_email('autre@example.invalid') AS reponse;
+COMMIT;
 
 
 -- ── BLOC 4 — Nettoyage ──
 -- Peut envoyer un dernier e-mail (trigger sur DELETE). Les triggers
 -- d'audit/présence créent aussi des lignes : on les retire.
-DELETE FROM inscriptions  WHERE email = '__MON_ADRESSE_DE_TEST__';
-DELETE FROM presences     WHERE email = '__MON_ADRESSE_DE_TEST__';
+DELETE FROM inscriptions   WHERE email = '__MON_ADRESSE_DE_TEST__';
+DELETE FROM presences      WHERE email = '__MON_ADRESSE_DE_TEST__';
+DELETE FROM recap_email_log WHERE email = lower('__MON_ADRESSE_DE_TEST__');
