@@ -17,7 +17,7 @@
 //   2. Coller ce code dans l'éditeur du Worker
 //   3. Ajouter les variables d'environnement dans Settings → Variables :
 //      - RESEND_API_KEY  : clé API Resend
-//      - WEBHOOK_SECRET  : secret partagé avec pg_net (même valeur que dans email-triggers.sql)
+//      - WEBHOOK_SECRET  : variable SECRÈTE (type « Secret »), même valeur que le secret Vault « melusine_webhook_secret » (voir docs/ROTATION_WEBHOOK_SECRET.md)
 //   4. (Optionnel) Ajouter FROM_EMAIL si vous avez un domaine vérifié sur Resend
 //   5. Dans app.js, définir EMAIL_WORKER_URL avec l'URL de ce Worker
 //
@@ -933,7 +933,7 @@ export default {
    * Variables d'environnement requises (dans Cloudflare → Settings → Variables) :
    *   - RESEND_API_KEY  : clé API Resend
    *   - FROM_EMAIL      : adresse d'expédition (optionnel, défaut: "Mélusine <onboarding@resend.dev>")
-   *   - WEBHOOK_SECRET  : secret partagé avec pg_net pour authentifier les appels
+   *   - WEBHOOK_SECRET  : variable SECRÈTE, identique au secret Vault « melusine_webhook_secret » côté Supabase
    *
    * @param {Request} request - La requête HTTP entrante
    * @param {Object}  env     - Variables d'environnement du Worker

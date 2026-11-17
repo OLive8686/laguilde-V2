@@ -38,7 +38,12 @@ Site d'inscription pour une convention de jeu de rôle à Poitiers (16-17 mai 20
 - `programme_sync.sql` : Trigger `trg_sync_inscriptions_on_programme_rename` qui propage automatiquement un renommage de table (`programme.jeu` ou `creneau`) aux inscriptions liées
 - `audit_log.sql` : Table `audit_log` + trigger générique `trg_audit` sur les tables sensibles (inscriptions, programme, benevoles, repas, presences, profiles, accompagnants) — archive automatique de toutes les modifications avec JSONB old/new + email de l'appelant
 
+### Migrations et tests de sécurité
+- `migrations/NNN_*.sql` : correctifs à exécuter une fois dans Supabase SQL Editor ; leur retour arrière est dans `migrations/rollback/`
+- `tests/` : scripts de test de sécurité (projet de TEST uniquement, jamais en production)
+
 ### Documentation
+- `docs/ROTATION_WEBHOOK_SECRET.md` : procédure de rotation du secret du webhook
 - `CLAUDE.md` : Ce fichier
 - `README.md` : Description projet
 - `MIGRATION_URL.md` : Notes sur la migration vers le domaine custom
@@ -147,7 +152,7 @@ Les joueurs peuvent ajouter jusqu'à 3 accompagnants liés à leur compte :
 - **Race conditions** : protection via contraintes uniques DB (ex: index unique sur `presences`)
 - **Admin** : rôle `admin` lu depuis `profiles` côté backend dans les RPC (`get_presences_stats`, etc.)
 - **MJ** : rôle `mj` ou `admin` vérifié côté backend
-- **Secrets** : variables d'env Cloudflare (`MAILERSEND_API_KEY`, `WEBHOOK_SECRET`), JAMAIS dans le code
+- **Secrets** : variables secrètes Cloudflare (`MAILERSEND_API_KEY`, `WEBHOOK_SECRET`) et Supabase Vault (`melusine_webhook_secret`), JAMAIS dans le code. Rotation : `docs/ROTATION_WEBHOOK_SECRET.md`
 - **htmlRedirect** : URL sanitisée
 
 ## Emails transactionnels

@@ -19,8 +19,11 @@
 --
 -- SÉCURITÉ :
 --   - pg_net envoie les requêtes depuis le réseau interne Supabase
---   - Un header X-Webhook-Secret authentifie les appels au Worker
---     (la même valeur doit être configurée en var d'env WEBHOOK_SECRET sur Cloudflare)
+--   - Un header X-Webhook-Secret authentifie les appels au Worker. Sa valeur
+--     est dans Supabase Vault (secret « melusine_webhook_secret ») et dans la
+--     variable SECRÈTE WEBHOOK_SECRET du Worker Cloudflare. Jamais dans ce fichier.
+--   - send_email_via_worker() et get_webhook_secret() ne sont appelables ni par
+--     « anon » ni par « authenticated » (REVOKE ci-dessous)
 --   - Aucune clé API n'est exposée dans les triggers (elle est dans le Worker)
 --   - Les triggers sont AFTER (l'opération DB réussit même si l'email échoue)
 --
@@ -80,7 +83,8 @@ CREATE OR REPLACE FUNCTION send_email_via_worker(
 )
 RETURNS VOID
 LANGUAGE plpgsql
-SECURITY DEFINER  -- Exécuté avec les droits du créateur (nécessaire pour pg_net)
+SECURITY DEFINER  -- Exécuté avec les droits du créateur (nécessaire pg_net + Vault)
+SET search_path = public, pg_temp  -- Empêche le détournement par un schéma/objet homonyme
 AS $$
 BEGIN
   -- Vérification basique de l'email (ne bloque pas si invalide, juste un skip)
@@ -91,12 +95,17 @@ BEGIN
 
   -- Appel asynchrone au Worker via pg_net
   -- pg_net_http_post retourne un ID de requête (bigint) qu'on ignore ici
-  -- Le header X-Webhook-Secret authentifie l'appel auprès du Worker
-  -- IMPORTANT : cette valeur doit correspondre à la variable WEBHOOK_SECRET
-  -- configurée dans Cloudflare Workers (Settings → Variables).
+  -- Le header X-Webhook-Secret authentifie l'appel auprès du Worker.
+  -- La valeur vient de Supabase Vault (secret « melusine_webhook_secret »),
+  -- JAMAIS d'un fichier versionné. Elle doit être identique à la variable
+  -- secrète WEBHOOK_SECRET du Worker Cloudflare (procédure de rotation :
+  -- docs/ROTATION_WEBHOOK_SECRET.md).
   PERFORM net.http_post(
     url     := get_email_worker_url(),
-    headers := '{"Content-Type": "application/json", "X-Webhook-Secret": "melusine-pg-webhook-2026-secret"}'::jsonb,
+    headers := jsonb_build_object(
+      'Content-Type',      'application/json',
+      'X-Webhook-Secret',  get_webhook_secret()
+    ),
     body    := jsonb_build_object(
       'type', email_type,
       'to',   recipient,
@@ -114,6 +123,55 @@ $$;
 COMMENT ON FUNCTION send_email_via_worker(TEXT, TEXT, JSONB) IS
   'Envoie un email transactionnel via le Worker Cloudflare. '
   'Appel asynchrone (fire-and-forget) : ne bloque jamais l''opération DB.';
+
+-- ── Verrouillage des droits d'exécution ──
+-- Cette fonction attache elle-même le secret du webhook : si un visiteur
+-- pouvait l'appeler (via /rest/v1/rpc/...), il ferait envoyer n'importe quel
+-- e-mail depuis le domaine du site. Seuls les triggers et RPC SECURITY DEFINER
+-- (qui s'exécutent avec les droits du propriétaire) doivent pouvoir l'appeler.
+-- « anon » et « authenticated » sont nommés explicitement : Supabase leur
+-- accorde EXECUTE à part, « FROM PUBLIC » seul ne suffirait pas.
+REVOKE ALL ON FUNCTION send_email_via_worker(TEXT, TEXT, JSONB) FROM PUBLIC, anon, authenticated;
+
+
+-- =============================================================================
+-- HELPER — Lecture du secret du webhook dans Supabase Vault
+-- =============================================================================
+
+/**
+ * Renvoie le secret partagé avec le Worker, lu dans Supabase Vault.
+ * Sortie : le secret (TEXT). Lève une exception s'il est absent, ce qui
+ * empêche d'envoyer un e-mail avec un secret vide (le Worker le refuserait).
+ * Droits : propriétaire uniquement (aucun rôle API ne peut l'appeler).
+ *
+ * À créer UNE FOIS, via le dashboard (voir docs/ROTATION_WEBHOOK_SECRET.md) :
+ * on ne passe pas par une requête SQL, car l'éditeur SQL garde un historique
+ * des requêtes et la valeur y serait lisible.
+ */
+CREATE OR REPLACE FUNCTION get_webhook_secret()
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_secret TEXT;
+BEGIN
+  SELECT decrypted_secret INTO v_secret
+  FROM vault.decrypted_secrets
+  WHERE name = 'melusine_webhook_secret'
+  LIMIT 1;
+
+  IF v_secret IS NULL OR v_secret = '' THEN
+    -- Le message ne contient jamais la valeur (elle n'est de toute façon pas là)
+    RAISE EXCEPTION 'Secret melusine_webhook_secret absent de Supabase Vault';
+  END IF;
+
+  RETURN v_secret;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION get_webhook_secret() FROM PUBLIC, anon, authenticated;
 
 
 -- =============================================================================
