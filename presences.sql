@@ -123,6 +123,7 @@ CREATE OR REPLACE FUNCTION ensure_presence(
 RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 BEGIN
     -- Skip si jour invalide (créneau non parsable)
@@ -151,6 +152,12 @@ $$;
 COMMENT ON FUNCTION ensure_presence IS
   'Crée une présence si elle n''existe pas déjà (idempotent). '
   'Appelée par les triggers d''auto-création.';
+
+-- Cette fonction n'est appelée que par les triggers (SECURITY DEFINER, donc
+-- exécutés avec les droits du propriétaire). Elle ne doit PAS être appelable
+-- via l'API : sinon n'importe qui créerait des présences au nom de n'importe
+-- quel e-mail.
+REVOKE ALL ON FUNCTION ensure_presence(TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
 
 
 -- =============================================================================
@@ -289,10 +296,13 @@ COMMENT ON TRIGGER trg_presence_from_repas ON repas IS
 -- Annule TOUTES les inscriptions (tables, repas, bénévolat) de la personne
 -- pour le jour donné, puis supprime la présence.
 --
--- SÉCURITÉ : la vérification que l'utilisateur a le droit d'annuler cette
--- présence se fait CÔTÉ FRONTEND (pattern existant du projet, qui filtre
--- toutes les requêtes par currentUser.email côté JS). Cette fonction respecte
--- ce pattern. Pour un durcissement futur, on pourrait vérifier auth.uid().
+-- SÉCURITÉ : la fonction est SECURITY DEFINER (elle contourne la RLS), donc
+-- elle doit vérifier elle-même QUI appelle. Règles (migration 002) :
+--   - l'e-mail de la session (JWT) est la seule référence d'identité ;
+--   - p_email est conservé (compatibilité avec les pages en cache) mais doit
+--     être identique à l'e-mail du JWT (comparaison lower(trim())), sinon refus ;
+--   - un compte sans e-mail (SSO qui n'en fournit pas) est refusé ;
+--   - EXECUTE réservé aux utilisateurs connectés (REVOKE anon/PUBLIC).
 --
 -- IMPORTANT : on UPDATE statut='annulé' (au lieu de DELETE) pour conserver
 -- l'historique et déclencher le trigger d'email d'annulation existant.
@@ -306,17 +316,33 @@ CREATE OR REPLACE FUNCTION annuler_presence(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp  -- Empêche le détournement par un objet homonyme
 AS $$
 DECLARE
     nb_inscriptions INT := 0;
     nb_benevoles    INT := 0;
     nb_repas        INT := 0;
     clean_email     TEXT;
+    v_caller_email  TEXT;
 BEGIN
-    clean_email := lower(trim(p_email));
+    -- ── Identité : l'e-mail du JWT est la référence, jamais le paramètre ──
+    v_caller_email := lower(trim(coalesce(auth.jwt() ->> 'email', '')));
+    IF v_caller_email = '' THEN
+        -- Appel anonyme, ou compte SSO sans e-mail : on ne peut pas savoir à
+        -- qui appartiennent les données, donc on refuse.
+        RETURN jsonb_build_object('error', 'Aucune adresse e-mail associée à votre session : action impossible');
+    END IF;
+
+    clean_email := lower(trim(coalesce(p_email, '')));
+
+    -- Le paramètre doit désigner l'utilisateur connecté (anti-IDOR).
+    -- Message volontairement générique : on ne révèle rien sur l'e-mail visé.
+    IF clean_email <> v_caller_email THEN
+        RETURN jsonb_build_object('error', 'Accès refusé : vous ne pouvez agir que sur votre propre compte');
+    END IF;
 
     -- Validations
-    IF clean_email IS NULL OR clean_email = '' OR position('@' IN clean_email) = 0 THEN
+    IF position('@' IN clean_email) = 0 THEN
         RETURN jsonb_build_object('error', 'Email invalide');
     END IF;
     IF p_jour NOT IN ('samedi', 'dimanche') THEN
@@ -389,7 +415,14 @@ $$;
 COMMENT ON FUNCTION annuler_presence(TEXT, TEXT, TEXT) IS
   'Annule la présence d''une personne pour un jour donné, et toutes ses '
   'inscriptions (tables, repas, bénévolat) associées à ce jour. '
-  'Appelable via supabase.rpc(''annuler_presence'', { p_email, p_jour, p_nom_accompagnant }).';
+  'Appelable via supabase.rpc(''annuler_presence'', { p_email, p_jour, p_nom_accompagnant }). '
+  'p_email doit être l''e-mail de la session (JWT), sinon refus.';
+
+-- Droits d'exécution : utilisateurs connectés uniquement.
+-- « anon » est nommé explicitement : Supabase lui accorde EXECUTE à part,
+-- « FROM PUBLIC » seul ne le retirerait pas.
+REVOKE ALL ON FUNCTION annuler_presence(TEXT, TEXT, TEXT) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION annuler_presence(TEXT, TEXT, TEXT) TO authenticated;
 
 
 -- =============================================================================

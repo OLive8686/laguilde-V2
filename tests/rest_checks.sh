@@ -35,5 +35,7 @@ check() {
 
 check send_email_via_worker '{"email_type":"confirmation","recipient":"verif@example.invalid","payload":{}}'
 check get_webhook_secret    '{}'
+check annuler_presence      '{"p_email":"a@example.invalid","p_jour":"samedi","p_nom_accompagnant":null}'
+check ensure_presence       '{"p_email":"a@example.invalid","p_nom":"x","p_jour":"samedi","p_type_inscrit":"principal","p_nom_accompagnant":null}'
 
 exit $fail
