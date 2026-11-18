@@ -11,7 +11,9 @@
     <link rel="icon" type="image/png" href="logo.png">
     <link rel="apple-touch-icon" href="logo.png">
     <script>document.addEventListener('DOMContentLoaded',function(){var u=localStorage.getItem('melusine_user');var il=document.getElementById('navInscriptionsLink');if(il)il.style.display=u&&u!=='null'?'':'none';});</script>
-    <link rel="stylesheet" href="styles.css">
+    <meta name="color-scheme" content="dark light">
+    <link rel="stylesheet" href="theme.css?v=1">
+    <link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
 
@@ -36,8 +38,8 @@
             <label>Mot de passe</label>
             <input type="password" id="inputPassword" placeholder="Votre mot de passe" onkeydown="if(event.key==='Enter')loginEmail()">
             <button class="btn btn-primary" style="width:100%" onclick="loginEmail()">Se connecter</button>
-            <p style="margin-top:10px;font-size:13px;color:var(--accent);cursor:pointer;text-align:center" onclick="showForgotForm()">Mot de passe oublié ?</p>
-            <p style="margin-top:8px;font-size:14px;color:var(--text-muted);text-align:center">Pas encore de compte ? <span style="color:var(--accent);cursor:pointer" onclick="showRegisterForm()">Créer un compte</span></p>
+            <p style="margin-top:10px;font-size:13px;color:var(--accent-text);cursor:pointer;text-align:center" onclick="showForgotForm()">Mot de passe oublié ?</p>
+            <p style="margin-top:8px;font-size:14px;color:var(--text-muted);text-align:center">Pas encore de compte ? <span style="color:var(--accent-text);cursor:pointer" onclick="showRegisterForm()">Créer un compte</span></p>
             <p style="margin-top:8px;font-size:14px;color:var(--text-muted);cursor:pointer;text-align:center" onclick="showAuthOptions()">← Retour</p>
         </div>
         <div id="registerForm" class="auth-form">
@@ -50,7 +52,7 @@
             <label>Confirmer le mot de passe</label>
             <input type="password" id="inputRegConfirm" placeholder="Retapez le mot de passe" onkeydown="if(event.key==='Enter')registerEmail()">
             <button class="btn btn-primary" style="width:100%" onclick="registerEmail()">Créer mon compte</button>
-            <p style="margin-top:8px;font-size:14px;color:var(--text-muted);text-align:center">Déjà un compte ? <span style="color:var(--accent);cursor:pointer" onclick="showEmailForm()">Se connecter</span></p>
+            <p style="margin-top:8px;font-size:14px;color:var(--text-muted);text-align:center">Déjà un compte ? <span style="color:var(--accent-text);cursor:pointer" onclick="showEmailForm()">Se connecter</span></p>
             <p style="margin-top:8px;font-size:14px;color:var(--text-muted);cursor:pointer;text-align:center" onclick="showAuthOptions()">← Retour</p>
         </div>
         <div id="forgotForm" class="auth-form">
@@ -104,6 +106,7 @@
                 <h2 class="section-title" id="welcomeTitle">Bienvenue à toutes et tous</h2>
                 <div class="section-sep"></div>
             </div>
+            <div class="guilde-bloc animate-on-scroll"><img class="guilde-logo guilde-logo-lg" src="Logo_guilde_final.webp" width="112" height="106" alt="Logo de La Guilde — Poitiers" loading="lazy"></div>
             <p class="welcome-text animate-on-scroll" id="welcomeText">
                 Sous l'Œil de Mélusine est organisée par <a href="https://www.laguilde-poitiers.com/" target="_blank" rel="noopener" style="color:var(--gold);font-weight:600">la Guilde — Poitiers</a>, section jeu de rôle de l'association du Foyer du Porteau. Que vous soyez joueur·euse aguerri·e ou curieux·euse de découvrir le JDR, vous êtes les bienvenu·es !
             </p>
@@ -147,7 +150,7 @@
 
             <!-- Inscription au repas du samedi soir -->
             <div id="repasSection" style="display:none;margin-top:32px;text-align:center">
-                <div style="background:var(--dark-card);border-radius:12px;padding:24px;max-width:500px;margin:0 auto;border:1px solid rgba(212,168,67,0.15)">
+                <div style="background:var(--dark-card);border-radius:12px;padding:24px;max-width:500px;margin:0 auto;border:1px solid rgb(var(--accent-rgb) / 0.15)">
                     <h4 style="font-family:var(--font-heading);color:var(--gold);font-size:16px;margin:0 0 8px">Repas du samedi soir</h4>
                     <p style="font-size:14px;color:var(--text-light);margin:0 0 12px" id="repasDesc">Repas chaud le samedi soir. Inscription recommand&eacute;e.</p>
                     <p style="font-size:13px;color:var(--text-muted);margin:0 0 12px">Paiement en ligne : <a href="https://www.helloasso.com/associations/foyer-du-porteau/evenements/repas-du-soir-convention-sous-l-oeil-de-melusine-2026" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:underline">HelloAsso</a></p>
@@ -194,7 +197,7 @@
 </section>
 
 <!-- FOOTER -->
-<footer class="footer"><div class="footer-inner"><div><div class="footer-brand">Sous l'Œil de Mélusine</div><div class="footer-sub">Organisé par <a href="https://www.laguilde-poitiers.com/" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none">La Guilde</a> · Foyer du Porteau · Poitiers</div></div><div class="footer-right">16 & 17 mai 2026</div></div></footer>
+<footer class="footer"><div class="footer-inner"><a class="footer-guilde" href="https://www.laguilde-poitiers.com/" target="_blank" rel="noopener"><img class="guilde-logo" src="Logo_guilde_final.webp" width="72" height="68" alt="La Guilde — Poitiers" loading="lazy"></a><div><div class="footer-brand">Sous l'Œil de Mélusine</div><div class="footer-sub">Organisé par <a href="https://www.laguilde-poitiers.com/" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none">La Guilde</a> · Foyer du Porteau · Poitiers</div></div><div class="footer-right">16 & 17 mai 2026</div></div></footer>
 <button class="scroll-top" id="scrollTop" aria-label="Retour en haut">↑</button>
 
 <!-- Scripts : app.js (partagé) puis code spécifique à la page Infos -->
