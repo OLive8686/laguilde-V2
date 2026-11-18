@@ -1,5 +1,7 @@
 # Migration URL — Passage au domaine officiel
 
+> **État (18/11/2026)** : la migration vers `sousloeildemelusine.fr` est faite côté Worker (le domaine figure déjà dans `ALLOWED_ORIGINS` et `SITE_URL` de `worker-email.js`). Ce fichier reste la procédure à suivre pour un futur changement de domaine ; les autres étapes (DNS, GitHub Pages, Supabase, Google/Discord) ne sont pas vérifiables depuis le dépôt.
+
 ## Prérequis
 - Accès au DNS du domaine (ex: `sousloeildemelusine.fr`)
 - ~30 minutes de travail
@@ -41,8 +43,8 @@ Chez ton registrar/hébergeur DNS, ajoute :
 
 ### 6. Cloudflare Worker email — CORS + URL site (2 min)
 - **melusine-email** → **Edit code**
-- Ajouter `'https://sousloeildemelusine.fr'` dans `ALLOWED_ORIGINS` (ligne ~50)
-- Mettre à jour `SITE_URL` (ligne ~82) : `'https://sousloeildemelusine.fr/'`
+- Ajouter `'https://sousloeildemelusine.fr'` dans la constante `ALLOWED_ORIGINS` (en haut du fichier ; cherchez son nom, les numéros de ligne changent)
+- Mettre à jour la constante `SITE_URL` (cherchez `const SITE_URL`) : `'https://sousloeildemelusine.fr/'`
 - **Deploy**
 
 ### 7. Cloudflare Worker keep-alive — Rien à changer

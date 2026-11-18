@@ -118,7 +118,7 @@ Listées par ordre chronologique d'ajout. Chaque ligne pointe vers le fichier de
 - 3 boutons dans `admin.html` : test, preview, envoyer J-3 (double confirmation)
 
 ### 2.5 Export CSV admin (`admin.html`)
-- Bouton "Exporter en CSV" → télécharge 5 fichiers en série :
+- Bouton "Exporter en CSV" → télécharge 5 fichiers en série (vérifié le 18/11/2026 : 5 appels `downloadCsv` dans `admin.html`, dont trois conditionnés à la présence de données ; l'infobulle du bouton et un ancien commentaire de code annoncent encore « 4 fichiers » : texte à corriger lors d'un prochain passage sur `admin.html`) :
   1. `melusine-programme-...` : tables validées (pour visuel programme)
   2. `melusine-tables-...` : inscriptions par table avec MJ + position en attente
   3. `melusine-benevoles-...` : créneaux bénévoles
@@ -139,6 +139,19 @@ Listées par ordre chronologique d'ajout. Chaque ligne pointe vers le fichier de
 ---
 
 ## 2.8 Outillage admin pour gestion in-event (CRITIQUE pour 2027)
+
+### État d'avancement au 18/11/2026
+
+Après la rédaction de cette section (13/05/2026), une partie a été livrée avant la fin de l'édition 2026. **Reste à faire = tout ce qui n'est pas listé ici comme fait.**
+
+| Besoin listé plus bas | État |
+|---|---|
+| Historique des modifications admin (`audit_log`) | **Fait** : `audit_log.sql` (table + triggers sur 7 tables, lecture réservée aux admins). Déploiement en base à confirmer. Reste : durée de conservation et purge (données personnelles) |
+| Voir la liste des présents par jour | **Fait** dans l'outil du jour J (`melusine-convention-2026.html` : vues samedi, dimanche, repas, bénévoles, tables) |
+| Pointage le jour J (« arrivé·e ») | **Fait** dans le même outil, mais les coches restent **dans le navigateur de l'appareil** : jamais renvoyées à Supabase |
+| Tout le reste (changer créneau, renommer, annuler une table, inscription manuelle, déplacer une inscription, fusion de comptes, modifier pseudo ou e-mail…) | **Non fait** |
+
+**Règle pour toute nouvelle action d'écriture admin** : chaque nouvelle fonction SQL de type `SECURITY DEFINER` doit (1) vérifier le rôle `admin` dans `profiles`, (2) avoir un `SET search_path`, (3) réserver `EXECUTE` aux utilisateurs connectés (`REVOKE … FROM PUBLIC, anon`). Voir la section « Sécurité » de `CLAUDE.md`. À arbitrer avant le gel du périmètre du 10/01/2027 : ce chantier est le plus gros, une partie seulement sera faisable.
 
 Pendant l'édition 2026, plusieurs opérations courantes ont dû être faites en SQL direct car aucune UI admin ne les permet. À J-3 d'un événement, ça stresse et c'est risqué. Liste exhaustive des actions à intégrer dans `admin.html` pour la prochaine édition :
 
@@ -196,7 +209,7 @@ Lors de la prochaine édition, revérifier :
 - **Domaine** : `sousloeildemelusine.fr` est-il renouvelé ?
 - **Clés et secrets** :
   - `MAILERSEND_API_KEY` (Cloudflare) — vérifier qu'elle est toujours valide
-  - `WEBHOOK_SECRET` (Cloudflare + `email-triggers.sql`) — peut être renouvelé
+  - `WEBHOOK_SECRET` (Cloudflare + côté Supabase) — **à renouveler obligatoirement** : l'ancienne valeur a été écrite en clair dans `email-triggers.sql`, donc dans l'historique Git (voir « Sécurité » dans `CLAUDE.md`)
   - Domaine MailerSend vérifié — vérifier statut DNS
 - **Lien Facebook événement** : à mettre à jour dans `worker-email.js` (`FB_EVENT_URL`)
 - **Lien HelloAsso repas** : à mettre à jour dans `worker-email.js` (cherchez "helloasso.com")
@@ -233,5 +246,26 @@ Avant l'ouverture des inscriptions, vérifier :
 | `email_rappels.sql` | À chaque modif du contenu/format rappel | Oui (DROP+CREATE inclus) |
 | `admin_export.sql` | À chaque modif des données exportées | Oui |
 | `programme_sync.sql` | Une fois | Oui |
+| `audit_log.sql` | Une fois (table + triggers d'audit) | Oui (`IF NOT EXISTS`, `DROP TRIGGER IF EXISTS`) |
 
 Tous utilisent `CREATE OR REPLACE FUNCTION` et `DROP TRIGGER IF EXISTS` → rejouables sans risque.
+
+---
+
+## 7. Chantiers issus de l'audit du 18/11/2026
+
+Suivi des travaux décidés après l'audit de sécurité et de cohérence documentaire. Détail technique dans `CLAUDE.md` (section « Sécurité »). Mettre la colonne « État » à jour au fil de l'eau.
+
+| Chantier | Priorité | État |
+|---|---|---|
+| Secret du webhook en Vault, rotation, verrouillage de `send_email_via_worker` | P0 | Préparé dans la branche `security/lockdown-rpc` (migrations 001 à 003, procédures, recette) ; à appliquer en production |
+| Contrôle d'identité dans `annuler_presence` et `send_recap_email`, `REVOKE` pour `anon` | P0 | Idem |
+| Export et relecture des politiques RLS de toutes les tables (surtout `profiles`) | P0 | À faire |
+| Dates et valeurs annuelles 2027 (Worker, pages, outil du jour J, SQL) ; purge des données 2026 | P0 | À faire |
+| Intégrité des inscriptions : capacité côté base, index unique anti-doublon, trigger anti-orphelin (voir 1.1, 1.2 et section 3) | P1 | À faire (migrations à préparer) |
+| Échappement HTML des gabarits d'e-mails du Worker | P1 | À faire |
+| `SET search_path` sur toutes les fonctions `SECURITY DEFINER` | P1 | Fait pour celles de la branche de sécurité ; reste le reste |
+| Durée de conservation et purge de `audit_log` | P1 | À faire |
+| Fiche de recette `TESTS.md` à jour pour l'architecture Supabase | P1 | À faire |
+
+Hors périmètre avant la convention (gel du 10/01/2027) : refonte `programme_id` (1.1), SDK Supabase officiel (1.3), cron du rappel J-3 (1.4).
