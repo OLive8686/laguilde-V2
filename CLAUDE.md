@@ -43,7 +43,9 @@ Site d'inscription pour une convention de jeu de rôle à Poitiers (16-17 mai 20
 - `tests/` : scripts de test de sécurité (projet de TEST uniquement, jamais en production)
 
 ### Documentation
-- `docs/ROTATION_WEBHOOK_SECRET.md` : procédure de rotation du secret du webhook
+- `docs/ROTATION_WEBHOOK_SECRET.md` : procédure de rotation du secret du webhook (Vault + Cloudflare), avec l'ordre à respecter
+- `docs/SAUVEGARDE_AVANT_CORRECTIFS.md` : quoi sauvegarder avant d'appliquer une migration, et comment vérifier que les CSV exportés sont complets
+- `docs/RECETTE_MANUELLE.md` : test manuel avec votre propre compte (e-mails réels, refus sur un autre compte, visiteur anonyme)
 - `CLAUDE.md` : Ce fichier
 - `README.md` : Description projet
 - `MIGRATION_URL.md` : Notes sur la migration vers le domaine custom
