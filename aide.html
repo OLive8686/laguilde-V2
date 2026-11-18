@@ -9,22 +9,24 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400&family=Lora:wght@400;600&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400&family=Lora:wght@400;600&display=swap"></noscript>
     <link rel="icon" type="image/png" href="logo.png">
-    <link rel="stylesheet" href="styles.css">
+    <meta name="color-scheme" content="dark light">
+    <link rel="stylesheet" href="theme.css?v=1">
+    <link rel="stylesheet" href="styles.css?v=2">
     <style>
         /* Styles spécifiques à la page d'aide */
         .aide-section { max-width: 720px; margin: 0 auto; padding: 0 20px; }
-        .aide-step { background: var(--card-bg, rgba(255,255,255,0.04)); border-radius: 12px; padding: 24px; margin-bottom: 20px; border-left: 4px solid var(--gold); }
+        .aide-step { background: var(--surface); border-radius: 12px; padding: 24px; margin-bottom: 20px; border-left: 4px solid var(--gold); }
         .aide-step h3 { font-family: var(--font-heading); font-size: 17px; color: var(--gold); margin: 0 0 10px; }
         .aide-step p { font-family: var(--font-body); font-size: 15px; color: var(--text-light); line-height: 1.7; margin: 0 0 8px; }
         .aide-step .aide-note { font-size: 13px; color: var(--text-muted); font-style: italic; }
-        .aide-num { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: var(--gold); color: var(--bg-dark, #0D2B2B); font-family: var(--font-heading); font-size: 14px; font-weight: 700; margin-right: 10px; flex-shrink: 0; }
+        .aide-num { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: var(--gold); color: var(--on-accent); font-family: var(--font-heading); font-size: 14px; font-weight: 700; margin-right: 10px; flex-shrink: 0; }
         .aide-step h3 { display: flex; align-items: center; }
         .aide-faq { margin-top: 32px; }
-        .aide-faq details { background: var(--card-bg, rgba(255,255,255,0.04)); border-radius: 10px; margin-bottom: 12px; padding: 0; }
+        .aide-faq details { background: var(--surface); border-radius: 10px; margin-bottom: 12px; padding: 0; }
         .aide-faq summary { font-family: var(--font-heading); font-size: 15px; color: var(--cream); padding: 16px 20px; cursor: pointer; letter-spacing: 0.3px; list-style: none; }
         .aide-faq summary::before { content: '▸ '; color: var(--gold); }
         .aide-faq details[open] summary::before { content: '▾ '; }
-        .aide-faq details[open] summary { border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .aide-faq details[open] summary { border-bottom: 1px solid rgb(var(--text-rgb) / 0.12); }
         .aide-faq .aide-answer { padding: 16px 20px; font-size: 15px; color: var(--text-light); line-height: 1.7; }
         .aide-back { text-align: center; margin: 32px 0; }
     </style>
@@ -32,7 +34,7 @@
 <body>
 
 <!-- Barre de retour simple (pas de nav complète) -->
-<div style="position:fixed;top:0;left:0;right:0;z-index:100;background:var(--nav-bg, var(--bg-dark, #0D2B2B));border-bottom:1px solid var(--nav-border, rgba(255,255,255,0.06));padding:14px 24px;display:flex;align-items:center;justify-content:space-between">
+<div style="position:fixed;top:0;left:0;right:0;z-index:100;background:var(--surface-2);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between">
     <a href="programme.html" style="color:var(--gold);font-family:var(--font-heading);font-size:14px;text-decoration:none;letter-spacing:0.5px">&larr; Retour au programme</a>
     <span style="font-family:var(--font-heading);font-size:14px;color:var(--text-muted);letter-spacing:1px">Aide</span>
 </div>
@@ -159,7 +161,7 @@
 </div>
 
 <!-- FOOTER -->
-<footer class="footer"><div class="footer-inner"><div><div class="footer-brand">Sous l'Œil de Mélusine</div><div class="footer-sub">Organisé par La Guilde · <span data-edition="venueDot"></span></div></div><div class="footer-right" data-edition="range"></div></div></footer>
+<footer class="footer"><div class="footer-inner"><a class="footer-guilde" href="https://www.laguilde-poitiers.com/" target="_blank" rel="noopener"><img class="guilde-logo" src="Logo_guilde_final.webp" width="72" height="68" alt="La Guilde — Poitiers" loading="lazy"></a><div><div class="footer-brand">Sous l'Œil de Mélusine</div><div class="footer-sub">Organisé par La Guilde · <span data-edition="venueDot"></span></div></div><div class="footer-right" data-edition="range"></div></div></footer>
 
 <script src="edition.js?v=1"></script>
 </body>

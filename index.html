@@ -10,11 +10,13 @@
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400&family=Lora:wght@400;600&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400&family=Lora:wght@400;600&display=swap"></noscript>
     <link rel="icon" type="image/png" href="logo.png">
     <link rel="apple-touch-icon" href="logo.png">
-    <link rel="stylesheet" href="styles.css">
+    <meta name="color-scheme" content="dark light">
+    <link rel="stylesheet" href="theme.css?v=1">
+    <link rel="stylesheet" href="styles.css?v=2">
     <style>
         /* Page "convention terminée" : carte centrée, sans tout le décor du hero original */
         .end-wrap{min-height:calc(100vh - 140px);display:flex;align-items:center;justify-content:center;padding:40px 24px}
-        .end-card{max-width:680px;text-align:center;background:rgba(255,255,255,0.55);border:1px solid rgba(212,168,67,0.25);border-radius:18px;padding:48px 36px;box-shadow:0 10px 40px rgba(0,0,0,0.06)}
+        .end-card{max-width:680px;text-align:center;background:rgb(var(--surface-rgb) / 0.7);border:1px solid rgb(var(--accent-rgb) / 0.25);border-radius:18px;padding:48px 36px;box-shadow:var(--shadow-md)}
         .end-eyebrow{font-family:var(--font-heading);font-size:14px;letter-spacing:4px;text-transform:uppercase;color:var(--teal);margin-bottom:12px}
         .end-title{font-family:var(--font-display);font-size:clamp(2rem,5vw,2.8rem);color:var(--gold);margin-bottom:16px;line-height:1.2}
         .end-sep{width:60px;height:2px;background:var(--gold);margin:18px auto 24px;opacity:.6}
@@ -44,7 +46,7 @@
 </main>
 
 <!-- FOOTER -->
-<footer class="footer"><div class="footer-inner"><div><div class="footer-brand">Sous l'Œil de Mélusine</div><div class="footer-sub">Organisé par La Guilde · Foyer du Porteau · Poitiers</div></div><div class="footer-right">Édition 2026 — Terminée</div></div></footer>
+<footer class="footer"><div class="footer-inner"><a class="footer-guilde" href="https://www.laguilde-poitiers.com/" target="_blank" rel="noopener"><img class="guilde-logo" src="Logo_guilde_final.webp" width="72" height="68" alt="La Guilde — Poitiers" loading="lazy"></a><div><div class="footer-brand">Sous l'Œil de Mélusine</div><div class="footer-sub">Organisé par La Guilde · Foyer du Porteau · Poitiers</div></div><div class="footer-right">Édition 2026 — Terminée</div></div></footer>
 
 </body>
 </html>
