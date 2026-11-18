@@ -209,7 +209,7 @@
                 <h2 class="section-title">Repas du samedi soir</h2>
                 <div class="section-sep"></div>
             </div>
-            <p style="text-align:center;font-size:14px;color:var(--text-muted);margin-bottom:20px">Paiement en ligne : <a href="https://www.helloasso.com/associations/foyer-du-porteau/evenements/repas-du-soir-convention-sous-l-oeil-de-melusine-2026" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:underline">HelloAsso</a></p>
+            <p data-edition-link="helloassoMeal" style="text-align:center;font-size:14px;color:var(--text-muted);margin-bottom:20px">Paiement en ligne : <a href="#" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:underline">HelloAsso</a></p>
             <div id="mesRepasGrid"></div>
         </div>
     </section>
@@ -236,11 +236,12 @@
 </div>
 
 <!-- FOOTER -->
-<footer class="footer"><div class="footer-inner"><div><div class="footer-brand">Sous l'&#338;il de M&eacute;lusine</div><div class="footer-sub">Organis&eacute; par La Guilde &middot; Foyer du Porteau &middot; Poitiers</div></div><div class="footer-right">16 &amp; 17 mai 2026</div></div></footer>
+<footer class="footer"><div class="footer-inner"><div><div class="footer-brand">Sous l'&#338;il de M&eacute;lusine</div><div class="footer-sub">Organis&eacute; par La Guilde &middot; <span data-edition="venueDot"></span></div></div><div class="footer-right" data-edition="range"></div></div></footer>
 <button class="scroll-top" id="scrollTop" aria-label="Retour en haut">&uarr;</button>
 
 <!-- Scripts : app.js (partage) puis code specifique a cette page -->
-<script src="app.supabase.js?v=3"></script>
+<script src="edition.js?v=1"></script>
+<script src="app.supabase.js?v=4"></script>
 <script>
 // =============================================================================
 // CODE SPECIFIQUE A LA PAGE "MES INSCRIPTIONS" (mes-inscriptions.html)
@@ -372,7 +373,7 @@ function updateDashboardView(allData) {
 // SECTION PRÉSENCE : Ma présence à la convention
 // =========================================================================
 // Affiche un encart par personne (utilisateur + accompagnants) avec deux
-// cases à cocher (samedi 16 mai / dimanche 17 mai). Cocher → setPresence,
+// cases à cocher (samedi / dimanche, dates dans edition.js). Cocher → setPresence,
 // décocher → confirm + annulerPresence (qui annule en cascade les inscriptions
 // tables/repas/bénévolat du jour).
 
@@ -422,11 +423,11 @@ async function loadMesPresences(allData) {
         html += '<label class="presence-toggle">';
         html += '<input type="checkbox" ' + (etat.samedi ? 'checked' : '')
              + ' onchange="onPresenceToggle(\'samedi\',' + accArg + ',this)">';
-        html += '<span>Samedi 16 mai</span></label>';
+        html += '<span>' + EDITION.dayLabel('samedi', true) + '</span></label>';
         html += '<label class="presence-toggle">';
         html += '<input type="checkbox" ' + (etat.dimanche ? 'checked' : '')
              + ' onchange="onPresenceToggle(\'dimanche\',' + accArg + ',this)">';
-        html += '<span>Dimanche 17 mai</span></label>';
+        html += '<span>' + EDITION.dayLabel('dimanche', true) + '</span></label>';
         html += '</div>';
         html += '</div>';
         return html;
@@ -462,7 +463,7 @@ window.onPresenceToggle = async function(jour, nomAcc, checkbox) {
     _isProcessing = true;
 
     var checked = checkbox.checked;
-    var jourLib = jour === 'samedi' ? 'samedi 16 mai' : 'dimanche 17 mai';
+    var jourLib = EDITION.dayLabel(jour);
 
     try {
         if (checked) {
