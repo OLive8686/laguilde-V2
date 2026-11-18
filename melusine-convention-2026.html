@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mélusine 2026 — Outil Convention</title>
+<title>Mélusine — Outil Convention</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
 <style>
@@ -220,7 +220,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
 -->
 <div id="boot-screen" style="position:fixed;inset:0;background:#f4f0e8;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem;text-align:center;font-family:'EB Garamond',Georgia,serif">
   <div style="max-width:480px">
-    <h1 style="font-family:'Cinzel',serif;color:#1d4b3a;font-size:1.4rem;margin-bottom:.6rem">⚔ Outil Convention — Mélusine 2026</h1>
+    <h1 style="font-family:'Cinzel',serif;color:#1d4b3a;font-size:1.4rem;margin-bottom:.6rem">⚔ Outil Convention — Mélusine <span data-edition="year"></span></h1>
     <p id="boot-msg" style="color:#6e675e;font-style:italic">Vérification de l'accès…</p>
     <div id="boot-actions" style="margin-top:1.2rem;display:none">
       <a id="boot-link" href="https://sousloeildemelusine.fr/admin.html" style="display:inline-block;font-family:'Cinzel',serif;font-size:.75rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:#fff;background:#2a6b51;border:2px solid #2a6b51;border-radius:5px;padding:.5rem 1rem;text-decoration:none">Aller au site principal</a>
@@ -231,10 +231,10 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
 
 <header>
   <div>
-    <h1>⚔ Sous l'Œil de Mélusine — Convention 2026</h1>
+    <h1>⚔ Sous l'Œil de Mélusine — Convention <span data-edition="year"></span></h1>
     <div class="sub">Outil de gestion — Jour J</div>
   </div>
-  <div class="datebadge">📅 Samedi 16 &amp; Dimanche 17 mai 2026</div>
+  <div class="datebadge">📅 <span data-edition="range"></span></div>
 </header>
 
 <nav class="tabs-nav">
@@ -415,6 +415,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
   </div>
 </div>
 
+<script src="edition.js?v=1"></script>
 <script>
 // =============================================================================
 // CONFIGURATION SUPABASE — chargement live des données du site (lecture seule)
@@ -422,7 +423,11 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
 // On lit les données via la RPC `get_admin_export_data` (SECURITY DEFINER côté
 // Supabase, qui vérifie elle-même que l'appelant a le rôle admin).
 // Aucune écriture ne sera faite vers Supabase — toutes les modifs faites dans
-// cet outil restent en localStorage du navigateur (variables m26d_*).
+// cet outil restent en localStorage du navigateur (clés STORAGE_PREFIX + « d_ », voir edition.js).
+// Préfixe des clés localStorage : vient de edition.js (change à chaque édition, pour ne pas
+// relire les pointages de l'année précédente). Repli si edition.js est absent.
+const STORAGE_PREFIX = (window.EDITION && window.EDITION.storagePrefix) || 'm27';
+if (window.EDITION) document.title = 'Mélusine ' + window.EDITION.year + ' — Outil Convention';
 const SUPABASE_URL = 'https://hdbhvwaemrjoantcecuv.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_YGImet9fG8OKLDf_H0GNyQ_SmY5Mo56';
 
@@ -716,8 +721,8 @@ async function bootApp() {
 async function reloadFromSite() {
   if (!confirm('Recharger depuis le site ?\n\nCela va remplacer toutes vos modifications locales par la photo actuelle des inscriptions sur le site.\n\nContinuer ?')) return;
   ['samedi','dimanche','repas','benevoles','tables'].forEach(t => {
-    localStorage.removeItem('m26d_' + t);
-    localStorage.removeItem('m26c_' + t);  // coches aussi remises à zéro
+    localStorage.removeItem(STORAGE_PREFIX + 'd_' + t);
+    localStorage.removeItem(STORAGE_PREFIX + 'c_' + t);  // coches aussi remises à zéro
   });
   document.getElementById('unsaved-banner').classList.remove('on');
   document.getElementById('boot-screen').style.display = 'flex';
@@ -788,17 +793,17 @@ function openRecap(nom, email) {
 
   // ── Présence à la convention ──
   const jours = [];
-  if (samedi.length) jours.push('Samedi 16 mai');
-  if (dimanche.length) jours.push('Dimanche 17 mai');
+  if (samedi.length) jours.push(EDITION.dayLabel('samedi', true));
+  if (dimanche.length) jours.push(EDITION.dayLabel('dimanche', true));
   html += `<div class="mrs"><h3>📅 Présence</h3>`;
   if (jours.length) {
     html += '<ul>';
     if (samedi.length) {
       const s = samedi[0];
-      html += `<li><span class="mri"><strong>Samedi 16 mai</strong>${s.type==='accompagnant'?` <span class="mr-tag" style="background:var(--acc-bg);color:var(--acc-fg)">acc. de ${esc(s.avec||'')}</span>`:''}</span></li>`;
+      html += `<li><span class="mri"><strong>${EDITION.dayLabel('samedi', true)}</strong>${s.type==='accompagnant'?` <span class="mr-tag" style="background:var(--acc-bg);color:var(--acc-fg)">acc. de ${esc(s.avec||'')}</span>`:''}</span></li>`;
     }
     if (dimanche.length) {
-      html += `<li><span class="mri"><strong>Dimanche 17 mai</strong></span></li>`;
+      html += `<li><span class="mri"><strong>${EDITION.dayLabel('dimanche', true)}</strong></span></li>`;
     }
     html += '</ul>';
   } else {
@@ -886,10 +891,10 @@ const COLS = {
 };
 
 function getColPrefs(t) {
-  try { return JSON.parse(localStorage.getItem('m26col_'+t) || '{}'); } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem(STORAGE_PREFIX + 'col_' + t) || '{}'); } catch { return {}; }
 }
 function setColPrefs(t, p) {
-  localStorage.setItem('m26col_'+t, JSON.stringify(p));
+  localStorage.setItem(STORAGE_PREFIX + 'col_' + t, JSON.stringify(p));
 }
 
 /**
@@ -953,10 +958,10 @@ document.addEventListener('click', e => {
 // persisté en localStorage.
 
 function isGroupedView() {
-  return localStorage.getItem('m26_grouped') === '1';
+  return localStorage.getItem(STORAGE_PREFIX + '_grouped') === '1';
 }
 function setGroupedView(on) {
-  localStorage.setItem('m26_grouped', on ? '1' : '0');
+  localStorage.setItem(STORAGE_PREFIX + '_grouped', on ? '1' : '0');
 }
 
 function toggleGrouped() {
@@ -967,12 +972,12 @@ function toggleGrouped() {
 
 // État collapsed des groupes (clé = "creneau|jeu")
 function getCollapsed() {
-  try { return JSON.parse(localStorage.getItem('m26_grp_col') || '{}'); } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem(STORAGE_PREFIX + '_grp_col') || '{}'); } catch { return {}; }
 }
 function setCollapsed(key, on) {
   const c = getCollapsed();
   if (on) c[key] = 1; else delete c[key];
-  localStorage.setItem('m26_grp_col', JSON.stringify(c));
+  localStorage.setItem(STORAGE_PREFIX + '_grp_col', JSON.stringify(c));
 }
 function toggleGroupCollapse(key) {
   const c = getCollapsed();
@@ -1117,8 +1122,8 @@ function dlBlob(filename, content) {
 // Accueil Dimanche, Bénévoles, Tables) pour que la page imprimée soit claire.
 window.doPrint = function(btn) {
   const labels = {
-    samedi:    'Accueil — Samedi 16 mai 2026',
-    dimanche:  'Accueil — Dimanche 17 mai 2026',
+    samedi:    'Accueil — ' + EDITION.dayLabel('samedi', true) + ' ' + EDITION.year,
+    dimanche:  'Accueil — ' + EDITION.dayLabel('dimanche', true) + ' ' + EDITION.year,
     repas:     'Repas du samedi soir',
     benevoles: 'Bénévoles',
     tables:    'Tables de JDR'
@@ -1246,7 +1251,7 @@ function dc(o){return JSON.parse(JSON.stringify(o))}
 function initData(){
   let any=false;
   ['samedi','dimanche','repas','benevoles','tables'].forEach(t=>{
-    const raw=localStorage.getItem('m26d_'+t);
+    const raw=localStorage.getItem(STORAGE_PREFIX + 'd_' + t);
     if(raw){try{D[t]=JSON.parse(raw);any=true}catch{D[t]=dc(INIT[t])}}
     else D[t]=dc(INIT[t]);
     D[t].forEach(r=>{if(!r._id)r._id=nid();else idc=Math.max(idc,r._id)});
@@ -1255,22 +1260,22 @@ function initData(){
 }
 
 function save(t){
-  localStorage.setItem('m26d_'+t,JSON.stringify(D[t]));
+  localStorage.setItem(STORAGE_PREFIX + 'd_' + t,JSON.stringify(D[t]));
   document.getElementById('unsaved-banner').classList.add('on');
   updateDL();
 }
 
 function resetAllData(){
   if(!confirm('Restaurer toutes les données d\'origine ?\nToutes vos modifications seront perdues.'))return;
-  ['samedi','dimanche','repas','benevoles','tables'].forEach(t=>localStorage.removeItem('m26d_'+t));
+  ['samedi','dimanche','repas','benevoles','tables'].forEach(t=>localStorage.removeItem(STORAGE_PREFIX + 'd_' + t));
   idc=0; initData();
   ['samedi','dimanche','repas','benevoles','tables'].forEach(render);
 }
 
 // ── COCHES ────────────────────────────────────────────
-function getChk(t){try{return JSON.parse(localStorage.getItem('m26c_'+t)||'{}')}catch{return{}}}
-function setChk(t,o){localStorage.setItem('m26c_'+t,JSON.stringify(o))}
-function resetChecked(t){if(!confirm('Remettre toutes les coches à zéro ?'))return;localStorage.removeItem('m26c_'+t);render(t)}
+function getChk(t){try{return JSON.parse(localStorage.getItem(STORAGE_PREFIX + 'c_' + t)||'{}')}catch{return{}}}
+function setChk(t,o){localStorage.setItem(STORAGE_PREFIX + 'c_' + t,JSON.stringify(o))}
+function resetChecked(t){if(!confirm('Remettre toutes les coches à zéro ?'))return;localStorage.removeItem(STORAGE_PREFIX + 'c_' + t);render(t)}
 
 // ── UTILS ─────────────────────────────────────────────
 function esc(v){if(v==null)return'';return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
