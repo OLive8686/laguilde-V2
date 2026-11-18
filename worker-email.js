@@ -84,13 +84,70 @@ const ALLOWED_EMAIL_TYPES = [
 // ── URL du site (pour les liens dans les emails) ──
 const SITE_URL = 'https://sousloeildemelusine.fr/';
 
-// ── Dates de la convention (pour les liens agenda) ──
-const DATE_SAMEDI   = '2026-05-16';
-const DATE_DIMANCHE = '2026-05-17';
+// =============================================================================
+// VALEURS ANNUELLES — le SEUL bloc à modifier chaque année dans ce fichier
+// =============================================================================
+// À garder identique à edition.js (côté site). Les libellés (« samedi 8 mai »)
+// sont calculés à partir des dates ISO : on ne saisit une date qu'une fois.
+// Une valeur vide ('') MASQUE le passage de l'e-mail qui l'utilise (jamais de
+// lien cassé ni d'information de l'année précédente).
+const EDITION = {
+  year: 2027,
+  saturday: '2027-05-08',          // AAAA-MM-JJ (doit être un samedi)
+  sunday:   '2027-05-09',          // AAAA-MM-JJ (doit être un dimanche)
+  venueName: 'Foyer du Porteau',
+  venueCity: 'Poitiers',
+  // TODO(à fournir) : horaires de l'édition, ex. 'samedi 9h-00h, dimanche 9h-17h'
+  horaires: '',
+  // TODO(à fournir) : page HelloAsso du repas du samedi soir 2027
+  helloassoMealUrl: '',
+  // TODO(à fournir) : événement Facebook 2027
+  facebookEventUrl: '',
+};
 
-// ── Lieu de la convention (pour les événements agenda) ──
-const LIEU_NOM     = 'Salle Gérard Gaschet';
-const LIEU_ADRESSE = 'Poitiers';
+// Constantes dérivées (utilisées par les liens agenda et les gabarits)
+const DATE_SAMEDI   = EDITION.saturday;
+const DATE_DIMANCHE = EDITION.sunday;
+const LIEU_NOM      = EDITION.venueName;
+const LIEU_ADRESSE  = EDITION.venueCity;
+
+const JOURS_SEMAINE = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+const MOIS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août',
+                 'septembre', 'octobre', 'novembre', 'décembre'];
+
+/**
+ * Découpe une date ISO (calcul en UTC : pas de décalage de fuseau).
+ * @param {string} iso - « AAAA-MM-JJ »
+ * @returns {{jour: string, numero: number, mois: string}} ex. { jour: 'samedi', numero: 8, mois: 'mai' }
+ */
+function decomposeDate(iso) {
+  const [annee, mois, numero] = iso.split('-').map(Number);
+  const d = new Date(Date.UTC(annee, mois - 1, numero));
+  return { jour: JOURS_SEMAINE[d.getUTCDay()], numero, mois: MOIS_FR[mois - 1] };
+}
+
+/**
+ * Texte des deux jours pour les e-mails, selon les jours de présence.
+ * @param {string[]} jours - ex. ['samedi'], ['dimanche'] ou les deux ; vide = les deux jours
+ * @returns {string} ex. « samedi 8 et dimanche 9 mai », « samedi 8 mai », « les 8 et 9 mai »
+ */
+function libelleJours(jours) {
+  const sam = decomposeDate(EDITION.saturday);
+  const dim = decomposeDate(EDITION.sunday);
+  const memeMois = sam.mois === dim.mois;
+  const aSam = jours.includes('samedi');
+  const aDim = jours.includes('dimanche');
+  if (aSam && aDim) {
+    return memeMois
+      ? sam.jour + ' ' + sam.numero + ' et ' + dim.jour + ' ' + dim.numero + ' ' + dim.mois
+      : sam.jour + ' ' + sam.numero + ' ' + sam.mois + ' et ' + dim.jour + ' ' + dim.numero + ' ' + dim.mois;
+  }
+  if (aSam) return sam.jour + ' ' + sam.numero + ' ' + sam.mois;
+  if (aDim) return dim.jour + ' ' + dim.numero + ' ' + dim.mois;
+  return memeMois
+    ? 'les ' + sam.numero + ' et ' + dim.numero + ' ' + dim.mois
+    : 'les ' + sam.numero + ' ' + sam.mois + ' et ' + dim.numero + ' ' + dim.mois;
+}
 
 
 // =============================================================================
@@ -602,7 +659,9 @@ function buildRecapEmail(data) {
       var nom = r.nom_accompagnant || r.nom || 'Vous';
       sections += `<p style="color:${c.text};margin:0 0 4px">• ${nom} — inscrit·e</p>`;
     }
-    sections += `<p style="color:${c.muted};font-size:13px;margin-top:8px">Paiement en ligne : <a href="https://www.helloasso.com/associations/foyer-du-porteau/evenements/repas-du-soir-convention-sous-l-oeil-de-melusine-2026" style="color:${c.accent};text-decoration:underline">HelloAsso</a></p>`;
+    if (EDITION.helloassoMealUrl) {
+      sections += `<p style="color:${c.muted};font-size:13px;margin-top:8px">Paiement en ligne : <a href="${EDITION.helloassoMealUrl}" style="color:${c.accent};text-decoration:underline">HelloAsso</a></p>`;
+    }
   }
 
   return {
@@ -641,16 +700,7 @@ function buildRappelEmail(data) {
   const c = DEFAULT_COLORS;
 
   // Phrase d'introduction adaptée au(x) jour(s) de présence
-  let joursTexte;
-  if (jours.includes('samedi') && jours.includes('dimanche')) {
-    joursTexte = `<strong>samedi 16 et dimanche 17 mai</strong>`;
-  } else if (jours.includes('samedi')) {
-    joursTexte = `<strong>samedi 16 mai</strong>`;
-  } else if (jours.includes('dimanche')) {
-    joursTexte = `<strong>dimanche 17 mai</strong>`;
-  } else {
-    joursTexte = `<strong>les 16 et 17 mai</strong>`;
-  }
+  const joursTexte = `<strong>${libelleJours(jours)}</strong>`;
 
   let sections = '';
 
@@ -695,7 +745,9 @@ function buildRappelEmail(data) {
   if (repas.length > 0) {
     sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">🍽️ Repas du samedi soir</h3>`;
     sections += `<p style="color:${c.text};margin:0 0 4px">${repas.length} repas réservé(s).</p>`;
-    sections += `<p style="color:${c.muted};font-size:13px;margin-top:4px">Si pas encore réglé : paiement en ligne sur <a href="https://www.helloasso.com/associations/foyer-du-porteau/evenements/repas-du-soir-convention-sous-l-oeil-de-melusine-2026" style="color:${c.accent};text-decoration:underline">HelloAsso</a>.</p>`;
+    if (EDITION.helloassoMealUrl) {
+      sections += `<p style="color:${c.muted};font-size:13px;margin-top:4px">Si pas encore réglé : paiement en ligne sur <a href="${EDITION.helloassoMealUrl}" style="color:${c.accent};text-decoration:underline">HelloAsso</a>.</p>`;
+    }
   }
 
   // Si pas d'inscription, message court
@@ -707,7 +759,7 @@ function buildRappelEmail(data) {
   const infosPratiques = ''
     + `<h3 style="color:${c.accent};font-size:16px;margin:20px 0 8px">📍 Infos pratiques</h3>`
     + `<p style="color:${c.text};margin:0 0 4px"><strong>Lieu :</strong> ${LIEU_NOM}, ${LIEU_ADRESSE}</p>`
-    + `<p style="color:${c.text};margin:0 0 4px"><strong>Horaires :</strong> samedi 9h-00h, dimanche 9h-17h</p>`
+    + (EDITION.horaires ? `<p style="color:${c.text};margin:0 0 4px"><strong>Horaires :</strong> ${EDITION.horaires}</p>` : '')
     + `<p style="color:${c.muted};font-size:13px;margin-top:8px">Programme complet : <a href="${SITE_URL}programme.html" style="color:${c.accent}">${SITE_URL}programme.html</a></p>`;
 
   const intro = `Bonjour ${nom},<br><br>`
@@ -717,8 +769,8 @@ function buildRappelEmail(data) {
   // --- Invitation à partager l'événement Facebook ---
   // Ajouté en bas du mail (avant le pied) pour booster la visibilité
   // de la convention dans les jours qui précèdent.
-  const FB_EVENT_URL = 'https://www.facebook.com/events/1271855161045499/';
-  const partage = ''
+  const FB_EVENT_URL = EDITION.facebookEventUrl;
+  const partage = !FB_EVENT_URL ? '' : ''
     + `<p style="color:${c.text};font-size:14px;margin-top:24px;padding-top:16px;border-top:1px solid ${c.muted}33">`
     + `📣 <strong>Aidez-nous à faire connaître la convention Sous l'Œil de Mélusine !</strong><br>`
     + `Partagez l'<a href="${FB_EVENT_URL}" style="color:${c.accent};text-decoration:underline">événement Facebook</a> avec vos amis et invitez-les à venir.`
