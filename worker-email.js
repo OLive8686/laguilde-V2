@@ -1,48 +1,45 @@
 // =============================================================================
-// CLOUDFLARE WORKER — Service d'envoi d'emails transactionnels
+// CLOUDFLARE WORKER — Envoi des e-mails transactionnels (relais MailerSend)
 // =============================================================================
-// Ce Worker reçoit des requêtes POST du frontend (après inscription, annulation,
-// validation de table, etc.) et envoie des emails via l'API Resend.
+// Rôle : recevoir les appels de la base de données (Supabase, via pg_net) et
+// envoyer l'e-mail correspondant avec l'API MailerSend. Le front du site
+// n'appelle PAS ce Worker.
 //
 // ARCHITECTURE :
-//   Frontend (app.js) → POST /send-email → Ce Worker → API Resend → Email
+//   Trigger PostgreSQL → send_email_via_worker() → pg_net (net.http_post)
+//     → CE WORKER (POST + en-tête X-Webhook-Secret) → API MailerSend → e-mail
+//   (Le Worker de maintien en éveil de Supabase est un autre fichier : worker.js.)
 //
 // POURQUOI un Worker séparé ?
-//   - La clé API Resend reste côté serveur (jamais exposée au frontend)
-//   - Découplé du proxy GAS (worker.js) : chaque Worker a une responsabilité
-//   - Resend offre 100 emails/jour gratuits (sans carte bancaire)
+//   - la clé MailerSend reste côté serveur, jamais dans la base ni dans le front ;
+//   - la base peut envoyer un e-mail sans connaître l'API du fournisseur.
 //
-// DÉPLOIEMENT :
-//   1. Créer un Worker sur dash.cloudflare.com → Workers & Pages → Create
-//   2. Coller ce code dans l'éditeur du Worker
-//   3. Ajouter les variables d'environnement dans Settings → Variables :
-//      - RESEND_API_KEY  : clé API Resend
-//      - WEBHOOK_SECRET  : secret partagé avec pg_net (même valeur que dans email-triggers.sql)
-//   4. (Optionnel) Ajouter FROM_EMAIL si vous avez un domaine vérifié sur Resend
-//   5. Dans app.js, définir EMAIL_WORKER_URL avec l'URL de ce Worker
+// VARIABLES (Cloudflare → Worker « melusine-email » → Settings → Variables and Secrets) :
+//   - MAILERSEND_API_KEY : clé API MailerSend (type Secret)
+//   - WEBHOOK_SECRET     : secret partagé, même valeur que celle envoyée par la
+//                          base dans l'en-tête X-Webhook-Secret (type Secret)
+//   - FROM_EMAIL         : adresse d'expédition (optionnelle ; défaut dans le code)
 //
-// RESEND — CONFIGURATION :
-//   - Créer un compte sur https://resend.com (gratuit, pas de CB)
-//   - Récupérer la clé API dans Settings → API Keys
-//   - Par défaut, Resend envoie depuis "onboarding@resend.dev" (limité)
-//   - Pour un domaine custom : ajouter un domaine dans Resend → Domains
-//     puis configurer les DNS (DKIM, SPF, DMARC)
+// DÉPLOIEMENT : copier ce fichier dans le Worker « melusine-email » → Deploy.
 //
 // SÉCURITÉ :
-//   - CORS restreint aux origines autorisées (même liste que worker.js)
-//   - La clé API est dans une variable d'environnement (jamais dans le code)
-//   - Validation stricte du type d'email et des paramètres
-//   - Rate limiting basique par IP (10 emails/minute)
-//   - Aucune donnée sensible dans les logs
+//   - appel refusé (403) sans le bon X-Webhook-Secret ;
+//   - validation stricte du type d'e-mail et des paramètres ;
+//   - CORS restreint aux origines autorisées (utile aux appels depuis un navigateur ;
+//     les appels de la base n'en ont pas besoin) ;
+//   - limite par IP en mémoire (peu efficace : voir ROADMAP.md, section 1.5) ;
+//   - aucune donnée sensible dans les logs.
 //
-// TYPES D'EMAILS SUPPORTÉS :
-//   - confirmation : inscription confirmée ou liste d'attente
-//   - promotion    : promotion depuis la liste d'attente
-//   - annulation   : inscription annulée
+// TYPES D'E-MAILS SUPPORTÉS (ALLOWED_EMAIL_TYPES) :
+//   - confirmation          : inscription confirmée ou liste d'attente
+//   - promotion             : promotion depuis la liste d'attente
+//   - annulation            : inscription annulée
 //   - accompagnant_supprime : accompagnant supprimé (+ inscriptions annulées)
-//   - table_validee  : proposition de table MJ validée par l'admin
-//   - table_refusee  : proposition de table MJ refusée par l'admin
-//   - recap          : récapitulatif complet des inscriptions
+//   - table_validee         : proposition de table MJ validée par l'admin
+//   - table_refusee         : proposition de table MJ refusée par l'admin
+//   - nouvelle_proposition, proposition_recue : propositions de tables MJ
+//   - recap                 : récapitulatif des inscriptions
+//   - rappel                : rappel J-3 avant la convention
 // =============================================================================
 
 // ── Origines autorisées (CORS) — identiques à worker.js ──
@@ -1013,8 +1010,8 @@ export default {
    * }
    *
    * Variables d'environnement requises (dans Cloudflare → Settings → Variables) :
-   *   - RESEND_API_KEY  : clé API Resend
-   *   - FROM_EMAIL      : adresse d'expédition (optionnel, défaut: "Mélusine <onboarding@resend.dev>")
+   *   - MAILERSEND_API_KEY : clé API MailerSend
+   *   - FROM_EMAIL      : adresse d'expédition (optionnel, défaut: "Sous l oeil de Melusine <noreply@sousloeildemelusine.fr>")
    *   - WEBHOOK_SECRET  : secret partagé avec pg_net pour authentifier les appels
    *
    * @param {Request} request - La requête HTTP entrante

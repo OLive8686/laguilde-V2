@@ -1,7 +1,9 @@
 # Mélusine — Convention JDR "Sous l'Œil de Mélusine"
 
 ## Vue d'ensemble
-Site d'inscription pour une convention de jeu de rôle à Poitiers (16-17 mai 2026), organisée par La Guilde Poitiers. Les joueurs consultent le programme et s'inscrivent aux tables. Les MJ proposent des tables. Les admins gèrent le tout.
+Site d'inscription pour une convention de jeu de rôle à Poitiers, organisée par La Guilde Poitiers. Les joueurs consultent le programme et s'inscrivent aux tables. Les MJ proposent des tables. Les admins gèrent le tout.
+
+**État (novembre 2026)** : l'édition 2026 (16-17 mai 2026) est terminée. L'édition 2027 a lieu les 8-9 mai 2027. Calendrier : périmètre gelé le 10/01/2027, site rouvert et testé le 23/01/2027, lancement public le 07/02/2027 au plus tard. Pas de refonte de framework avant la convention. Les textes de ce fichier qui parlent encore de dates 2026 décrivent l'édition passée ; les valeurs annuelles sont à mettre à jour (voir `ROADMAP.md`, sections 4 et 5).
 
 ## Architecture
 - **Frontend** : pages HTML statiques + 1 JS partagé + 1 CSS, hébergées sur GitHub Pages (domaine `sousloeildemelusine.fr`)
@@ -13,7 +15,8 @@ Site d'inscription pour une convention de jeu de rôle à Poitiers (16-17 mai 20
 ## Fichiers
 
 ### Pages HTML
-- `index.html` : Accueil
+- `index.html` : Accueil (depuis le 18/05/2026 : message de fin d'édition ; les autres pages restent accessibles par leur adresse directe, la navigation est masquée)
+- `index.2026.html` : Archive de l'ancien accueil de l'édition 2026 (à restaurer ou adapter pour 2027)
 - `programme.html` : Programme des tables et inscription
 - `mes-inscriptions.html` : Récap personnel (présence, tables, accompagnants, bénévolat, repas, propositions MJ)
 - `infos.html` : Infos pratiques
@@ -21,11 +24,14 @@ Site d'inscription pour une convention de jeu de rôle à Poitiers (16-17 mai 20
 - `aide.html` : FAQ / aide
 - `espace-mj.html` : Proposer des tables (rôle `mj` ou `admin`)
 - `admin.html` : Panneau admin (stats, validation tables, gestion rôles)
+- `melusine-convention-2026.html` : Outil admin autonome pour le jour J (pointage, vues par jour, repas). Lit les données via la RPC `get_admin_export_data` (rôle admin vérifié côté base) avec la session de `localStorage` ; les pointages et modifications restent **uniquement dans le navigateur** de l'appareil (clés `m26*`), jamais renvoyés à Supabase
 
 ### Code
 - `app.supabase.js` : JS partagé — config Supabase, client REST léger (sbQuery/sbInsert/sbUpdate/sbDelete), proxy `APP.supabase.from(...)/rpc(...)`, helpers (escHtml, esc, toast), auth, navigation, rôles, présences. Importé par toutes les pages avec un query string `?v=N` pour le cache busting (à bumper à chaque changement).
 - `styles.css` : Feuille de styles unique, partagée par toutes les pages
-- `worker-email.js` : Code du Cloudflare Worker (à copier dans le dashboard Cloudflare après modification)
+- `worker-email.js` : Code du Cloudflare Worker d'e-mails `melusine-email` (à copier dans le dashboard Cloudflare après modification)
+- `worker.js` : Code du second Worker Cloudflare, de **maintien en éveil** : un cron ping la base Supabase toutes les 4 minutes pour éviter la mise en pause du plan gratuit. Sans lien avec les e-mails
+- `CNAME` : Domaine personnalisé GitHub Pages (`sousloeildemelusine.fr`)
 
 ### SQL (Supabase)
 - `seed_data.sql` : Données initiales (créneaux bénévoles, programme, restauration, animations)
@@ -40,9 +46,10 @@ Site d'inscription pour une convention de jeu de rôle à Poitiers (16-17 mai 20
 
 ### Documentation
 - `CLAUDE.md` : Ce fichier
-- `README.md` : Description projet
+- `README.md` : Présentation, installation, structure, maintenance annuelle
+- `ROADMAP.md` : Feuille de route de l'édition 2027 (dette technique, fonctionnalités à préserver, checklist de pré-production)
 - `MIGRATION_URL.md` : Notes sur la migration vers le domaine custom
-- `TESTS.md` : Notes de tests
+- `TESTS.md` : Fiche de recette (version à cocher) ; `tests-melusine.csv` en est la version tableur
 
 ## Stack technique
 - HTML/CSS/JS vanilla (pas de framework)
@@ -79,7 +86,7 @@ Site d'inscription pour une convention de jeu de rôle à Poitiers (16-17 mai 20
 1. L'utilisateur se connecte → `fetchRole` lit `profiles` → crée l'entrée si nouvelle
 2. Le rôle est stocké en `localStorage` (`melusine_role`) pour la navigation
 3. La navigation s'adapte : liens "Espace MJ" et "Admin" affichés selon le rôle
-4. Les pages MJ et admin vérifient le rôle côté client ET côté backend (RLS Supabase)
+4. Les pages MJ et admin vérifient le rôle côté client. Côté base, seules les RPC admin versionnées dans ce dépôt (`get_presences_stats`, `get_admin_export_data`, `send_reminders`) contrôlent le rôle `admin` ; la protection des écritures MJ/admin repose sur des politiques RLS configurées dans le tableau de bord Supabase, **non versionnées et non auditées** (voir « Sécurité »)
 
 ## Architecture JS (app.supabase.js)
 - Pattern : IIFE + exports `window.xxx` pour les onclick handlers
@@ -138,21 +145,25 @@ Les joueurs peuvent ajouter jusqu'à 3 accompagnants liés à leur compte :
 - **Lecture** : `APP.supabase.from('table').select(...)` (proxy REST)
 - **Écriture** : `APP.supabase.from('table').insert/update/delete(...)`
 - **RPC** (stored procedures) : `APP.supabase.rpc('nom_fonction', { params })`
-- **Tout passe par RLS Supabase** côté DB (filtre par email JWT)
-- Les fonctions sensibles (annuler_presence, send_recap_email, get_presences_stats) sont en SECURITY DEFINER pour bypass RLS de manière contrôlée
+- Les lectures et écritures directes passent par la RLS Supabase (filtre par e-mail du JWT) **là où elle est configurée** (voir « Sécurité »)
+- Les fonctions sensibles (annuler_presence, send_recap_email, get_presences_stats…) sont en SECURITY DEFINER, donc elles contournent la RLS : **chacune doit vérifier elle-même l'identité de l'appelant** (e-mail du JWT) et avoir un `SET search_path`. À la date de cet audit, `annuler_presence` et `send_recap_email` ne le faisaient pas (correctif dans la branche `security/lockdown-rpc`)
 
 ## Sécurité
-- **RLS Supabase** activé sur toutes les tables sensibles (filtre par email JWT côté DB)
-- **XSS** : `escHtml()` dans `app.supabase.js`, appliquée partout dans les innerHTML
-- **Race conditions** : protection via contraintes uniques DB (ex: index unique sur `presences`)
-- **Admin** : rôle `admin` lu depuis `profiles` côté backend dans les RPC (`get_presences_stats`, etc.)
-- **MJ** : rôle `mj` ou `admin` vérifié côté backend
-- **Secrets** : variables d'env Cloudflare (`MAILERSEND_API_KEY`, `WEBHOOK_SECRET`), JAMAIS dans le code
+État vérifié par l'audit du 18/11/2026 (lecture du dépôt ; la base et les tableaux de bord n'ont pas été consultés) :
+
+- **RLS** : seules les tables `presences` et `audit_log` ont leurs politiques versionnées (`presences.sql`, `audit_log.sql`). Pour `profiles`, `inscriptions`, `benevoles`, `repas`, `accompagnants`, `programme`, `config`, les politiques sont dans le tableau de bord Supabase : **à exporter (`pg_policies`) et à relire**, en priorité `profiles` (un utilisateur ne doit pas pouvoir se donner le rôle `admin`). Ne jamais écrire « RLS sur toutes les tables » tant que ce n'est pas vérifié
+- **XSS** : `escHtml()` / `esc()` dans `app.supabase.js` et les pages (échantillon vérifié). Les gabarits d'e-mails de `worker-email.js` n'échappaient pas les valeurs saisies par les utilisateurs (correctif : branche `feature/worker-escape`)
+- **Session** : le jeton de session Supabase est dans `localStorage` (`melusine_session`) : lisible par tout script injecté. Limite connue, acceptée tant qu'il n'y a pas de refonte de l'authentification ; elle rend la prévention du XSS prioritaire. Aucune Content Security Policy n'est définie
+- **Race conditions** : une seule contrainte unique versionnée (`presences`). Les places des tables sont calculées côté navigateur, sans trigger de capacité : deux inscriptions simultanées peuvent dépasser la capacité (chantier de migrations préparées)
+- **Admin** : rôle `admin` lu depuis `profiles` dans les RPC `get_presences_stats`, `get_admin_export_data`, `send_reminders` (vérifié)
+- **MJ** : le rôle `mj` n'est contrôlé dans aucun fichier SQL du dépôt (à vérifier dans les politiques RLS)
+- **Secrets** : `MAILERSEND_API_KEY` et `WEBHOOK_SECRET` sont des variables Cloudflare. **Mais** la valeur du secret du webhook a été écrite en clair dans `email-triggers.sql` (donc dans l'historique Git) : elle est **considérée compromise** et doit être renouvelée. Le correctif (secret dans Supabase Vault, fonctions d'envoi verrouillées) est dans la branche `security/lockdown-rpc`, avec une procédure de rotation. La clé Supabase « publishable » visible dans `app.supabase.js` et `worker.js` est publique par conception ; sa sûreté dépend de la RLS
+- **Données personnelles** : `audit_log` copie les lignes modifiées (noms, e-mails) sans purge ; l'outil du jour J garde une copie des données dans le navigateur de l'appareil utilisé. Prévoir une durée de conservation et la purge des données de l'édition précédente
 - **htmlRedirect** : URL sanitisée
 
 ## Emails transactionnels
 - Triggers PostgreSQL → `pg_net.http_post` → Cloudflare Worker (`worker-email.js`) → MailerSend
-- Types : confirmation, promotion, annulation, accompagnant_supprime, table_validee, table_refusee, recap (RPC à la demande), rappel (J-3, déclenché manuellement par l'admin via le bouton dans admin.html)
+- Types : confirmation, promotion, annulation, accompagnant_supprime, table_validee, table_refusee, nouvelle_proposition, proposition_recue, recap (RPC à la demande), rappel (J-3, déclenché manuellement par l'admin via le bouton « Envoyer les rappels J-3 » de admin.html, **masqué depuis l'envoi de mai 2026** : ne le réactiver qu'après la purge des données de l'édition précédente, car `send_reminders` écrit à toutes les personnes présentes dans `presences`)
 - Asynchrone (fire-and-forget) — n'impacte jamais la transaction principale
 - **À surveiller** : si MailerSend retourne 401 → vérifier `MAILERSEND_API_KEY` dans Cloudflare. Si erreur 422 → vérifier DNS du domaine.
 
@@ -168,3 +179,12 @@ Les joueurs peuvent ajouter jusqu'à 3 accompagnants liés à leur compte :
 - CSS dans `styles.css`, JS partagé dans `app.supabase.js`, JS page-spécifique inline dans chaque HTML
 - Thème visuel : médiéval doré sur parchemin (couleurs principales : `--gold #D4A030`, `--cream`, `--text-light`)
 - Polices : Cinzel Decorative (titres), Lora (corps)
+
+## Règles d'autonomie (sessions Claude Code)
+- Une branche par chantier, nommée `feature/<sujet>`, créée depuis `main` à jour. Jamais de commit direct sur `main`. Ne pas pousser (pas de `git push`) : l'utilisateur relit en local.
+- Ne jamais exécuter de SQL, ne toucher à aucune configuration Supabase, Cloudflare ou MailerSend, ne modifier aucun secret. Tout ce qui touche à la base s'écrit en fichiers de migration avec rollback, **non appliqués**.
+- Ne pas modifier la logique métier ni les appels RPC/REST hors du périmètre du chantier. Pas de refonte de framework, pas de nouvelle dépendance sans demander.
+- Aucun secret, e-mail personnel ni donnée réelle dans les fichiers, les messages de commit ou les réponses.
+- Commits courts, un par sujet. En fin de chantier : fichiers modifiés, ce qui a été vérifié et comment, ce qui ne l'a pas été.
+- Une décision de contenu (texte, couleur, règle) : proposer deux options et attendre ; ne pas inventer de contenu officiel.
+- Ne jamais utiliser `git add -A` : le dépôt peut contenir des fichiers de travail non suivis qui ne doivent pas être versionnés.
