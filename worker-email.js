@@ -208,6 +208,36 @@ function isRateLimited(ip) {
 
 
 // =============================================================================
+// ÉCHAPPEMENT HTML — toute valeur saisie par un utilisateur
+// =============================================================================
+// Les pseudos, noms de jeu, créneaux et noms d'accompagnants sont saisis par des
+// utilisateurs : sans échappement, un pseudo comme <img src=x onerror=...> serait
+// inséré tel quel dans le HTML de l'e-mail. Règle du fichier : toute valeur issue
+// de « data » insérée dans un gabarit HTML passe par escapeHtml().
+//
+// Ne PAS l'appliquer :
+//   - au sujet de l'e-mail (texte brut : un « &amp; » y serait affiché tel quel) ;
+//   - aux liens d'agenda (déjà encodés avec encodeURIComponent) ;
+//   - aux fragments HTML écrits dans ce fichier (<strong>, <a href=...>).
+
+/**
+ * Échappe les cinq caractères spéciaux du HTML pour qu'une valeur soit affichée
+ * comme du texte et jamais interprétée comme du code.
+ * @param {*} value - La valeur à afficher (texte, nombre, null ou undefined)
+ * @returns {string} Le texte échappé ; chaîne vide pour null et undefined
+ */
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')   // en premier : sinon on échapperait les & déjà produits
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+
+// =============================================================================
 // TEMPLATE HTML — Construction des emails
 // =============================================================================
 
@@ -232,7 +262,7 @@ function buildEmailHtml(options) {
   let champsHtml = '';
   if (options.champs && options.champs.length > 0) {
     for (const champ of options.champs) {
-      champsHtml += `<p style="color:${c.text};margin:0 0 8px"><strong>${champ.label} :</strong> ${champ.valeur}</p>`;
+      champsHtml += `<p style="color:${c.text};margin:0 0 8px"><strong>${escapeHtml(champ.label)} :</strong> ${escapeHtml(champ.valeur)}</p>`;
     }
   }
 
@@ -603,7 +633,7 @@ function buildRecapEmail(data) {
     sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">🎲 Mes tables MJ</h3>`;
     for (const t of tablesMJ) {
       const statut = t.statut_table === 'validé' ? '✅ Validée' : '⏳ En attente';
-      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${t.jeu}</strong> — ${t.creneau} (${statut})</p>`;
+      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${escapeHtml(t.jeu)}</strong> — ${escapeHtml(t.creneau)} (${statut})</p>`;
       if (t.statut_table === 'validé') {
         sections += buildCalendarLinks(t.creneau, t.jeu + ' (MJ)', 'table');
       }
@@ -616,7 +646,7 @@ function buildRecapEmail(data) {
     sections += `<h3 style="color:${c.success};font-size:16px;margin:16px 0 8px">🧑 Mes tables joueur</h3>`;
     for (const i of perso) {
       const statut = i.statut === 'inscrit' ? '✅ Inscrit·e' : '⏳ En attente';
-      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${i.jeu}</strong> — ${i.creneau} (${statut})</p>`;
+      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${escapeHtml(i.jeu)}</strong> — ${escapeHtml(i.creneau)} (${statut})</p>`;
       if (i.statut === 'inscrit') {
         sections += buildCalendarLinks(i.creneau, i.jeu, 'table');
       }
@@ -629,7 +659,7 @@ function buildRecapEmail(data) {
     sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">👤 Accompagnants</h3>`;
     for (const i of accs) {
       const statut = i.statut === 'inscrit' ? '✅' : '⏳';
-      sections += `<p style="color:${c.text};margin:0 0 4px">• ${i.nom_accompagnant} → <strong>${i.jeu}</strong> — ${i.creneau} ${statut}</p>`;
+      sections += `<p style="color:${c.text};margin:0 0 4px">• ${escapeHtml(i.nom_accompagnant)} → <strong>${escapeHtml(i.jeu)}</strong> — ${escapeHtml(i.creneau)} ${statut}</p>`;
     }
   }
 
@@ -640,7 +670,7 @@ function buildRecapEmail(data) {
   if (benPerso.length > 0) {
     sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">🤝 Bénévolat</h3>`;
     for (const b of benPerso) {
-      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${b.creneau}</strong></p>`;
+      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${escapeHtml(b.creneau)}</strong></p>`;
       sections += buildCalendarLinks(b.creneau, 'Bénévolat', 'benevole');
     }
   }
@@ -648,7 +678,7 @@ function buildRecapEmail(data) {
   if (benAcc.length > 0) {
     sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">🤝 Bénévolat accompagnants</h3>`;
     for (const b of benAcc) {
-      sections += `<p style="color:${c.text};margin:0 0 4px">• ${b.nom_accompagnant} → <strong>${b.creneau}</strong></p>`;
+      sections += `<p style="color:${c.text};margin:0 0 4px">• ${escapeHtml(b.nom_accompagnant)} → <strong>${escapeHtml(b.creneau)}</strong></p>`;
     }
   }
 
@@ -657,7 +687,7 @@ function buildRecapEmail(data) {
     sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">🍽️ Repas du samedi soir</h3>`;
     for (const r of repas) {
       var nom = r.nom_accompagnant || r.nom || 'Vous';
-      sections += `<p style="color:${c.text};margin:0 0 4px">• ${nom} — inscrit·e</p>`;
+      sections += `<p style="color:${c.text};margin:0 0 4px">• ${escapeHtml(nom)} — inscrit·e</p>`;
     }
     if (EDITION.helloassoMealUrl) {
       sections += `<p style="color:${c.muted};font-size:13px;margin-top:8px">Paiement en ligne : <a href="${EDITION.helloassoMealUrl}" style="color:${c.accent};text-decoration:underline">HelloAsso</a></p>`;
@@ -709,7 +739,7 @@ function buildRappelEmail(data) {
     sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">🎲 Vos tables en tant que MJ</h3>`;
     for (const t of tablesMJ) {
       const statut = t.statut_table === 'validé' ? '✅ Validée' : '⏳ En attente de validation';
-      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${t.jeu}</strong> — ${t.creneau} (${statut})</p>`;
+      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${escapeHtml(t.jeu)}</strong> — ${escapeHtml(t.creneau)} (${statut})</p>`;
     }
   }
 
@@ -719,7 +749,7 @@ function buildRappelEmail(data) {
     sections += `<h3 style="color:${c.success};font-size:16px;margin:16px 0 8px">🧑 Vos tables en tant que joueur·euse</h3>`;
     for (const i of perso) {
       const statut = i.statut === 'inscrit' ? '✅ Inscrit·e' : '⏳ En attente';
-      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${i.jeu}</strong> — ${i.creneau} (${statut})</p>`;
+      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${escapeHtml(i.jeu)}</strong> — ${escapeHtml(i.creneau)} (${statut})</p>`;
     }
   }
 
@@ -729,7 +759,7 @@ function buildRappelEmail(data) {
     sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">👤 Vos accompagnant·e·s</h3>`;
     for (const i of accs) {
       const statut = i.statut === 'inscrit' ? '✅' : '⏳';
-      sections += `<p style="color:${c.text};margin:0 0 4px">• ${i.nom_accompagnant} → <strong>${i.jeu}</strong> — ${i.creneau} ${statut}</p>`;
+      sections += `<p style="color:${c.text};margin:0 0 4px">• ${escapeHtml(i.nom_accompagnant)} → <strong>${escapeHtml(i.jeu)}</strong> — ${escapeHtml(i.creneau)} ${statut}</p>`;
     }
   }
 
@@ -737,7 +767,7 @@ function buildRappelEmail(data) {
   if (benevolats.length > 0) {
     sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">🤝 Bénévolat</h3>`;
     for (const b of benevolats) {
-      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${b.creneau}</strong></p>`;
+      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${escapeHtml(b.creneau)}</strong></p>`;
     }
   }
 
@@ -762,7 +792,7 @@ function buildRappelEmail(data) {
     + (EDITION.horaires ? `<p style="color:${c.text};margin:0 0 4px"><strong>Horaires :</strong> ${EDITION.horaires}</p>` : '')
     + `<p style="color:${c.muted};font-size:13px;margin-top:8px">Programme complet : <a href="${SITE_URL}programme.html" style="color:${c.accent}">${SITE_URL}programme.html</a></p>`;
 
-  const intro = `Bonjour ${nom},<br><br>`
+  const intro = `Bonjour ${escapeHtml(nom)},<br><br>`
     + `La convention <strong>Sous l'Œil de Mélusine</strong> approche : c'est ${joursTexte} ! `
     + `Voici un rappel de votre programme :`;
 
