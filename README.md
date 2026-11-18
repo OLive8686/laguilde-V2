@@ -15,7 +15,7 @@ Navigateur  ──►  Pages HTML statiques (GitHub Pages, sousloeildemelusine.f
 Worker Cloudflare « keep-alive » : ping Supabase toutes les 4 minutes (évite la mise en pause du plan gratuit)
 ```
 
-Pas de framework ni de build : HTML, CSS et JavaScript « vanilla ». Le détail (flux d'inscription, rôles, présences, e-mails, sécurité) est dans `CLAUDE.md`.
+Pas de framework ni de build : HTML, CSS et JavaScript « vanilla ». Les polices sont auto-hébergées (aucun appel à Google Fonts). Le détail (flux d'inscription, rôles, présences, e-mails, sécurité) est dans `CLAUDE.md`.
 
 ## Installation et lancement en local
 
@@ -38,8 +38,15 @@ Il n'y a rien à installer : le site est statique.
 | `admin.html` | Panneau admin (validation des tables, rôles, rappels, export CSV) |
 | `melusine-convention-2026.html` | Outil admin du jour J (pointage ; données gardées dans le navigateur de l'appareil) |
 | `app.supabase.js` | JavaScript partagé : connexion, client REST, rôles, présences, aides d'affichage |
-| `styles.css` | Feuille de styles unique |
-| `worker-email.js` | Code du Worker d'e-mails `melusine-email` |
+| `edition.js` | **Valeurs de l'édition** : année, dates, lieu, liens, préfixe de stockage (seul fichier du site à changer chaque année) |
+| `theme.css` | **Jetons visuels** : toutes les couleurs, polices, rayons, ombres ; sombre par défaut, clair automatique |
+| `styles.css` | Mise en page et composants, sans couleur en dur |
+| `fonts.css`, `fonts/` | Polices auto-hébergées (Cinzel, Cinzel Decorative, Lora ; 116 Ko ; licence SIL OFL) |
+| `logo.png`, `Logo_guilde_final.webp` | Logo du menu ; logo de La Guilde (pieds de page, page Infos) |
+| `worker-email.js` | Code du Worker d'e-mails `melusine-email` (valeurs annuelles dans son bloc `EDITION`) |
+| `tests/` | Tests automatisés Node (`worker-email.test.js`, `edition.test.js`) |
+| `docs/EDITION_2027_A_FAIRE.md` | Valeurs annuelles : où les changer, ce qu'il reste à fournir |
+| `migrations/` | Modèle de migration préparé, non exécuté (`010`, valeurs 2027 de la table `config`) |
 | `worker.js` | Code du Worker de maintien en éveil de Supabase |
 | `*.sql` | Base de données : données initiales, triggers, fonctions (voir `CLAUDE.md`) |
 | `CNAME` | Domaine personnalisé |
@@ -63,18 +70,19 @@ Il n'y a **pas de fichier `.env`** : le site est statique, sans serveur à confi
 | Action | Commande ou geste |
 |---|---|
 | Lancer en local | `python -m http.server 8080` dans le dossier du dépôt |
+| Lancer les tests automatisés (46) | `node --test "tests/*.test.js"` (Node 18 ou plus, rien à installer ; garder les guillemets) |
 | Vérifier la syntaxe du Worker | `node --check worker-email.js` |
 | Déployer le site | `git push` sur `main` → GitHub Pages (~3-5 min ; Ctrl+Maj+R pour contourner le cache) |
 | Déployer le Worker d'e-mails | Copier `worker-email.js` dans le Worker `melusine-email` (dashboard Cloudflare) → Deploy |
 | Appliquer un fichier SQL | Supabase → SQL Editor → coller le fichier → Run |
-| Changer `app.supabase.js` | Incrémenter `?v=N` dans le `<script src>` de **toutes** les pages (et dans `prefetchAllPages`) |
+| Changer `app.supabase.js`, `edition.js`, `theme.css`, `styles.css` ou `fonts.css` | Incrémenter leur `?v=N` dans **toutes** les pages qui les chargent (et, pour `app.supabase.js`, dans `prefetchAllPages`) |
 
-Il n'y a pas de tests automatisés : la recette se fait avec `TESTS.md`.
+Les tests automatisés couvrent le Worker d'e-mails (échappement HTML, authentification) et la configuration annuelle (dates, liens, cohérence site/Worker). Le reste se vérifie avec la recette manuelle `TESTS.md`.
 
 ## Maintenance à prévoir
 
 **Chaque année, avant l'ouverture des inscriptions** (checklist complète : `ROADMAP.md`, section 5) :
-- mettre à jour les dates, le lieu et les liens (Facebook, HelloAsso) : constantes en tête de `worker-email.js` et pages du site ;
+- mettre à jour les dates, le lieu et les liens (Facebook, HelloAsso) dans **`edition.js`** et dans le bloc `EDITION` de `worker-email.js` (puis `node --test "tests/*.test.js"`), et les valeurs de la table `config` ; marche à suivre dans `docs/EDITION_2027_A_FAIRE.md` ;
 - **renouveler le secret du webhook** (`WEBHOOK_SECRET`, côté Cloudflare et côté Supabase) et noter la date ;
 - **purger ou archiver les données de l'édition précédente** (inscriptions, présences, bénévoles, repas, accompagnants, copie dans `audit_log`) : ce sont des données personnelles ;
 - vérifier la clé `MAILERSEND_API_KEY` et le statut DNS du domaine d'envoi dans MailerSend ;
