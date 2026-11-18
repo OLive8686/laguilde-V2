@@ -1,0 +1,8 @@
+# Fichiers de travail personnels : ne pas versionner
+10-prompts-autonomes-site-v2.md
+
+# Captures d'écran et sorties de tests visuels : jamais dans le dépôt
+captures/
+screenshots/
+shots/
+*.screenshot.png
