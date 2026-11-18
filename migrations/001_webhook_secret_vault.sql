@@ -9,10 +9,14 @@
 --
 -- ⚠ ORDRE OBLIGATOIRE (voir docs/ROTATION_WEBHOOK_SECRET.md) :
 --   a) créer le secret « melusine_webhook_secret » dans Vault (dashboard) ;
---   b) exécuter CETTE migration ;
---   c) mettre la même valeur dans la variable secrète WEBHOOK_SECRET du Worker.
---   Entre (b) et (c), les e-mails échouent en 403 (sans conséquence pour les
---   inscriptions : l'envoi est asynchrone). Faites (b) et (c) à la suite.
+--   b) mettre la même valeur dans la variable secrète WEBHOOK_SECRET du Worker
+--      Cloudflare et déployer : l'ancienne valeur (compromise) est refusée dès
+--      ce moment ;
+--   c) exécuter CETTE migration.
+--   Entre (b) et (c), la base envoie encore l'ancienne valeur : les e-mails
+--   déclenchés par la base échouent en 403. C'est voulu et sans conséquence tant
+--   que le site est en pause (et l'envoi est de toute façon asynchrone : il ne
+--   bloque jamais une inscription). Site actif : enchaîner (b) puis (c) sans pause.
 --
 -- Retour arrière : migrations/rollback/001_webhook_secret_vault_rollback.sql
 -- Rejouable : oui (CREATE OR REPLACE, REVOKE idempotent).
