@@ -227,6 +227,7 @@ Avant l'ouverture des inscriptions, vérifier :
 - [ ] `seed_data.sql` adapté pour la nouvelle édition (créneaux bénévoles, etc.)
 - [ ] Si refonte `programme_id` faite : tester un workflow complet (inscription → annulation → promotion auto → email)
 - [ ] Test de l'envoi du rappel J-3 sur un compte admin avant la vraie date
+- [ ] **Purger les données de 2026 avant de réactiver le bouton « Envoyer les rappels J-3 »** (inscriptions, présences, bénévoles, repas, accompagnants, copie dans `audit_log`). Le bouton est masqué (`display:none` dans `admin.html`) : `send_reminders` écrit à **toutes** les personnes présentes dans `presences`, donc tant que les données 2026 y figurent, le réactiver expose à un envoi massif aux participants de l'édition passée
 - [ ] Test de l'export CSV (les 5 fichiers)
 - [ ] Vue admin par table opérationnelle
 - [ ] Modal post-login s'affiche pour un nouveau compte
