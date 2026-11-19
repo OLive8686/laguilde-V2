@@ -14,6 +14,7 @@
     <meta name="color-scheme" content="dark light">
     <link rel="stylesheet" href="theme.css?v=1">
     <link rel="stylesheet" href="styles.css?v=2">
+    <link rel="stylesheet" href="v2.css?v=1">
 </head>
 <body>
 
@@ -546,18 +547,57 @@ function renderProgramme(items) {
         }
     });
 
-    // Générer les onglets : "Tous" + un onglet par créneau
-    tabsEl.innerHTML = '<button class="tab active" data-filter="all">Tous</button>' +
-        creneaux.map(function(c) {
-            return '<button class="tab" data-filter="' + escHtml(c) + '">' + escHtml(c) + '</button>';
-        }).join('');
+    // ── Filtres (v2) : un choix de jour, puis (si un jour est choisi) un choix de créneau ──
+    // Remplace les ~13 pastilles d'un seul rang. L'état du filtre est gardé ici.
+    var state = { jour: 'all', creneau: 'all' };
+
+    /** Jour d'un créneau : 'samedi' ou 'dimanche' (même règle que creneauSortKey). */
+    function jourDe(creneau) {
+        return (creneau || '').toLowerCase().indexOf('dimanche') !== -1 ? 'dimanche' : 'samedi';
+    }
+
+    /** Libellé d'un jour (« Samedi 8 mai », dates lues dans edition.js ; repli : « Samedi »). */
+    function jourLibelle(jour) {
+        if (window.EDITION && typeof window.EDITION.dayLabel === 'function') return window.EDITION.dayLabel(jour, true);
+        return jour.charAt(0).toUpperCase() + jour.slice(1);
+    }
+
+    var aSamedi = creneaux.some(function(c) { return jourDe(c) === 'samedi'; });
+    var aDimanche = creneaux.some(function(c) { return jourDe(c) === 'dimanche'; });
+
+    /** (Re)construit les contrôles de filtre selon l'état courant. */
+    function renderControls() {
+        function seg(valeur, libelle) {
+            var actif = state.jour === valeur;
+            return '<button type="button" class="seg' + (actif ? ' active' : '') + '" data-jour="' + valeur + '" aria-pressed="' + actif + '">' + escHtml(libelle) + '</button>';
+        }
+        var html = '<div class="day-switch" role="group" aria-label="Choisir le jour">' +
+            seg('all', 'Tous') +
+            (aSamedi ? seg('samedi', jourLibelle('samedi')) : '') +
+            (aDimanche ? seg('dimanche', jourLibelle('dimanche')) : '') +
+            '</div>';
+        if (state.jour !== 'all') {
+            var chips = creneaux.filter(function(c) { return jourDe(c) === state.jour; });
+            html += '<div class="creneau-chips" role="group" aria-label="Choisir un créneau">' +
+                '<button type="button" class="tab' + (state.creneau === 'all' ? ' active' : '') + '" data-creneau="all">Toute la journée</button>' +
+                chips.map(function(c) {
+                    return '<button type="button" class="tab' + (state.creneau === c ? ' active' : '') + '" data-creneau="' + escHtml(c) + '">' + escHtml(c) + '</button>';
+                }).join('') + '</div>';
+        }
+        tabsEl.innerHTML = html;
+    }
 
     /**
-     * Rendu des cartes de jeu pour un filtre donné.
-     * @param {string} filter - 'all' ou le nom d'un créneau
+     * Rendu des cartes de jeu selon l'état du filtre (jour, puis créneau).
+     * Les cartes sont groupées sous un titre de jour (si « Tous ») puis un titre de créneau.
      */
-    function render(filter) {
-        var list = filter === 'all' ? items : items.filter(function(i) { return i.creneau === filter; });
+    function render() {
+        var list = items.filter(function(i) {
+            if (state.jour !== 'all' && jourDe(i.creneau) !== state.jour) return false;
+            if (state.creneau !== 'all' && i.creneau !== state.creneau) return false;
+            return true;
+        });
+        var lastJour = null, lastCreneau = null; // pour n'écrire chaque titre de groupe qu'une fois
 
         grid.innerHTML = list.map(function(item) {
             // Calcul des places — utiliser le quota web si défini
@@ -654,32 +694,63 @@ function renderProgramme(items) {
                 inscritsHtml = '<div style="margin-top:8px;font-size:13px;color:var(--text-muted)">👥 ' + noms.join(', ') + '</div>';
             }
 
+            // État de remplissage (couleur du liseré et de la jauge) et jauge en pourcentage
+            var etat = (fullWeb && !item.complet) ? 'attente' : (fullWeb ? 'complet' : (webRest <= 2 ? 'peu' : 'dispo'));
+            var pct = max > 0 ? Math.round(Math.min(ins, max) / max * 100) : 0;
+
+            // Description : repliée sur 3 lignes quand elle est longue, avec « Lire la suite »
+            var desc = item.description || '';
+            var longue = desc.length > 180;
+            var descHtml = '<div class="desc' + (longue ? ' desc--clamp' : '') + '">' + escHtml(desc) + '</div>' +
+                (longue ? '<button type="button" class="desc-toggle" onclick="var d=this.previousElementSibling;d.classList.toggle(\'desc--clamp\');this.textContent=d.classList.contains(\'desc--clamp\')?\'Lire la suite\':\'Réduire\'">Lire la suite</button>' : '');
+
+            // Titres de groupe : le jour (si « Tous »), puis le créneau, une seule fois chacun
+            var entete = '';
+            var jour = jourDe(item.creneau);
+            if (state.jour === 'all' && jour !== lastJour) {
+                entete += '<h2 class="day-title">' + escHtml(jourLibelle(jour)) + '</h2>';
+                lastJour = jour;
+                lastCreneau = null;
+            }
+            if (item.creneau !== lastCreneau) {
+                entete += '<h3 class="time-block">' + escHtml(item.creneau) + '</h3>';
+                lastCreneau = item.creneau;
+            }
+
             // Carte du jeu
-            return '<div class="creneau">' +
-                '<div class="creneau-time">' + (escHtml(item.creneau) || '') + '</div>' +
+            return entete + '<div class="creneau creneau--' + etat + '">' +
                 '<div class="creneau-info">' +
                     '<h4>' + (escHtml(item.jeu) || '') + '</h4>' +
                     '<div class="mj">MJ : ' + (escHtml(item.mj) || '—') + (item.systeme ? ' · ' + escHtml(item.systeme) : '') + '</div>' +
-                    '<div class="desc">' + (escHtml(item.description) || '') + '</div>' +
+                    descHtml +
                     (item.content_warning ? '<div class="content-warning">⚠️ ' + escHtml(item.content_warning) + '</div>' : '') +
-                    '<span class="badge ' + badgeCls + '">' + statusTxt + '</span>' +
+                    '<div class="places"><span class="badge ' + badgeCls + '">' + statusTxt + '</span>' +
+                        '<span class="places-bar" aria-hidden="true"><span style="width:' + pct + '%"></span></span></div>' +
                     inscritsHtml +
                 '</div>' +
                 '<div class="creneau-actions">' + btn + '</div>' +
             '</div>';
-        }).join('');
+        }).join('') || '<p class="vide">Aucune table sur ce créneau.</p>';
     }
 
-    // Rendu initial : afficher tous les créneaux
-    render('all');
+    // Rendu initial : tous les jours
+    renderControls();
+    render();
 
-    // Gestion des clics sur les onglets de filtre
+    // Gestion des clics : choix du jour (remet le créneau à « tout »), ou choix d'un créneau
     tabsEl.onclick = function(e) {
-        if (e.target.classList.contains('tab')) {
-            tabsEl.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
-            e.target.classList.add('active');
-            render(e.target.dataset.filter);
+        var seg = e.target.closest ? e.target.closest('.seg') : null;
+        var chip = e.target.closest ? e.target.closest('.tab') : null;
+        if (seg) {
+            state.jour = seg.dataset.jour;
+            state.creneau = 'all';
+        } else if (chip) {
+            state.creneau = chip.dataset.creneau;
+        } else {
+            return;
         }
+        renderControls();
+        render();
     };
 }
 
