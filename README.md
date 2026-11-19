@@ -42,7 +42,7 @@ Il n'y a rien à installer : le site est statique.
 | `theme.css` | **Jetons visuels** : toutes les couleurs, polices, rayons, ombres ; sombre par défaut, clair automatique |
 | `styles.css` | Mise en page et composants, sans couleur en dur |
 | `fonts.css`, `fonts/` | Polices auto-hébergées (Cinzel, Cinzel Decorative, Lora ; 116 Ko ; licence SIL OFL) |
-| `logo.png`, `Logo_guilde_final.webp` | Logo du menu ; logo de La Guilde (pieds de page, page Infos) |
+| `Logo_guilde_final.webp`, `img/`, `icons/` | Logo de La Guilde (source, versions réduites claire et sombre, icônes d'onglet) ; `logo.png` (ancien) ne sert plus qu'à l'archive `index.2026.html` |
 | `v2.css`, `accueil-2027.html`, `img/`, `tools/` | **Maquettes design v2** (branche `feature/design-v2`) : couche visuelle, nouvel accueil, affiche allégée, script d'optimisation (voir `docs/DESIGN_V2.md`, `docs/AFFICHE.md`) |
 | `acces.js` | Rideau d'accès équipe (code saisi sur `index.html`) : **pas une protection**, voir `docs/ACCES_EQUIPE.md` |
 | `worker-email.js` | Code du Worker d'e-mails `melusine-email` (valeurs annuelles dans son bloc `EDITION`) |
