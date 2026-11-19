@@ -9,7 +9,10 @@
 // protocole DevTools, avec Node 22 ou plus (WebSocket intégré).
 //
 // Usage :
-//   node tools/optimiser-affiche.js <image source> [<fichier de sortie>] [<largeur>] [<qualité 1-100>]
+//   node tools/optimiser-affiche.js <image source> [<fichier de sortie>] [<largeur>] [<qualité 1-100>] [transparent]
+//
+// Le format de sortie suit l'extension (.webp ou .png). Le mot « transparent » en dernier argument
+// conserve la transparence de l'image (logos) ; sans lui, le fond est opaque.
 // Exemple (valeurs par défaut) :
 //   node tools/optimiser-affiche.js docs/AfficheSOM27_base.jpeg img/affiche-2027.webp 960 80
 //
@@ -22,7 +25,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 
-const [, , source, sortie = 'img/affiche-2027.webp', largeurArg = '960', qualiteArg = '80'] = process.argv;
+const [, , source, sortie = 'img/affiche-2027.webp', largeurArg = '960', qualiteArg = '80', optionTransparence] = process.argv;
+const transparent = optionTransparence === 'transparent';
+const formatSortie = /.png$/i.test(sortie) ? 'png' : 'webp';
 if (!source) {
   console.error('Usage : node tools/optimiser-affiche.js <image source> [<sortie>] [<largeur>] [<qualité>]');
   process.exit(1);
@@ -77,12 +82,13 @@ async function main() {
 
   // 2) Afficher l'image à la taille voulue et la capturer en WebP
   await cmd('Emulation.setDeviceMetricsOverride', { width: largeur, height: hauteur, deviceScaleFactor: 1, mobile: false });
+  if (transparent) await cmd('Emulation.setDefaultBackgroundColorOverride', { color: { r: 0, g: 0, b: 0, a: 0 } });
   await cmd('Runtime.evaluate', {
     expression: `document.body.style.margin='0'; document.body.innerHTML='<img id="a" style="display:block;width:${largeur}px;height:${hauteur}px" src=${JSON.stringify(dataUrl)}>';`,
   });
   await cmd('Runtime.evaluate', { awaitPromise: true, expression: `document.getElementById('a').decode()` });
   await attendre(300);
-  const r = await cmd('Page.captureScreenshot', { format: 'webp', quality: qualite, clip: { x: 0, y: 0, width: largeur, height: hauteur, scale: 1 } });
+  const r = await cmd('Page.captureScreenshot', { format: formatSortie, quality: qualite, clip: { x: 0, y: 0, width: largeur, height: hauteur, scale: 1 } });
   fs.mkdirSync(path.dirname(sortie), { recursive: true });
   fs.writeFileSync(sortie, Buffer.from(r.result.data, 'base64'));
   const taille = fs.statSync(sortie).size;
