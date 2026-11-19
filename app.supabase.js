@@ -119,6 +119,11 @@ async function sbQuery(table, query) {
             var refreshed = await refreshSession();
             if (refreshed) {
                 r = await fetch(url, { headers: sbHeaders() });
+            } else {
+                // Session irrécupérable : on retente UNE fois comme visiteur. Les données publiques
+                // (programme, créneaux…) restent ainsi disponibles ; les données privées, elles,
+                // reviendront vides (la base refuse sans session valide), ce qui est le comportement voulu.
+                r = await fetch(url + '&apikey=' + encodeURIComponent(SUPABASE_ANON_KEY));
             }
         }
         if (!r.ok) {
@@ -713,8 +718,11 @@ async function _fetchAllDataImpl() {
 
         // Stocker dans le cache mémoire pour éviter le double-fetch
         _allDataCache = allData;
-        // Et garder une copie « publique » dans le navigateur pour l'affichage instantané à la visite suivante
-        savePublicCache(allData);
+        // Et garder une copie « publique » dans le navigateur pour l'affichage instantané à la visite
+        // suivante, SEULEMENT si les 8 requêtes publiques ont toutes réussi : sinon une panne réseau
+        // remplacerait une bonne copie par des listes vides (« programme en préparation » à tort).
+        var publicOk = results.slice(0, privateStart).every(function(res) { return res && !res.error; });
+        if (publicOk) savePublicCache(allData);
         return allData;
     } catch(e) {
         console.error('fetchAllData erreur:', e);
@@ -727,18 +735,26 @@ async function _fetchAllDataImpl() {
 // en arrière-plan. Pour un programme vide, « Le programme est en préparation » apparaît sans attente.
 //
 // Ce qu'on stocke (données déjà publiques) : config, programme, créneaux bénévoles, restauration,
-// animations, nombre de repas. Ce qu'on ne stocke JAMAIS : e-mails (toute clé commençant par « email »),
-// noms des inscrits, données de l'utilisateur connecté.
+// animations, nombre de repas, limités aux colonnes de la liste blanche ci-dessous. Ce qu'on ne stocke
+// JAMAIS : e-mails, noms des inscrits, données de l'utilisateur connecté.
 // Utilisée uniquement pour un VISITEUR : un utilisateur connecté a besoin de ses inscriptions pour
 // afficher les bons boutons, et elles arrivent avec la même requête (aucun gain à afficher avant).
 var CLE_CACHE_PUBLIC = 'melusine_cache_public_v1';
-var DUREE_MAX_CACHE_PUBLIC = 7 * 24 * 3600 * 1000;   // au-delà d'une semaine, on l'ignore
+var DUREE_MAX_CACHE_PUBLIC = 24 * 3600 * 1000;   // au-delà d'un jour, on l'ignore (places vite périmées)
 
-/** Copie d'une ligne sans les clés « email… » (sécurité : aucune adresse dans le stockage du navigateur). */
-function sansEmails(ligne) {
+// LISTE BLANCHE des colonnes gardées : seules celles qu'affichent les pages. Une colonne ajoutée plus
+// tard à la base (note interne, téléphone…) ne sera donc JAMAIS recopiée dans le navigateur par défaut.
+// À mettre à jour si une page affiche une nouvelle colonne.
+var COLONNES_CACHE_PROGRAMME = ['creneau', 'jeu', 'mj', 'systeme', 'description', 'content_warning',
+    'places', 'places_web', 'statut_table', 'places_restantes', 'places_web_restantes',
+    'inscrits', 'complet', 'complet_web', 'has_quota'];
+var COLONNES_CACHE_CRENEAUX = ['creneau', 'description', 'places', 'inscrits', 'places_restantes', 'complet'];
+
+/** Copie d'une ligne limitée aux colonnes autorisées. */
+function colonnesAutorisees(ligne, autorisees) {
     var copie = {};
-    Object.keys(ligne || {}).forEach(function(cle) {
-        if (!/^email/i.test(cle)) copie[cle] = ligne[cle];
+    autorisees.forEach(function(cle) {
+        if (ligne && ligne[cle] !== undefined) copie[cle] = ligne[cle];
     });
     return copie;
 }
@@ -747,12 +763,8 @@ function sansEmails(ligne) {
 function versCachePublic(allData) {
     return {
         config: allData.config || {},
-        programme: (allData.programme || []).map(sansEmails),
-        creneaux_benevoles: (allData.creneaux_benevoles || []).map(function(c) {
-            var copie = sansEmails(c);
-            delete copie.noms_inscrits;   // pseudos des bénévoles : pas de stockage durable
-            return copie;
-        }),
+        programme: (allData.programme || []).map(function(t) { return colonnesAutorisees(t, COLONNES_CACHE_PROGRAMME); }),
+        creneaux_benevoles: (allData.creneaux_benevoles || []).map(function(c) { return colonnesAutorisees(c, COLONNES_CACHE_CRENEAUX); }),
         restauration: allData.restauration || [],
         animations: allData.animations || [],
         repas_count: allData.repas_count || 0,
@@ -1780,7 +1792,7 @@ function closeChoixModal() {
  *   7. Précharger les autres pages
  */
 // Pages dont l'accès dépend du rôle : elles doivent connaître le rôle RÉEL avant de s'initialiser.
-var PAGES_SELON_ROLE = ['admin.html', 'espace-mj.html'];
+var PAGES_SELON_ROLE = ['admin.html', 'espace-mj.html', 'mes-inscriptions.html'];
 
 /**
  * Lit le contenu d'un jeton de session (JWT) SANS en vérifier la signature.
@@ -1855,7 +1867,12 @@ async function initApp() {
         if (infosJeton && infosJeton.exp && infosJeton.exp * 1000 < Date.now() + 30000) {
             // Jeton périmé (ou presque) : UN rafraîchissement avant de lancer les requêtes, sinon elles
             // partiraient toutes en 401 en même temps.
-            await refreshSession();
+            var rafraichi = await refreshSession();
+            if (!rafraichi) {
+                // Session irrécupérable : même traitement qu'un jeton invalide (voir la vérification plus bas)
+                _accessToken = null;
+                localStorage.removeItem('melusine_session');
+            }
             infosJeton = _accessToken ? lireJeton(_accessToken) : null;
         }
         if (infosJeton && infosJeton.email) {
@@ -1911,6 +1928,13 @@ async function initApp() {
 
     // La vérification est finie (ou le sera presque tout de suite) : navigation définitive
     await verification;
+    if (sessionProvisoire && !currentUser) {
+        // L'identité provisoire s'est révélée fausse (jeton révoqué) : la page a pu s'afficher avec des
+        // données « connecté ». Le jeton est maintenant effacé : un rechargement repart en visiteur
+        // (et ne peut pas boucler, puisqu'il n'y a plus de jeton).
+        location.reload();
+        return;
+    }
     updateNavUser();
     updateNavForRole();
 
@@ -1927,7 +1951,7 @@ async function initApp() {
 function prefetchAllPages() {
     // Attendre 1 seconde après le rendu pour ne pas concurrencer le contenu visible
     setTimeout(function() {
-        var pages = ['index.html', 'programme.html', 'infos.html', 'benevoles.html', 'mes-inscriptions.html', 'espace-mj.html', 'aide.html', 'styles.css', 'edition.js?v=1', 'app.supabase.js?v=5'];
+        var pages = ['index.html', 'programme.html', 'infos.html', 'benevoles.html', 'mes-inscriptions.html', 'espace-mj.html', 'aide.html', 'styles.css?v=3', 'edition.js?v=1', 'app.supabase.js?v=5'];
         var current = location.pathname.split('/').pop() || 'index.html';
         pages.forEach(function(page) {
             if (page === current) return;
@@ -1985,6 +2009,7 @@ window.fetchSheetData = fetchSheetData;
 window.fetchConfig = fetchConfig;
 window.fetchAllPublic = fetchAllPublic;
 window.readPublicCache = readPublicCache;
+window.versCachePublic = versCachePublic;
 window.fetchAllData = fetchAllData;
 window.fetchRole = fetchRole;
 

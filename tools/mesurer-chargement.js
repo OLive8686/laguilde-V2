@@ -42,8 +42,13 @@ const essais = parseInt(process.argv[3] || '5', 10);
 /** Serveur statique minimal : sert les fichiers du dépôt (lecture seule, local uniquement). */
 function demarrerServeur() {
   const serveur = http.createServer((req, res) => {
-    const chemin = path.join(RACINE, decodeURIComponent(req.url.split('?')[0]));
-    if (!chemin.startsWith(RACINE) || !fs.existsSync(chemin) || fs.statSync(chemin).isDirectory()) { res.writeHead(404); return res.end(); }
+    let demande;
+    try { demande = decodeURIComponent(req.url.split('?')[0]); } catch (e) { res.writeHead(400); return res.end(); }
+    const chemin = path.join(RACINE, demande);
+    // « path.relative » et non « startsWith » : un dossier voisin dont le nom commence pareil
+    // (ex. « laguilde-V2-copie ») passerait un simple test de préfixe.
+    const relatif = path.relative(RACINE, chemin);
+    if (relatif.startsWith('..') || path.isAbsolute(relatif) || !fs.existsSync(chemin) || fs.statSync(chemin).isDirectory()) { res.writeHead(404); return res.end(); }
     res.writeHead(200, { 'Content-Type': TYPES[path.extname(chemin)] || 'application/octet-stream' });
     fs.createReadStream(chemin).pipe(res);
   });
@@ -58,18 +63,19 @@ async function ouvrirOnglet() {
   for (let i = 0; i < 50; i++) {
     try { liste = await (await fetch('http://127.0.0.1:' + PORT_CHROME + '/json')).json(); break; } catch (e) { await attendre(200); }
   }
-  const cible = liste.find((t) => t.type === 'page');
+  const cible = liste && liste.find((t) => t.type === 'page');
+  if (!cible) throw new Error('Chrome n\'a pas démarré (port ' + PORT_CHROME + ' occupé, Chrome déjà ouvert avec un autre profil, ou installation introuvable) : fermer les fenêtres Chrome de test et relancer.');
   const ws = new WebSocket(cible.webSocketDebuggerUrl);
   await new Promise((ok) => { ws.onopen = ok; });
   let n = 0; const attente = {}; const ecouteurs = [];
   ws.onmessage = (m) => {
     const msg = JSON.parse(m.data);
-    if (msg.id && attente[msg.id]) { attente[msg.id](msg.result || msg.error); delete attente[msg.id]; }
+    if (msg.id && attente[msg.id]) { attente[msg.id].ok(msg.error ? Promise.reject(new Error('Chrome : ' + msg.error.message)) : (msg.result || {})); delete attente[msg.id]; }
     else ecouteurs.forEach((f) => f(msg));
   };
   return {
-    envoyer: (methode, params) => new Promise((ok) => { const id = ++n; attente[id] = ok; ws.send(JSON.stringify({ id, method: methode, params: params || {} })); }),
-    ecouter: (f) => ecouteurs.push(f),
+    envoyer: (methode, params) => new Promise((ok) => { const id = ++n; attente[id] = { ok }; ws.send(JSON.stringify({ id, method: methode, params: params || {} })); }),
+    ecouter: (f) => { ecouteurs.push(f); return () => { const i = ecouteurs.indexOf(f); if (i >= 0) ecouteurs.splice(i, 1); }; },
     fermer: () => ws.close(),
   };
 }
@@ -77,7 +83,7 @@ async function ouvrirOnglet() {
 /** Une mesure : charge la page et renvoie { ms, requetesSupabase }. */
 async function mesurer(onglet, page, viderStockage) {
   let requetes = 0;
-  onglet.ecouter((msg) => {
+  const retirer = onglet.ecouter((msg) => {
     if (msg.method === 'Network.requestWillBeSent' && /supabase\.co\/(rest|auth)\//.test(msg.params.request.url)) requetes++;
   });
   if (viderStockage) await onglet.envoyer('Storage.clearDataForOrigin', { origin: 'http://127.0.0.1:' + PORT_SITE, storageTypes: 'all' });
@@ -92,8 +98,9 @@ async function mesurer(onglet, page, viderStockage) {
       expression: "(function(){var g=document.getElementById('programmeGrid')||document.getElementById('benevoleGrid');return !!g && g.innerHTML.trim().length>0 && !g.querySelector('.loading-shimmer');})()",
       returnByValue: true,
     });
-    if (r && r.result && r.result.value === true) return { ms: Date.now() - debut, requetes };
+    if (r && r.result && r.result.value === true) { retirer(); return { ms: Date.now() - debut, requetes }; }
   }
+  retirer();
   return { ms: null, requetes };
 }
 

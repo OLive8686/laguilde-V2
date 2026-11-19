@@ -251,11 +251,15 @@ window.onPageInit = async function() {
         _allProgramme = allData.programme;
         // Pas de nouveau rendu si rien n'a changé depuis la copie déjà affichée (évite un clignotement)
         var identique = signatureCopie !== null
-            && JSON.stringify(allData.programme.map(function(t) { var c = {}; Object.keys(t).forEach(function(k) { if (!/^email/i.test(k)) c[k] = t[k]; }); return c; })) === signatureCopie
+            && JSON.stringify(versCachePublic({ programme: allData.programme }).programme) === signatureCopie
             && !_allInscriptions.length;
         if (!identique) renderProgramme(allData.programme);
     } else if (signatureCopie === null) {
         await refreshProgramme();
+    } else {
+        // La copie de la dernière visite est affichée mais les données fraîches n'ont pas pu être lues :
+        // les places indiquées peuvent être périmées.
+        toast('Impossible d\'actualiser le programme : les places affichées peuvent ne plus être exactes. Rechargez la page.', 'error');
     }
     updateMJButton();
 };
