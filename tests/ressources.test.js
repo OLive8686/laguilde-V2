@@ -61,14 +61,9 @@ test('les logos réduits (clair et sombre) existent aux deux tailles et restent 
   }
 });
 
-test('chaque logo en <picture> a sa version sombre et sa version claire', () => {
+test('le logo est affiché dans sa version normale (essai : plus de version rose pour le thème sombre)', () => {
   for (const page of pages) {
     const html = fs.readFileSync(path.join(racine, page), 'utf8');
-    for (const m of html.matchAll(/<picture><source media="\(prefers-color-scheme: dark\)" srcset="img\/logo-guilde-sombre-(\d+)\.webp"><img[^>]*src="img\/logo-guilde-(\d+)\.webp"/g)) {
-      assert.equal(m[1], m[2], page + ' : tailles clair et sombre différentes');
-    }
-    const nbImgs = (html.match(/src="img\/logo-guilde-(?:192|256)\.webp"/g) || []).length;
-    const nbPictures = (html.match(/<picture><source media="\(prefers-color-scheme: dark\)" srcset="img\/logo-guilde-sombre-/g) || []).length;
-    assert.equal(nbPictures, nbImgs, page + ' : un logo sans version sombre (image nue sur fond sombre)');
+    assert.ok(!/logo-guilde-sombre/.test(html), page + ' : référence encore la version sombre');
   }
 });
