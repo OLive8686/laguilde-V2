@@ -34,7 +34,9 @@ a{color:var(--gold);text-decoration:none;transition:color var(--transition)} a:h
 .nav.scrolled{background:rgb(var(--bg-rgb) / 0.99);box-shadow:0 4px 30px rgb(var(--shadow-rgb) / 0.1)}
 .nav-inner{max-width:1200px;margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:70px}
 .nav-brand{display:flex;align-items:center;gap:12px}
-.nav-brand img{width:42px;height:42px;border-radius:10px}
+/* Logo de La Guilde : fond transparent ; en thème sombre, le navigateur charge la version à bordeaux éclairci (<picture>) */
+.nav-brand picture{display:flex}
+.nav-brand img{width:46px;height:auto}
 .nav-brand span{font-family:var(--font-display);font-size:19px;color:var(--accent-text);letter-spacing:1px}
 .nav-links{display:flex;gap:6px;list-style:none;align-items:center}
 .nav-links a{font-family:var(--font-heading);font-size:13px;letter-spacing:1.5px;text-transform:uppercase;color:var(--cream);padding:8px 12px;border-radius:6px;transition:all var(--transition)}
@@ -312,9 +314,9 @@ select.mj-input option{background:var(--dark-card);color:var(--cream)}
 @media(max-width:768px){.badge{white-space:normal;text-align:center;max-width:100%}}
 
 /* ── LOGO DE LA GUILDE ───────────────────────────────────────────────────── */
-/* Le logo a des éléments bordeaux : posé sur une plaque claire (--logo-plate) pour rester lisible en mode sombre. */
+/* Logo transparent : original en thème clair, version à bordeaux éclairci en thème sombre (<picture>, voir tools/logo-mode-sombre.js). */
 .footer-guilde{display:inline-flex;flex-shrink:0;border-radius:var(--radius-md)}
-.guilde-logo{display:block;width:72px;height:auto;background:var(--logo-plate);border-radius:var(--radius-md);padding:6px}
-.guilde-logo-lg{width:112px;padding:8px}
+.guilde-logo{display:block;width:72px;height:auto}
+.guilde-logo-lg{width:112px}
 .guilde-bloc{text-align:center;margin-bottom:var(--space-5)}
 .guilde-bloc .guilde-logo{margin:0 auto}

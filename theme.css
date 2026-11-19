@@ -40,8 +40,6 @@
   --info:      #7fa3b3;   /* information : remplissages, icônes */
   --info-text: #8babba;   /* information en TEXTE (≥ 4,5:1 sur les 3 fonds) */
 
-  --logo-plate: #fbf3ec;  /* plaque claire sous le logo de La Guilde (texte bordeaux : illisible sur fond sombre) */
-
   --success: #79b297;     /* succès  (vert d'acier) — texte et remplissage */
   --warning: #d9a441;     /* alerte  (ambre) */
   --danger:  #e48f83;     /* erreur  (rouge brique clair) */
