@@ -67,7 +67,16 @@ function sbHeaders(extra) {
  * Appelé automatiquement quand une requête retourne 401.
  * @returns {boolean} true si le refresh a réussi
  */
-async function refreshSession() {
+var _refreshEnCours = null;   // promesse partagée : un seul rafraîchissement à la fois
+
+function refreshSession() {
+    if (!_refreshEnCours) {
+        _refreshEnCours = _refreshSessionImpl().then(function(ok) { _refreshEnCours = null; return ok; });
+    }
+    return _refreshEnCours;
+}
+
+async function _refreshSessionImpl() {
     try {
         var stored = JSON.parse(localStorage.getItem('melusine_session') || '{}');
         if (!stored.refresh_token) return false;
@@ -95,7 +104,16 @@ async function refreshSession() {
 async function sbQuery(table, query) {
     try {
         var url = SUPABASE_URL + '/rest/v1/' + table + '?' + (query || 'select=*');
-        var r = await fetch(url, { headers: sbHeaders() });
+        var r;
+        if (!_accessToken) {
+            // Visiteur non connecté : la clé publique passe dans l'URL et on n'ajoute AUCUN en-tête
+            // personnalisé. Le navigateur traite alors la requête comme « simple » et saute la requête
+            // préalable de sécurité (OPTIONS, « preflight »), qui doublait chaque aller-retour réseau.
+            // Même résultat qu'avant : sans session, l'en-tête Authorization valait déjà la clé publique.
+            r = await fetch(url + '&apikey=' + encodeURIComponent(SUPABASE_ANON_KEY));
+        } else {
+            r = await fetch(url, { headers: sbHeaders() });
+        }
         // Si 401 (token expiré), tenter un refresh et réessayer
         if (r.status === 401 && _accessToken) {
             var refreshed = await refreshSession();
@@ -695,11 +713,70 @@ async function _fetchAllDataImpl() {
 
         // Stocker dans le cache mémoire pour éviter le double-fetch
         _allDataCache = allData;
+        // Et garder une copie « publique » dans le navigateur pour l'affichage instantané à la visite suivante
+        savePublicCache(allData);
         return allData;
     } catch(e) {
         console.error('fetchAllData erreur:', e);
         return null;
     }
+}
+
+// ── Copie publique des données, gardée dans le navigateur (affichage instantané) ──────────────
+// Idée : à la 2e visite, on affiche TOUT DE SUITE ce qu'on a reçu la dernière fois, puis on rafraîchit
+// en arrière-plan. Pour un programme vide, « Le programme est en préparation » apparaît sans attente.
+//
+// Ce qu'on stocke (données déjà publiques) : config, programme, créneaux bénévoles, restauration,
+// animations, nombre de repas. Ce qu'on ne stocke JAMAIS : e-mails (toute clé commençant par « email »),
+// noms des inscrits, données de l'utilisateur connecté.
+// Utilisée uniquement pour un VISITEUR : un utilisateur connecté a besoin de ses inscriptions pour
+// afficher les bons boutons, et elles arrivent avec la même requête (aucun gain à afficher avant).
+var CLE_CACHE_PUBLIC = 'melusine_cache_public_v1';
+var DUREE_MAX_CACHE_PUBLIC = 7 * 24 * 3600 * 1000;   // au-delà d'une semaine, on l'ignore
+
+/** Copie d'une ligne sans les clés « email… » (sécurité : aucune adresse dans le stockage du navigateur). */
+function sansEmails(ligne) {
+    var copie = {};
+    Object.keys(ligne || {}).forEach(function(cle) {
+        if (!/^email/i.test(cle)) copie[cle] = ligne[cle];
+    });
+    return copie;
+}
+
+/** Forme « publique » des données, prête à être stockée. */
+function versCachePublic(allData) {
+    return {
+        config: allData.config || {},
+        programme: (allData.programme || []).map(sansEmails),
+        creneaux_benevoles: (allData.creneaux_benevoles || []).map(function(c) {
+            var copie = sansEmails(c);
+            delete copie.noms_inscrits;   // pseudos des bénévoles : pas de stockage durable
+            return copie;
+        }),
+        restauration: allData.restauration || [],
+        animations: allData.animations || [],
+        repas_count: allData.repas_count || 0,
+        inscriptions_publiques: []
+    };
+}
+
+function savePublicCache(allData) {
+    try {
+        localStorage.setItem(CLE_CACHE_PUBLIC, JSON.stringify({ t: Date.now(), d: versCachePublic(allData) }));
+    } catch(e) { /* stockage plein ou bloqué : sans conséquence, on n'aura simplement pas de cache */ }
+}
+
+/**
+ * Renvoie la copie publique de la dernière visite, ou null (pas de copie, trop ancienne, illisible,
+ * ou utilisateur connecté).
+ */
+function readPublicCache() {
+    if (currentUser || _accessToken) return null;
+    try {
+        var brut = JSON.parse(localStorage.getItem(CLE_CACHE_PUBLIC) || 'null');
+        if (!brut || !brut.d || Date.now() - brut.t > DUREE_MAX_CACHE_PUBLIC) return null;
+        return brut.d;
+    } catch(e) { return null; }
 }
 
 // Cache config en mémoire (évite les appels multiples dans la même page)
@@ -1702,6 +1779,25 @@ function closeChoixModal() {
  *   6. Appeler l'init spécifique de la page
  *   7. Précharger les autres pages
  */
+// Pages dont l'accès dépend du rôle : elles doivent connaître le rôle RÉEL avant de s'initialiser.
+var PAGES_SELON_ROLE = ['admin.html', 'espace-mj.html'];
+
+/**
+ * Lit le contenu d'un jeton de session (JWT) SANS en vérifier la signature.
+ * Ne sert qu'à connaître l'e-mail et la date d'expiration pour lancer les requêtes plus tôt :
+ * c'est la base de données qui vérifie la signature à chaque requête.
+ * @param {string} jeton - Jeton d'accès (3 parties séparées par des points)
+ * @returns {Object|null} Contenu du jeton (email, sub, exp, user_metadata…) ou null si illisible
+ */
+function lireJeton(jeton) {
+    try {
+        var morceau = String(jeton).split('.')[1];
+        var base64 = morceau.replace(/-/g, '+').replace(/_/g, '/');
+        var octets = Uint8Array.from(atob(base64), function(c) { return c.charCodeAt(0); });
+        return JSON.parse(new TextDecoder().decode(octets));
+    } catch(e) { return null; }
+}
+
 async function initApp() {
     // ── Détecter le retour SSO (Google/Discord) ──────────────────────────
     // Après un SSO, Supabase redirige vers le site avec un fragment #access_token=...
@@ -1745,39 +1841,78 @@ async function initApp() {
         console.error('Erreur traitement callback SSO:', e);
     }
 
-    // ── Restaurer la session existante ─────────────────────────────────
-    // Si un token est en localStorage, vérifier qu'il est encore valide
-    // et récupérer les infos utilisateur.
-    try {
-        if (_accessToken) {
-            var { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                setUserFromSupabase(user);
-                await fetchRole();
-            } else {
-                // Token invalide → nettoyer
-                _accessToken = null;
-                localStorage.removeItem('melusine_session');
-            }
+    // ── Restaurer la session existante, SANS attendre le réseau ─────────────
+    // Avant : getUser() puis fetchRole() puis le chargement des données, l'un après l'autre
+    // (3 allers-retours réseau avant d'afficher quoi que ce soit). Maintenant : l'identité provisoire
+    // est lue dans le jeton déjà stocké (e-mail, nom), le chargement des données part tout de suite,
+    // et la vérification réelle (getUser + rôle) tourne EN PARALLÈLE.
+    // Sécurité : cette identité provisoire ne sert qu'à choisir quoi demander et quoi afficher. Les
+    // droits réels restent décidés par la base (RLS, jeton vérifié à chaque requête), et la
+    // vérification ci-dessous corrige ou efface l'état si le jeton est invalide.
+    var sessionProvisoire = false;
+    if (_accessToken) {
+        var infosJeton = lireJeton(_accessToken);
+        if (infosJeton && infosJeton.exp && infosJeton.exp * 1000 < Date.now() + 30000) {
+            // Jeton périmé (ou presque) : UN rafraîchissement avant de lancer les requêtes, sinon elles
+            // partiraient toutes en 401 en même temps.
+            await refreshSession();
+            infosJeton = _accessToken ? lireJeton(_accessToken) : null;
         }
-    } catch(e) {
-        console.error('Erreur restauration session:', e);
-        _accessToken = null;
-        localStorage.removeItem('melusine_session');
+        if (infosJeton && infosJeton.email) {
+            setUserFromSupabase({ id: infosJeton.sub, email: infosJeton.email, user_metadata: infosJeton.user_metadata });
+            sessionProvisoire = true;
+        }
     }
+
+    // Navigation tout de suite (le rôle, donc le bouton Admin, arrive avec la vérification)
+    updateNavUser();
+    updateNavForRole();
+
+    // Chargement des données lancé MAINTENANT : onPageInit() réutilisera cette même requête
+    // (fetchAllData partage sa promesse), il n'attendra que ce qui reste.
+    fetchAllData();
+
+    // Vérification réelle de la session, en parallèle
+    var verification = (async function() {
+        try {
+            if (_accessToken) {
+                var { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    setUserFromSupabase(user);
+                    await fetchRole();
+                } else {
+                    // Token invalide → nettoyer
+                    _accessToken = null;
+                    currentUser = null;
+                    localStorage.removeItem('melusine_session');
+                }
+            }
+        } catch(e) {
+            console.error('Erreur restauration session:', e);
+            _accessToken = null;
+            currentUser = null;
+            localStorage.removeItem('melusine_session');
+        }
+    })();
 
     // Vérifier les callbacks d'authentification dans l'URL
     await checkAuthCallback();
 
-    // Mettre à jour la navigation avec l'état actuel
-    updateNavUser();
-    updateNavForRole();
-
     // Initialiser l'UI commune (scroll, menu mobile, modals, animations)
     initCommonUI();
 
+    // Les pages réservées (admin, MJ) décident de laisser entrer d'après le rôle : elles attendent
+    // donc la vérification. Les autres pages s'affichent sans l'attendre.
+    var pageCourante = location.pathname.split('/').pop() || 'index.html';
+    if (PAGES_SELON_ROLE.indexOf(pageCourante) !== -1) await verification;
+
     // Appeler l'init spécifique de la page si définie
     if (window.onPageInit) await window.onPageInit();
+
+    // La vérification est finie (ou le sera presque tout de suite) : navigation définitive
+    await verification;
+    updateNavUser();
+    updateNavForRole();
 
     // Précharger les autres pages en arrière-plan
     prefetchAllPages();
@@ -1792,7 +1927,7 @@ async function initApp() {
 function prefetchAllPages() {
     // Attendre 1 seconde après le rendu pour ne pas concurrencer le contenu visible
     setTimeout(function() {
-        var pages = ['index.html', 'programme.html', 'infos.html', 'benevoles.html', 'mes-inscriptions.html', 'espace-mj.html', 'aide.html', 'styles.css', 'edition.js?v=1', 'app.supabase.js?v=4'];
+        var pages = ['index.html', 'programme.html', 'infos.html', 'benevoles.html', 'mes-inscriptions.html', 'espace-mj.html', 'aide.html', 'styles.css', 'edition.js?v=1', 'app.supabase.js?v=5'];
         var current = location.pathname.split('/').pop() || 'index.html';
         pages.forEach(function(page) {
             if (page === current) return;
@@ -1849,6 +1984,7 @@ window.esc = esc;
 window.fetchSheetData = fetchSheetData;
 window.fetchConfig = fetchConfig;
 window.fetchAllPublic = fetchAllPublic;
+window.readPublicCache = readPublicCache;
 window.fetchAllData = fetchAllData;
 window.fetchRole = fetchRole;
 

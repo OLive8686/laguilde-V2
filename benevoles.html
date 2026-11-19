@@ -16,7 +16,7 @@
     <script>document.addEventListener('DOMContentLoaded',function(){var u=localStorage.getItem('melusine_user');var il=document.getElementById('navInscriptionsLink');if(il)il.style.display=u&&u!=='null'?'':'none';});</script>
     <meta name="color-scheme" content="dark light">
     <link rel="stylesheet" href="theme.css?v=1">
-    <link rel="stylesheet" href="styles.css?v=2">
+    <link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
 
@@ -143,7 +143,7 @@
 <button class="scroll-top" id="scrollTop" aria-label="Retour en haut">↑</button>
 
 <script src="edition.js?v=1"></script>
-<script src="app.supabase.js?v=4"></script>
+<script src="app.supabase.js?v=5"></script>
 <script>
 (function() {
 'use strict';
@@ -156,6 +156,11 @@ window.onUserLogin = function() { updateBenevoleView(); };
 window.onUserLogout = function() { updateBenevoleView(); };
 
 window.onPageInit = async function() {
+    // Affichage INSTANTANÉ pour un visiteur : copie publique de la dernière visite (créneaux sans noms
+    // d'inscrits), remplacée dès que les données fraîches arrivent.
+    var copie = (typeof readPublicCache === 'function') ? readPublicCache() : null;
+    if (copie && copie.creneaux_benevoles) updateBenevoleView(copie);
+
     // UN SEUL appel API charge tout (créneaux + données utilisateur)
     var allData = await fetchAllPublic();
     updateBenevoleView(allData);

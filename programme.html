@@ -16,7 +16,7 @@
     <script>document.addEventListener('DOMContentLoaded',function(){var u=localStorage.getItem('melusine_user');var il=document.getElementById('navInscriptionsLink');if(il)il.style.display=u&&u!=='null'?'':'none';});</script>
     <meta name="color-scheme" content="dark light">
     <link rel="stylesheet" href="theme.css?v=1">
-    <link rel="stylesheet" href="styles.css?v=2">
+    <link rel="stylesheet" href="styles.css?v=3">
     <link rel="stylesheet" href="v2.css?v=1">
 </head>
 <body>
@@ -153,7 +153,7 @@
 
 <!-- Scripts : app.js (partagé) puis code spécifique à la page programme -->
 <script src="edition.js?v=1"></script>
-<script src="app.supabase.js?v=4"></script>
+<script src="app.supabase.js?v=5"></script>
 <script>
 // =============================================================================
 // CODE SPÉCIFIQUE À LA PAGE PROGRAMME (programme.html)
@@ -214,6 +214,18 @@ var _mesInscriptions = []; // inscriptions de l'utilisateur connecté
 var _allProgramme = [];    // données programme avec places calculées
 
 window.onPageInit = async function() {
+    // Affichage INSTANTANÉ pour un visiteur : dernière version publique du programme reçue lors d'une
+    // visite précédente (sans e-mails ni noms d'inscrits). Elle est remplacée dès que les données
+    // fraîches arrivent, quelques instants plus tard. Un programme vide s'affiche donc sans attente.
+    var copie = (typeof readPublicCache === 'function') ? readPublicCache() : null;
+    var signatureCopie = null;
+    if (copie && copie.programme) {
+        window._programmeConfig = copie.config || {};
+        _allProgramme = copie.programme;
+        signatureCopie = JSON.stringify(copie.programme);
+        renderProgramme(copie.programme);
+    }
+
     // UN SEUL appel API charge tout (public + utilisateur si connecté)
     var allData = await fetchAllPublic();
 
@@ -237,8 +249,12 @@ window.onPageInit = async function() {
         _allInscriptions = allData.inscriptions_publiques || allData.inscriptions || [];
         if (allData.mes_inscriptions) _mesInscriptions = allData.mes_inscriptions;
         _allProgramme = allData.programme;
-        renderProgramme(allData.programme);
-    } else {
+        // Pas de nouveau rendu si rien n'a changé depuis la copie déjà affichée (évite un clignotement)
+        var identique = signatureCopie !== null
+            && JSON.stringify(allData.programme.map(function(t) { var c = {}; Object.keys(t).forEach(function(k) { if (!/^email/i.test(k)) c[k] = t[k]; }); return c; })) === signatureCopie
+            && !_allInscriptions.length;
+        if (!identique) renderProgramme(allData.programme);
+    } else if (signatureCopie === null) {
         await refreshProgramme();
     }
     updateMJButton();

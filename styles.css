@@ -27,7 +27,8 @@ a{color:var(--gold);text-decoration:none;transition:color var(--transition)} a:h
 @keyframes spin{to{transform:rotate(360deg)}}
 .animate-on-scroll{opacity:0;transform:translateY(30px);transition:opacity 0.6s ease,transform 0.6s ease}
 .animate-on-scroll.visible{opacity:1;transform:translateY(0)}
-.loading-shimmer{background:linear-gradient(90deg,var(--surface) 25%,var(--surface-2) 50%,var(--surface) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:8px;min-height:20px}
+@keyframes shimmerIn{from{opacity:0}to{opacity:1}}
+.loading-shimmer{background:linear-gradient(90deg,var(--surface) 25%,var(--surface-2) 50%,var(--surface) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite,shimmerIn .2s ease .25s backwards;border-radius:8px;min-height:20px}
 
 /* ── NAV ─────────────────────────────────────────────────────────────────── */
 .nav{position:fixed;top:0;left:0;right:0;z-index:1000;background:linear-gradient(180deg,rgb(var(--bg-rgb) / 0.97),rgb(var(--bg-rgb) / 0.95));backdrop-filter:blur(12px);border-bottom:1px solid rgb(var(--info-rgb) / 0.15);transition:all var(--transition)}
