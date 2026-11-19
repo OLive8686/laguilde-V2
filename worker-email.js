@@ -1,48 +1,46 @@
 // =============================================================================
-// CLOUDFLARE WORKER — Service d'envoi d'emails transactionnels
+// CLOUDFLARE WORKER — Envoi des e-mails transactionnels (relais MailerSend)
 // =============================================================================
-// Ce Worker reçoit des requêtes POST du frontend (après inscription, annulation,
-// validation de table, etc.) et envoie des emails via l'API Resend.
+// Rôle : recevoir les appels de la base de données (Supabase, via pg_net) et
+// envoyer l'e-mail correspondant avec l'API MailerSend. Le front du site
+// n'appelle PAS ce Worker.
 //
 // ARCHITECTURE :
-//   Frontend (app.js) → POST /send-email → Ce Worker → API Resend → Email
+//   Trigger PostgreSQL → send_email_via_worker() → pg_net (net.http_post)
+//     → CE WORKER (POST + en-tête X-Webhook-Secret) → API MailerSend → e-mail
+//   (Le Worker de maintien en éveil de Supabase est un autre fichier : worker.js.)
 //
 // POURQUOI un Worker séparé ?
-//   - La clé API Resend reste côté serveur (jamais exposée au frontend)
-//   - Découplé du proxy GAS (worker.js) : chaque Worker a une responsabilité
-//   - Resend offre 100 emails/jour gratuits (sans carte bancaire)
+//   - la clé MailerSend reste côté serveur, jamais dans la base ni dans le front ;
+//   - la base peut envoyer un e-mail sans connaître l'API du fournisseur.
 //
-// DÉPLOIEMENT :
-//   1. Créer un Worker sur dash.cloudflare.com → Workers & Pages → Create
-//   2. Coller ce code dans l'éditeur du Worker
-//   3. Ajouter les variables d'environnement dans Settings → Variables :
-//      - RESEND_API_KEY  : clé API Resend
-//      - WEBHOOK_SECRET  : variable SECRÈTE (type « Secret »), même valeur que le secret Vault « melusine_webhook_secret » (voir docs/ROTATION_WEBHOOK_SECRET.md)
-//   4. (Optionnel) Ajouter FROM_EMAIL si vous avez un domaine vérifié sur Resend
-//   5. Dans app.js, définir EMAIL_WORKER_URL avec l'URL de ce Worker
+// VARIABLES (Cloudflare → Worker « melusine-email » → Settings → Variables and Secrets) :
+//   - MAILERSEND_API_KEY : clé API MailerSend (type Secret)
+//   - WEBHOOK_SECRET     : secret partagé, même valeur que le secret Vault
+//                          « melusine_webhook_secret » lu par la base (en-tête X-Webhook-Secret ;
+//                          type Secret ; voir docs/ROTATION_WEBHOOK_SECRET.md)
+//   - FROM_EMAIL         : adresse d'expédition (optionnelle ; défaut dans le code)
 //
-// RESEND — CONFIGURATION :
-//   - Créer un compte sur https://resend.com (gratuit, pas de CB)
-//   - Récupérer la clé API dans Settings → API Keys
-//   - Par défaut, Resend envoie depuis "onboarding@resend.dev" (limité)
-//   - Pour un domaine custom : ajouter un domaine dans Resend → Domains
-//     puis configurer les DNS (DKIM, SPF, DMARC)
+// DÉPLOIEMENT : copier ce fichier dans le Worker « melusine-email » → Deploy.
 //
 // SÉCURITÉ :
-//   - CORS restreint aux origines autorisées (même liste que worker.js)
-//   - La clé API est dans une variable d'environnement (jamais dans le code)
-//   - Validation stricte du type d'email et des paramètres
-//   - Rate limiting basique par IP (10 emails/minute)
-//   - Aucune donnée sensible dans les logs
+//   - appel refusé (403) sans le bon X-Webhook-Secret ;
+//   - validation stricte du type d'e-mail et des paramètres ;
+//   - CORS restreint aux origines autorisées (utile aux appels depuis un navigateur ;
+//     les appels de la base n'en ont pas besoin) ;
+//   - limite par IP en mémoire (peu efficace : voir ROADMAP.md, section 1.5) ;
+//   - aucune donnée sensible dans les logs.
 //
-// TYPES D'EMAILS SUPPORTÉS :
-//   - confirmation : inscription confirmée ou liste d'attente
-//   - promotion    : promotion depuis la liste d'attente
-//   - annulation   : inscription annulée
+// TYPES D'E-MAILS SUPPORTÉS (ALLOWED_EMAIL_TYPES) :
+//   - confirmation          : inscription confirmée ou liste d'attente
+//   - promotion             : promotion depuis la liste d'attente
+//   - annulation            : inscription annulée
 //   - accompagnant_supprime : accompagnant supprimé (+ inscriptions annulées)
-//   - table_validee  : proposition de table MJ validée par l'admin
-//   - table_refusee  : proposition de table MJ refusée par l'admin
-//   - recap          : récapitulatif complet des inscriptions
+//   - table_validee         : proposition de table MJ validée par l'admin
+//   - table_refusee         : proposition de table MJ refusée par l'admin
+//   - nouvelle_proposition, proposition_recue : propositions de tables MJ
+//   - recap                 : récapitulatif des inscriptions
+//   - rappel                : rappel J-3 avant la convention
 // =============================================================================
 
 // ── Origines autorisées (CORS) — identiques à worker.js ──
@@ -84,13 +82,70 @@ const ALLOWED_EMAIL_TYPES = [
 // ── URL du site (pour les liens dans les emails) ──
 const SITE_URL = 'https://sousloeildemelusine.fr/';
 
-// ── Dates de la convention (pour les liens agenda) ──
-const DATE_SAMEDI   = '2026-05-16';
-const DATE_DIMANCHE = '2026-05-17';
+// =============================================================================
+// VALEURS ANNUELLES — le SEUL bloc à modifier chaque année dans ce fichier
+// =============================================================================
+// À garder identique à edition.js (côté site). Les libellés (« samedi 8 mai »)
+// sont calculés à partir des dates ISO : on ne saisit une date qu'une fois.
+// Une valeur vide ('') MASQUE le passage de l'e-mail qui l'utilise (jamais de
+// lien cassé ni d'information de l'année précédente).
+const EDITION = {
+  year: 2027,
+  saturday: '2027-05-08',          // AAAA-MM-JJ (doit être un samedi)
+  sunday:   '2027-05-09',          // AAAA-MM-JJ (doit être un dimanche)
+  venueName: 'Foyer du Porteau',
+  venueCity: 'Poitiers',
+  // TODO(à fournir) : horaires de l'édition, ex. 'samedi 9h-00h, dimanche 9h-17h'
+  horaires: '',
+  // TODO(à fournir) : page HelloAsso du repas du samedi soir 2027
+  helloassoMealUrl: '',
+  // TODO(à fournir) : événement Facebook 2027
+  facebookEventUrl: '',
+};
 
-// ── Lieu de la convention (pour les événements agenda) ──
-const LIEU_NOM     = 'Salle Gérard Gaschet';
-const LIEU_ADRESSE = 'Poitiers';
+// Constantes dérivées (utilisées par les liens agenda et les gabarits)
+const DATE_SAMEDI   = EDITION.saturday;
+const DATE_DIMANCHE = EDITION.sunday;
+const LIEU_NOM      = EDITION.venueName;
+const LIEU_ADRESSE  = EDITION.venueCity;
+
+const JOURS_SEMAINE = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+const MOIS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août',
+                 'septembre', 'octobre', 'novembre', 'décembre'];
+
+/**
+ * Découpe une date ISO (calcul en UTC : pas de décalage de fuseau).
+ * @param {string} iso - « AAAA-MM-JJ »
+ * @returns {{jour: string, numero: number, mois: string}} ex. { jour: 'samedi', numero: 8, mois: 'mai' }
+ */
+function decomposeDate(iso) {
+  const [annee, mois, numero] = iso.split('-').map(Number);
+  const d = new Date(Date.UTC(annee, mois - 1, numero));
+  return { jour: JOURS_SEMAINE[d.getUTCDay()], numero, mois: MOIS_FR[mois - 1] };
+}
+
+/**
+ * Texte des deux jours pour les e-mails, selon les jours de présence.
+ * @param {string[]} jours - ex. ['samedi'], ['dimanche'] ou les deux ; vide = les deux jours
+ * @returns {string} ex. « samedi 8 et dimanche 9 mai », « samedi 8 mai », « les 8 et 9 mai »
+ */
+function libelleJours(jours) {
+  const sam = decomposeDate(EDITION.saturday);
+  const dim = decomposeDate(EDITION.sunday);
+  const memeMois = sam.mois === dim.mois;
+  const aSam = jours.includes('samedi');
+  const aDim = jours.includes('dimanche');
+  if (aSam && aDim) {
+    return memeMois
+      ? sam.jour + ' ' + sam.numero + ' et ' + dim.jour + ' ' + dim.numero + ' ' + dim.mois
+      : sam.jour + ' ' + sam.numero + ' ' + sam.mois + ' et ' + dim.jour + ' ' + dim.numero + ' ' + dim.mois;
+  }
+  if (aSam) return sam.jour + ' ' + sam.numero + ' ' + sam.mois;
+  if (aDim) return dim.jour + ' ' + dim.numero + ' ' + dim.mois;
+  return memeMois
+    ? 'les ' + sam.numero + ' et ' + dim.numero + ' ' + dim.mois
+    : 'les ' + sam.numero + ' ' + sam.mois + ' et ' + dim.numero + ' ' + dim.mois;
+}
 
 
 // =============================================================================
@@ -151,6 +206,36 @@ function isRateLimited(ip) {
 
 
 // =============================================================================
+// ÉCHAPPEMENT HTML — toute valeur saisie par un utilisateur
+// =============================================================================
+// Les pseudos, noms de jeu, créneaux et noms d'accompagnants sont saisis par des
+// utilisateurs : sans échappement, un pseudo comme <img src=x onerror=...> serait
+// inséré tel quel dans le HTML de l'e-mail. Règle du fichier : toute valeur issue
+// de « data » insérée dans un gabarit HTML passe par escapeHtml().
+//
+// Ne PAS l'appliquer :
+//   - au sujet de l'e-mail (texte brut : un « &amp; » y serait affiché tel quel) ;
+//   - aux liens d'agenda (déjà encodés avec encodeURIComponent) ;
+//   - aux fragments HTML écrits dans ce fichier (<strong>, <a href=...>).
+
+/**
+ * Échappe les cinq caractères spéciaux du HTML pour qu'une valeur soit affichée
+ * comme du texte et jamais interprétée comme du code.
+ * @param {*} value - La valeur à afficher (texte, nombre, null ou undefined)
+ * @returns {string} Le texte échappé ; chaîne vide pour null et undefined
+ */
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')   // en premier : sinon on échapperait les & déjà produits
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+
+// =============================================================================
 // TEMPLATE HTML — Construction des emails
 // =============================================================================
 
@@ -175,7 +260,7 @@ function buildEmailHtml(options) {
   let champsHtml = '';
   if (options.champs && options.champs.length > 0) {
     for (const champ of options.champs) {
-      champsHtml += `<p style="color:${c.text};margin:0 0 8px"><strong>${champ.label} :</strong> ${champ.valeur}</p>`;
+      champsHtml += `<p style="color:${c.text};margin:0 0 8px"><strong>${escapeHtml(champ.label)} :</strong> ${escapeHtml(champ.valeur)}</p>`;
     }
   }
 
@@ -546,7 +631,7 @@ function buildRecapEmail(data) {
     sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">🎲 Mes tables MJ</h3>`;
     for (const t of tablesMJ) {
       const statut = t.statut_table === 'validé' ? '✅ Validée' : '⏳ En attente';
-      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${t.jeu}</strong> — ${t.creneau} (${statut})</p>`;
+      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${escapeHtml(t.jeu)}</strong> — ${escapeHtml(t.creneau)} (${statut})</p>`;
       if (t.statut_table === 'validé') {
         sections += buildCalendarLinks(t.creneau, t.jeu + ' (MJ)', 'table');
       }
@@ -559,7 +644,7 @@ function buildRecapEmail(data) {
     sections += `<h3 style="color:${c.success};font-size:16px;margin:16px 0 8px">🧑 Mes tables joueur</h3>`;
     for (const i of perso) {
       const statut = i.statut === 'inscrit' ? '✅ Inscrit·e' : '⏳ En attente';
-      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${i.jeu}</strong> — ${i.creneau} (${statut})</p>`;
+      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${escapeHtml(i.jeu)}</strong> — ${escapeHtml(i.creneau)} (${statut})</p>`;
       if (i.statut === 'inscrit') {
         sections += buildCalendarLinks(i.creneau, i.jeu, 'table');
       }
@@ -572,7 +657,7 @@ function buildRecapEmail(data) {
     sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">👤 Accompagnants</h3>`;
     for (const i of accs) {
       const statut = i.statut === 'inscrit' ? '✅' : '⏳';
-      sections += `<p style="color:${c.text};margin:0 0 4px">• ${i.nom_accompagnant} → <strong>${i.jeu}</strong> — ${i.creneau} ${statut}</p>`;
+      sections += `<p style="color:${c.text};margin:0 0 4px">• ${escapeHtml(i.nom_accompagnant)} → <strong>${escapeHtml(i.jeu)}</strong> — ${escapeHtml(i.creneau)} ${statut}</p>`;
     }
   }
 
@@ -583,7 +668,7 @@ function buildRecapEmail(data) {
   if (benPerso.length > 0) {
     sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">🤝 Bénévolat</h3>`;
     for (const b of benPerso) {
-      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${b.creneau}</strong></p>`;
+      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${escapeHtml(b.creneau)}</strong></p>`;
       sections += buildCalendarLinks(b.creneau, 'Bénévolat', 'benevole');
     }
   }
@@ -591,7 +676,7 @@ function buildRecapEmail(data) {
   if (benAcc.length > 0) {
     sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">🤝 Bénévolat accompagnants</h3>`;
     for (const b of benAcc) {
-      sections += `<p style="color:${c.text};margin:0 0 4px">• ${b.nom_accompagnant} → <strong>${b.creneau}</strong></p>`;
+      sections += `<p style="color:${c.text};margin:0 0 4px">• ${escapeHtml(b.nom_accompagnant)} → <strong>${escapeHtml(b.creneau)}</strong></p>`;
     }
   }
 
@@ -600,9 +685,11 @@ function buildRecapEmail(data) {
     sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">🍽️ Repas du samedi soir</h3>`;
     for (const r of repas) {
       var nom = r.nom_accompagnant || r.nom || 'Vous';
-      sections += `<p style="color:${c.text};margin:0 0 4px">• ${nom} — inscrit·e</p>`;
+      sections += `<p style="color:${c.text};margin:0 0 4px">• ${escapeHtml(nom)} — inscrit·e</p>`;
     }
-    sections += `<p style="color:${c.muted};font-size:13px;margin-top:8px">Paiement en ligne : <a href="https://www.helloasso.com/associations/foyer-du-porteau/evenements/repas-du-soir-convention-sous-l-oeil-de-melusine-2026" style="color:${c.accent};text-decoration:underline">HelloAsso</a></p>`;
+    if (EDITION.helloassoMealUrl) {
+      sections += `<p style="color:${c.muted};font-size:13px;margin-top:8px">Paiement en ligne : <a href="${EDITION.helloassoMealUrl}" style="color:${c.accent};text-decoration:underline">HelloAsso</a></p>`;
+    }
   }
 
   return {
@@ -641,16 +728,7 @@ function buildRappelEmail(data) {
   const c = DEFAULT_COLORS;
 
   // Phrase d'introduction adaptée au(x) jour(s) de présence
-  let joursTexte;
-  if (jours.includes('samedi') && jours.includes('dimanche')) {
-    joursTexte = `<strong>samedi 16 et dimanche 17 mai</strong>`;
-  } else if (jours.includes('samedi')) {
-    joursTexte = `<strong>samedi 16 mai</strong>`;
-  } else if (jours.includes('dimanche')) {
-    joursTexte = `<strong>dimanche 17 mai</strong>`;
-  } else {
-    joursTexte = `<strong>les 16 et 17 mai</strong>`;
-  }
+  const joursTexte = `<strong>${libelleJours(jours)}</strong>`;
 
   let sections = '';
 
@@ -659,7 +737,7 @@ function buildRappelEmail(data) {
     sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">🎲 Vos tables en tant que MJ</h3>`;
     for (const t of tablesMJ) {
       const statut = t.statut_table === 'validé' ? '✅ Validée' : '⏳ En attente de validation';
-      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${t.jeu}</strong> — ${t.creneau} (${statut})</p>`;
+      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${escapeHtml(t.jeu)}</strong> — ${escapeHtml(t.creneau)} (${statut})</p>`;
     }
   }
 
@@ -669,7 +747,7 @@ function buildRappelEmail(data) {
     sections += `<h3 style="color:${c.success};font-size:16px;margin:16px 0 8px">🧑 Vos tables en tant que joueur·euse</h3>`;
     for (const i of perso) {
       const statut = i.statut === 'inscrit' ? '✅ Inscrit·e' : '⏳ En attente';
-      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${i.jeu}</strong> — ${i.creneau} (${statut})</p>`;
+      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${escapeHtml(i.jeu)}</strong> — ${escapeHtml(i.creneau)} (${statut})</p>`;
     }
   }
 
@@ -679,7 +757,7 @@ function buildRappelEmail(data) {
     sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">👤 Vos accompagnant·e·s</h3>`;
     for (const i of accs) {
       const statut = i.statut === 'inscrit' ? '✅' : '⏳';
-      sections += `<p style="color:${c.text};margin:0 0 4px">• ${i.nom_accompagnant} → <strong>${i.jeu}</strong> — ${i.creneau} ${statut}</p>`;
+      sections += `<p style="color:${c.text};margin:0 0 4px">• ${escapeHtml(i.nom_accompagnant)} → <strong>${escapeHtml(i.jeu)}</strong> — ${escapeHtml(i.creneau)} ${statut}</p>`;
     }
   }
 
@@ -687,7 +765,7 @@ function buildRappelEmail(data) {
   if (benevolats.length > 0) {
     sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">🤝 Bénévolat</h3>`;
     for (const b of benevolats) {
-      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${b.creneau}</strong></p>`;
+      sections += `<p style="color:${c.text};margin:0 0 4px">• <strong>${escapeHtml(b.creneau)}</strong></p>`;
     }
   }
 
@@ -695,7 +773,9 @@ function buildRappelEmail(data) {
   if (repas.length > 0) {
     sections += `<h3 style="color:${c.accent};font-size:16px;margin:16px 0 8px">🍽️ Repas du samedi soir</h3>`;
     sections += `<p style="color:${c.text};margin:0 0 4px">${repas.length} repas réservé(s).</p>`;
-    sections += `<p style="color:${c.muted};font-size:13px;margin-top:4px">Si pas encore réglé : paiement en ligne sur <a href="https://www.helloasso.com/associations/foyer-du-porteau/evenements/repas-du-soir-convention-sous-l-oeil-de-melusine-2026" style="color:${c.accent};text-decoration:underline">HelloAsso</a>.</p>`;
+    if (EDITION.helloassoMealUrl) {
+      sections += `<p style="color:${c.muted};font-size:13px;margin-top:4px">Si pas encore réglé : paiement en ligne sur <a href="${EDITION.helloassoMealUrl}" style="color:${c.accent};text-decoration:underline">HelloAsso</a>.</p>`;
+    }
   }
 
   // Si pas d'inscription, message court
@@ -707,18 +787,18 @@ function buildRappelEmail(data) {
   const infosPratiques = ''
     + `<h3 style="color:${c.accent};font-size:16px;margin:20px 0 8px">📍 Infos pratiques</h3>`
     + `<p style="color:${c.text};margin:0 0 4px"><strong>Lieu :</strong> ${LIEU_NOM}, ${LIEU_ADRESSE}</p>`
-    + `<p style="color:${c.text};margin:0 0 4px"><strong>Horaires :</strong> samedi 9h-00h, dimanche 9h-17h</p>`
+    + (EDITION.horaires ? `<p style="color:${c.text};margin:0 0 4px"><strong>Horaires :</strong> ${EDITION.horaires}</p>` : '')
     + `<p style="color:${c.muted};font-size:13px;margin-top:8px">Programme complet : <a href="${SITE_URL}programme.html" style="color:${c.accent}">${SITE_URL}programme.html</a></p>`;
 
-  const intro = `Bonjour ${nom},<br><br>`
+  const intro = `Bonjour ${escapeHtml(nom)},<br><br>`
     + `La convention <strong>Sous l'Œil de Mélusine</strong> approche : c'est ${joursTexte} ! `
     + `Voici un rappel de votre programme :`;
 
   // --- Invitation à partager l'événement Facebook ---
   // Ajouté en bas du mail (avant le pied) pour booster la visibilité
   // de la convention dans les jours qui précèdent.
-  const FB_EVENT_URL = 'https://www.facebook.com/events/1271855161045499/';
-  const partage = ''
+  const FB_EVENT_URL = EDITION.facebookEventUrl;
+  const partage = !FB_EVENT_URL ? '' : ''
     + `<p style="color:${c.text};font-size:14px;margin-top:24px;padding-top:16px;border-top:1px solid ${c.muted}33">`
     + `📣 <strong>Aidez-nous à faire connaître la convention Sous l'Œil de Mélusine !</strong><br>`
     + `Partagez l'<a href="${FB_EVENT_URL}" style="color:${c.accent};text-decoration:underline">événement Facebook</a> avec vos amis et invitez-les à venir.`
@@ -931,9 +1011,9 @@ export default {
    * }
    *
    * Variables d'environnement requises (dans Cloudflare → Settings → Variables) :
-   *   - RESEND_API_KEY  : clé API Resend
-   *   - FROM_EMAIL      : adresse d'expédition (optionnel, défaut: "Mélusine <onboarding@resend.dev>")
-   *   - WEBHOOK_SECRET  : variable SECRÈTE, identique au secret Vault « melusine_webhook_secret » côté Supabase
+   *   - MAILERSEND_API_KEY : clé API MailerSend
+   *   - FROM_EMAIL      : adresse d'expédition (optionnel, défaut: "Sous l oeil de Melusine <noreply@sousloeildemelusine.fr>")
+   *   - WEBHOOK_SECRET  : secret partagé, identique au secret Vault « melusine_webhook_secret » (Supabase) ; authentifie les appels de pg_net
    *
    * @param {Request} request - La requête HTTP entrante
    * @param {Object}  env     - Variables d'environnement du Worker

@@ -1,342 +1,244 @@
-# Fiche de tests — Sous l'Œil de Mélusine
-
-## Comment utiliser cette fiche
-- Tester chaque scénario dans l'ordre
-- Cocher ✅ si OK, ❌ si KO (noter le détail)
-- Tester sur **desktop** ET **mobile** (ou DevTools responsive)
-- Tester en **thème dark** ET **thème clair** (changer dans la Sheet config)
-- Vider le cache entre les tests si nécessaire (Ctrl+Maj+R)
-
----
-
-## 1. ACCUEIL (index.html)
-
-| # | Test | Résultat |
-|---|---|---|
-| 1.1 | La page se charge sans erreur console | ☐ |
-| 1.2 | Le hero affiche le titre, les dates et le lieu | ☐ |
-| 1.3 | Les 3 cartes de navigation (Programme, Infos, Bénévoles) sont cliquables | ☐ |
-| 1.4 | Les infos pratiques (lieu, dates, tarif) s'affichent depuis la config Sheet | ☐ |
-| 1.5 | Le lien Google Maps fonctionne dans les infos | ☐ |
-| 1.6 | Le compteur global (inscrits, tables, bénévoles) s'affiche si > 0 | ☐ |
-| 1.7 | Le compteur est masqué si tout est à zéro | ☐ |
-| 1.8 | Le thème (dark/clair) s'applique correctement sans flash | ☐ |
-
----
-
-## 2. NAVIGATION
-
-| # | Test | Résultat |
-|---|---|---|
-| 2.1 | Les liens Accueil, Programme, Infos, Bénévoles fonctionnent | ☐ |
-| 2.2 | "Mes inscriptions" apparaît dans la nav quand connecté | ☐ |
-| 2.3 | "Mes inscriptions" est masqué quand déconnecté | ☐ |
-| 2.4 | Pas de flash visible/invisible du lien "Mes inscriptions" au chargement | ☐ |
-| 2.5 | Le bouton "Admin" apparaît à côté du pseudo pour les admins | ☐ |
-| 2.6 | Le menu hamburger fonctionne sur mobile | ☐ |
-| 2.7 | Le menu mobile se ferme au clic sur un lien | ☐ |
-
----
-
-## 3. CONNEXION / DÉCONNEXION
-
-### 3.1 Pseudo/Email
-| # | Test | Résultat |
-|---|---|---|
-| 3.1.1 | Clic "Se connecter" → modal s'ouvre | ☐ |
-| 3.1.2 | Clic "Pseudo & email" → formulaire s'affiche | ☐ |
-| 3.1.3 | Validation avec pseudo vide → erreur | ☐ |
-| 3.1.4 | Validation avec email invalide → erreur | ☐ |
-| 3.1.5 | Validation OK → toast "Bienvenue", pseudo dans la nav | ☐ |
-| 3.1.6 | Après connexion, la session persiste au rechargement de la page | ☐ |
-
-### 3.2 SSO Google
-| # | Test | Résultat |
-|---|---|---|
-| 3.2.1 | Clic "Continuer avec Google" → texte "Chargement de Google..." | ☐ |
-| 3.2.2 | Bouton Google officiel apparaît après chargement | ☐ |
-| 3.2.3 | Clic sur le bouton Google → popup Google → formulaire de pseudo | ☐ |
-| 3.2.4 | Pseudo pré-rempli avec le nom Google, modifiable | ☐ |
-| 3.2.5 | Validation du pseudo → connecté avec le bon email | ☐ |
-
-### 3.3 SSO Discord
-| # | Test | Résultat |
-|---|---|---|
-| 3.3.1 | Clic "Continuer avec Discord" → redirection vers Discord | ☐ |
-| 3.3.2 | Autorisation sur Discord → retour sur le site (page d'accueil) | ☐ |
-| 3.3.3 | Formulaire de pseudo s'affiche après retour | ☐ |
-| 3.3.4 | Validation du pseudo → connecté | ☐ |
-
-### 3.4 Déconnexion
-| # | Test | Résultat |
-|---|---|---|
-| 3.4.1 | Clic "Déco" → déconnecté, pseudo disparaît | ☐ |
-| 3.4.2 | "Mes inscriptions" disparaît de la nav | ☐ |
-| 3.4.3 | Rechargement → reste déconnecté | ☐ |
-
-### 3.5 Modification du pseudo
-| # | Test | Résultat |
-|---|---|---|
-| 3.5.1 | Clic sur le pseudo dans la nav → modal de modification | ☐ |
-| 3.5.2 | Changement du pseudo → mis à jour dans la nav | ☐ |
-
----
-
-## 4. PROGRAMME (programme.html)
-
-| # | Test | Résultat |
-|---|---|---|
-| 4.1 | Le programme se charge et affiche les tables validées | ☐ |
-| 4.2 | Les tables en_attente ou refusées ne sont PAS affichées | ☐ |
-| 4.3 | Les onglets de filtre par créneau fonctionnent | ☐ |
-| 4.4 | Le nombre de places restantes est correct | ☐ |
-| 4.5 | Les pseudos des inscrits sont affichés sous chaque table (👥) | ☐ |
-| 4.6 | Les accompagnants sont marqués "(acc.)" dans la liste | ☐ |
-| 4.7 | Le bouton "Proposer une table (MJ)" est visible si connecté | ☐ |
-| 4.8 | Le bouton MJ est masqué si non connecté | ☐ |
-| 4.9 | Programme vide → message "Le programme sera bientôt disponible" | ☐ |
-
-### 4.10 Quota web (places_web)
-| # | Test | Résultat |
-|---|---|---|
-| 4.10.1 | Table avec places_web : affiche "X places en ligne sur Y" | ☐ |
-| 4.10.2 | Quota web atteint : "Complet en ligne · X places sur place" (badge or) | ☐ |
-| 4.10.3 | Table sans places_web : affiche "X places sur Y" (classique) | ☐ |
-| 4.10.4 | Tout complet : "Complet (X/Y)" (badge rouge) | ☐ |
-
----
-
-## 5. INSCRIPTION AUX TABLES
-
-### 5.1 Inscription simple
-| # | Test | Résultat |
-|---|---|---|
-| 5.1.1 | Non connecté → clic "S'inscrire" → modal de connexion | ☐ |
-| 5.1.2 | Connecté → clic "S'inscrire" → toast de confirmation | ☐ |
-| 5.1.3 | Après inscription, la table affiche "✅ Inscrit·e" + bouton "Annuler" | ☐ |
-| 5.1.4 | Les pseudos des inscrits se mettent à jour | ☐ |
-| 5.1.5 | Le compteur de places se met à jour | ☐ |
-| 5.1.6 | Email de confirmation reçu avec liens agenda | ☐ |
-
-### 5.2 Anti-doublon
-| # | Test | Résultat |
-|---|---|---|
-| 5.2.1 | Déjà inscrit à cette table → erreur "Vous êtes déjà inscrit·e" | ☐ |
-| 5.2.2 | Déjà inscrit sur le même créneau (autre table) → erreur avec nom du jeu | ☐ |
-
-### 5.3 Anti-chevauchement
-| # | Test | Résultat |
-|---|---|---|
-| 5.3.1 | Bénévole sur ce créneau → erreur "Annulez votre bénévolat d'abord" | ☐ |
-| 5.3.2 | MJ sur ce créneau → erreur "Vous êtes MJ sur ce créneau" | ☐ |
-
-### 5.4 Liste d'attente
-| # | Test | Résultat |
-|---|---|---|
-| 5.4.1 | Table pleine → inscription en "attente" | ☐ |
-| 5.4.2 | Email de liste d'attente reçu | ☐ |
-| 5.4.3 | Sur le programme, la table affiche "⏳ En attente" | ☐ |
-
-### 5.5 Annulation
-| # | Test | Résultat |
-|---|---|---|
-| 5.5.1 | Clic "Annuler" sur la carte → inscription annulée | ☐ |
-| 5.5.2 | Le bouton repasse à "S'inscrire" | ☐ |
-| 5.5.3 | Email d'annulation reçu | ☐ |
-| 5.5.4 | Si quelqu'un était en attente → promu automatiquement + email | ☐ |
-
-### 5.6 Accompagnants
-| # | Test | Résultat |
-|---|---|---|
-| 5.6.1 | Si accompagnants ajoutés → modal "Pour qui ?" à l'inscription | ☐ |
-| 5.6.2 | Inscription pour soi → fonctionne | ☐ |
-| 5.6.3 | Inscription pour un accompagnant → fonctionne | ☐ |
-| 5.6.4 | L'accompagnant apparaît dans la liste des inscrits avec "(acc.)" | ☐ |
-
----
-
-## 6. BÉNÉVOLES (benevoles.html)
-
-| # | Test | Résultat |
-|---|---|---|
-| 6.1 | Les créneaux bénévoles s'affichent (même non connecté) | ☐ |
-| 6.2 | Le nombre de places restantes est correct | ☐ |
-| 6.3 | Les pseudos des bénévoles inscrits sont affichés (👥) | ☐ |
-| 6.4 | Non connecté → bouton "Se connecter pour s'inscrire" | ☐ |
-| 6.5 | Connecté → bouton "S'inscrire" sur les créneaux libres | ☐ |
-| 6.6 | Créneau complet → badge "Complet" | ☐ |
-| 6.7 | Déjà joueur sur ce créneau → badge grisé "Déjà pris (Joueur : nom)" | ☐ |
-| 6.8 | Déjà MJ sur ce créneau → badge grisé "Déjà pris (MJ : nom)" | ☐ |
-| 6.9 | Inscription bénévole → toast de confirmation | ☐ |
-| 6.10 | "Mes créneaux" affiche les inscriptions bénévoles avec bouton "Annuler" | ☐ |
-| 6.11 | Annulation bénévole → créneau redevient disponible | ☐ |
-
----
-
-## 7. MES INSCRIPTIONS (mes-inscriptions.html)
-
-| # | Test | Résultat |
-|---|---|---|
-| 7.1 | Non connecté → message de connexion | ☐ |
-| 7.2 | Connecté → affiche les 4 sections | ☐ |
-| 7.3 | Section JDR : liste des tables inscrites avec badge statut | ☐ |
-| 7.4 | Section JDR : bouton "Annuler" fonctionne | ☐ |
-| 7.5 | Section Accompagnants : liste des accompagnants | ☐ |
-| 7.6 | Ajout d'un accompagnant → apparaît dans la liste | ☐ |
-| 7.7 | Max 3 accompagnants → formulaire masqué au max | ☐ |
-| 7.8 | Suppression d'un accompagnant → confirm + annulation cascade | ☐ |
-| 7.9 | Section Bénévolat : liste des créneaux avec bouton "Annuler" | ☐ |
-| 7.10 | Section MJ : propositions avec badge statut (validé/en_attente/refusé) | ☐ |
-| 7.11 | Bouton "📧 Recevoir par email le détail de mes inscriptions" fonctionne | ☐ |
-| 7.12 | Toast de confirmation avec adresse email | ☐ |
-| 7.13 | Email récap reçu avec toutes les inscriptions + liens agenda | ☐ |
-
----
-
-## 8. ESPACE MJ (espace-mj.html)
-
-| # | Test | Résultat |
-|---|---|---|
-| 8.1 | Non connecté → message de connexion | ☐ |
-| 8.2 | Connecté → formulaire de proposition visible | ☐ |
-| 8.3 | Nom du MJ pré-rempli avec le pseudo | ☐ |
-| 8.4 | Soumission sans jeu → erreur | ☐ |
-| 8.5 | Soumission sans créneau → erreur | ☐ |
-| 8.6 | Soumission complète → toast "Table proposée !" | ☐ |
-| 8.7 | La proposition apparaît dans "Mes propositions" avec badge "⏳ En attente" | ☐ |
-| 8.8 | Compteur de caractères description fonctionne (/500) | ☐ |
-| 8.9 | Anti-chevauchement : déjà joueur sur ce créneau → erreur | ☐ |
-| 8.10 | Anti-chevauchement : déjà bénévole → erreur | ☐ |
-| 8.11 | Anti-doublon : même jeu + même créneau → erreur | ☐ |
-
----
-
-## 9. INFOS (infos.html)
-
-| # | Test | Résultat |
-|---|---|---|
-| 9.1 | La section Bienvenue affiche le texte de la config | ☐ |
-| 9.2 | Les balises `<strong>` dans le texte de bienvenue sont rendues | ☐ |
-| 9.3 | Les infos pratiques (lieu, dates, tarif) sont correctes | ☐ |
-| 9.4 | Le lien Google Maps fonctionne | ☐ |
-| 9.5 | La restauration affiche les items groupés par catégorie | ☐ |
-| 9.6 | Les prix sont formatés correctement (X,XX€) | ☐ |
-| 9.7 | Les animations s'affichent | ☐ |
-| 9.8 | Les items ne sont PAS invisibles (opacity visible) | ☐ |
-
----
-
-## 10. ADMIN (admin.html)
-
-| # | Test | Résultat |
-|---|---|---|
-| 10.1 | Non connecté → message "Connexion requise" avec bouton | ☐ |
-| 10.2 | Connecté non-admin → message "Accès restreint" | ☐ |
-| 10.3 | Connecté admin → formulaire de mot de passe | ☐ |
-| 10.4 | Mauvais mot de passe → erreur | ☐ |
-| 10.5 | Bon mot de passe → panneau admin complet | ☐ |
-| 10.6 | Stats (inscrits, en attente, total) sont correctes | ☐ |
-| 10.7 | Barres de remplissage par table | ☐ |
-| 10.8 | Tableau des inscriptions avec actions | ☐ |
-| 10.9 | Promouvoir une inscription en attente → fonctionne | ☐ |
-| 10.10 | Promouvoir quand table pleine → erreur | ☐ |
-| 10.11 | Supprimer une inscription → confirm + suppression | ☐ |
-| 10.12 | Suppression d'un inscrit → premier en attente promu | ☐ |
-| 10.13 | Propositions MJ en attente affichées | ☐ |
-| 10.14 | Valider une proposition → email au MJ + table dans le programme | ☐ |
-| 10.15 | Refuser une proposition → email au MJ | ☐ |
-| 10.16 | Gestion des rôles : dropdown joueur/mj/admin fonctionne | ☐ |
-
----
-
-## 11. EMAILS
-
-| # | Test | Résultat |
-|---|---|---|
-| 11.1 | Email inscription confirmée — design Mélusine, liens agenda | ☐ |
-| 11.2 | Email liste d'attente — pas de lien agenda | ☐ |
-| 11.3 | Email promotion (place libérée) — liens agenda | ☐ |
-| 11.4 | Email annulation | ☐ |
-| 11.5 | Email accompagnant supprimé — nombre d'inscriptions annulées | ☐ |
-| 11.6 | Email table MJ validée — liens agenda | ☐ |
-| 11.7 | Email table MJ refusée | ☐ |
-| 11.8 | Email récap à la demande — toutes les sections + liens agenda | ☐ |
-| 11.9 | Lien Google Agenda → ouvre le bon événement avec le bon créneau | ☐ |
-| 11.10 | Fichier .ics → téléchargeable et importable dans un calendrier | ☐ |
-| 11.11 | Couleurs des emails alignées sur le thème (dark/clair) | ☐ |
-
----
-
-## 12. THÈME
-
-| # | Test | Résultat |
-|---|---|---|
-| 12.1 | Config `theme` = `dark` → site en thème sombre | ☐ |
-| 12.2 | Config `theme` = `clair` → site en thème clair | ☐ |
-| 12.3 | Pas de flash dark → clair au chargement (après première visite) | ☐ |
-| 12.4 | Nav lisible en thème clair (desktop et mobile) | ☐ |
-| 12.5 | Cartes, badges, formulaires lisibles en thème clair | ☐ |
-| 12.6 | Admin lisible en thème clair | ☐ |
-| 12.7 | Shimmers de chargement adaptés au thème | ☐ |
-
----
-
-## 13. PERFORMANCE
-
-| # | Test | Résultat |
-|---|---|---|
-| 13.1 | Première visite : contenu visible en < 3s (avec keep-alive actif) | ☐ |
-| 13.2 | Visite suivante : contenu visible instantanément (cache localStorage) | ☐ |
-| 13.3 | Les données se rafraîchissent en arrière-plan (stale-while-revalidate) | ☐ |
-| 13.4 | Google Sign-In ne charge pas tant qu'on ne clique pas | ☐ |
-
----
-
-## 14. MOBILE / RESPONSIVE
-
-| # | Test | Résultat |
-|---|---|---|
-| 14.1 | Toutes les pages sont lisibles sur écran 360px | ☐ |
-| 14.2 | Le menu hamburger fonctionne | ☐ |
-| 14.3 | Les toasts ne débordent pas de l'écran | ☐ |
-| 14.4 | Les formulaires (MJ, accompagnants) sont utilisables sur mobile | ☐ |
-| 14.5 | Les modals (connexion, choix accompagnant) sont scrollables si nécessaire | ☐ |
-| 14.6 | Les boutons sont assez grands pour être tappés au doigt | ☐ |
-
----
-
-## 15. SÉCURITÉ (tests manuels)
-
-| # | Test | Résultat |
-|---|---|---|
-| 15.1 | Inscription avec un pseudo contenant `<script>` → pas d'exécution JS | ☐ |
-| 15.2 | Nom d'accompagnant avec `<img onerror=...>` → pas d'exécution | ☐ |
-| 15.3 | Double-clic rapide sur "S'inscrire" → une seule inscription | ☐ |
-| 15.4 | Accès direct à admin.html sans rôle admin → accès refusé | ☐ |
-| 15.5 | Appel API POST sans les bons paramètres → erreur propre | ☐ |
-
----
-
-## 16. GOOGLE SHEETS (vérifications)
-
-| # | Test | Résultat |
-|---|---|---|
-| 16.1 | Modifier le programme dans la Sheet → visible sur le site après refresh | ☐ |
-| 16.2 | Modifier la config (texte bienvenue) → visible sur Infos après refresh | ☐ |
-| 16.3 | Modifier la restauration → visible après refresh | ☐ |
-| 16.4 | Changer `theme` dans config → thème change au reload | ☐ |
-| 16.5 | Ajouter `places_web` à une table → quota affiché sur le programme | ☐ |
-| 16.6 | Valider une table (statut_table = validé) → apparaît dans le programme | ☐ |
-
----
-
-## Notes de test
-
-**Testeur** : _________________ **Date** : _________________
-
-**Navigateur** : _________________ **Appareil** : _________________
-
-**Thème testé** : ☐ Dark ☐ Clair
-
-**Remarques** :
-
+# Fiche de recette — Sous l'Œil de Mélusine
+
+Cette fiche permet à une personne qui ne connaît pas le code de vérifier que le site fonctionne : parcours joueur, MJ, bénévole et admin, e-mails, droits d'accès et outil du jour J. Chaque cas donne ses préconditions, ses étapes et le résultat attendu, avec une case à cocher.
+
+## Comment l'utiliser
+
+1. Lire la section 0 (préparation) **en entier** avant de commencer.
+2. Faire les sections dans l'ordre : les premières créent les données utilisées par les suivantes.
+3. Pour chaque cas : faire les étapes, comparer au résultat attendu, cocher ✅ (conforme) ou ❌ (écart). Noter dans le fichier tableur (`tests-melusine.csv`) ou à côté : l'écran, ce qui s'est passé, une capture si possible.
+4. Un cas ❌ ne se corrige pas pendant la recette : le noter, continuer, puis faire le point.
+5. Refaire la section 14 (nettoyage) à la fin.
+
+`tests-melusine.csv` est la version tableur de cette fiche (mêmes numéros) ; elle a été générée à partir de ce fichier. Si vous modifiez la fiche, regénérez le tableur ou cessez de l'utiliser pour ne pas avoir deux versions différentes.
+
+## 0. Préparation
+
+**Avertissement : le site, même ouvert en local, parle à la base de production.** Toute inscription faite pendant la recette est réelle (données et e-mails). N'utilisez que des comptes de test, jamais l'adresse d'un vrai participant.
+
+| Élément | À préparer |
+|---|---|
+| Quatre comptes de test, chacun avec une boîte mail que vous consultez | **Joueur A**, **Joueur B**, **MJ**, **Admin**. Une astuce : `prenom+a@…`, `prenom+b@…` si votre messagerie accepte les alias. L'admin est le seul compte dont le rôle est passé à `admin` (par un autre admin, en SQL ou via « Gestion des rôles ») ; le compte MJ reçoit le rôle `mj` de la même façon. |
+| Navigateurs | Un navigateur courant (Chrome ou Edge), et un second profil ou une fenêtre privée pour jouer deux comptes en parallèle. |
+| Appareils | Un ordinateur et un téléphone (ou le mode mobile des outils du navigateur, largeur 360 px). |
+| Données de test | Au moins : une table avec 2 places en ligne (pour la liste d'attente), une table avec plusieurs places, deux tables sur le même créneau, un créneau bénévole, le repas du samedi soir. Si elles n'existent pas, les créer via l'espace MJ puis les valider (section 10). |
+| MailerSend | Pouvoir consulter son onglet **Activity** pour vérifier les envois. |
+| Environnement | Adresse du site : `https://sousloeildemelusine.fr/`. L'accueil peut afficher un message de fin d'édition : les pages restent accessibles par leur adresse (`programme.html`, `mes-inscriptions.html`, `admin.html`, etc.). |
+
+## 1. Accueil, navigation et pages publiques
+
+*Sans être connecté.*
+
+| # | Préconditions | Étapes | Résultat attendu | OK |
+|---|---|---|---|---|
+| 1.1 | Aucune session ouverte | (1) Ouvrir `https://sousloeildemelusine.fr/` | La page se charge sans message d'erreur ; le titre de l'événement et le message d'accueil s'affichent | ☐ |
+| 1.2 | Idem | (1) Ouvrir `programme.html`, `infos.html`, `benevoles.html`, `aide.html` | Chaque page se charge ; aucune page blanche ; la navigation (Accueil, Programme, Infos, Bénévoles) est cohérente d'une page à l'autre | ☐ |
+| 1.3 | Idem | (1) Sur `programme.html`, regarder les tables | Les tables validées apparaissent avec leur créneau, leur MJ, leurs places, et un avertissement de contenu quand il est renseigné | ☐ |
+| 1.4 | Idem | (1) Sur `infos.html`, repérer les informations pratiques (lieu, dates, restauration, animations) | Les informations correspondent à l'édition en cours (dates, lieu) ; le lien de carte s'ouvre | ☐ |
+| 1.5 | Idem | (1) Sur `aide.html`, lire la FAQ « Comment s'inscrire ? » ; (2) cliquer sur « Retour au programme » | Le texte est cohérent avec le fonctionnement actuel ; le lien ramène au programme | ☐ |
+| 1.6 | Idem | (1) Ouvrir `mes-inscriptions.html`, puis `espace-mj.html`, puis `admin.html` | Chaque page demande de se connecter ou refuse l'accès ; aucune donnée personnelle n'est affichée | ☐ |
+| 1.7 | Idem | (1) Charger la page avec l'affichage mobile (360 px) | Aucun défilement horizontal ; le menu est utilisable ; le texte reste lisible | ☐ |
+
+## 2. Connexion et compte
+
+| # | Préconditions | Étapes | Résultat attendu | OK |
+|---|---|---|---|---|
+| 2.1 | Adresse e-mail jamais utilisée | (1) Cliquer sur « Se connecter » ; (2) choisir la création de compte « Créer mon compte » ; (3) saisir un pseudo, l'adresse, un mot de passe de 6 caractères minimum et sa confirmation ; (4) valider | Un message annonce qu'un e-mail de confirmation est envoyé ; l'e-mail arrive ; son lien confirme le compte | ☐ |
+| 2.2 | Compte 2.1 confirmé | (1) « Se connecter » avec l'adresse et le mot de passe | Connexion réussie ; le pseudo s'affiche dans la navigation | ☐ |
+| 2.3 | Idem | (1) Saisir un mauvais mot de passe | Un message d'erreur explicite ; pas de connexion ; **aucun détail technique** (pas de trace, pas de nom de table) | ☐ |
+| 2.4 | Création de compte | (1) Saisir un mot de passe de moins de 6 caractères ; (2) saisir deux mots de passe différents | Chaque cas est refusé avec un message clair | ☐ |
+| 2.5 | Compte confirmé | (1) Cliquer sur le lien de mot de passe oublié ; (2) saisir l'adresse ; (3) « Envoyer le lien » ; (4) ouvrir l'e-mail reçu ; (5) saisir un nouveau mot de passe et « Réinitialiser » | L'e-mail arrive ; le nouveau mot de passe fonctionne ; l'ancien est refusé | ☐ |
+| 2.6 | Compte Google disponible | (1) Se connecter avec Google | Connexion réussie ; un formulaire de pseudo modifiable s'affiche ; le pseudo choisi est conservé | ☐ |
+| 2.7 | Compte Discord disponible | (1) Se connecter avec Discord | Idem 2.6. **Si le compte Discord n'a pas d'adresse e-mail** : un message explicite doit l'indiquer, sans erreur technique | ☐ |
+| 2.8 | Connecté | (1) Se déconnecter ; (2) revenir en arrière avec le bouton du navigateur ; (3) ouvrir `mes-inscriptions.html` | La session est fermée ; les données personnelles ne réapparaissent pas | ☐ |
+| 2.9 | Connecté, onglet laissé ouvert plusieurs heures | (1) Cliquer sur « S'inscrire » après ce délai | La session est renouvelée ou on est invité à se reconnecter ; aucune perte silencieuse | ☐ |
+
+## 3. Programme et inscription à une table (joueur)
+
+*Connecté en **Joueur A** sauf indication contraire.*
+
+| # | Préconditions | Étapes | Résultat attendu | OK |
+|---|---|---|---|---|
+| 3.1 | Au moins une table avec des places | (1) Ouvrir `programme.html` ; (2) utiliser les filtres (« Tous » et les jours) | Le filtre n'affiche que les tables du jour choisi ; le compteur reste cohérent | ☐ |
+| 3.2 | Nouveau compte sans présence | (1) Se connecter pour la première fois | Une fenêtre « Quels jours viens-tu ? » s'affiche (voir la section 7) | ☐ |
+| 3.3 | Table avec des places en ligne | (1) Cliquer sur « S'inscrire » ; (2) confirmer si une confirmation est demandée | Un message confirme l'inscription ; la table affiche une place de moins ; **l'e-mail « Inscription confirmée » arrive** | ☐ |
+| 3.4 | Inscrit à la table du 3.3 | (1) Ouvrir `mes-inscriptions.html` | La table apparaît avec son créneau ; un lien ou un bouton « Annuler » est proposé | ☐ |
+| 3.5 | Inscrit à une table du samedi à 10h | (1) Tenter de s'inscrire à une autre table au **même créneau** | Refus avec un message explicite (une seule table par créneau) ; aucune seconde inscription créée | ☐ |
+| 3.6 | Idem | (1) S'inscrire à une table à un **autre créneau** | L'inscription réussit | ☐ |
+| 3.7 | Non connecté | (1) Cliquer sur « S'inscrire » ; (2) se connecter quand c'est demandé | Après connexion, l'inscription en attente est reprise ou l'utilisateur revient au programme sans perte ; aucune double inscription | ☐ |
+| 3.8 | Table avec 1 place en ligne restante, déjà prise par **Joueur B** | (1) Joueur A clique sur « Liste d'attente » | Message indiquant la liste d'attente ; **l'e-mail « Liste d'attente »** arrive ; la table montre « Complet » | ☐ |
+| 3.9 | Table avec quota en ligne atteint mais des places réservées sur place | (1) Regarder la carte de la table | Le libellé distingue « complet en ligne » et les places disponibles sur place | ☐ |
+| 3.10 | Deux onglets ouverts sur le programme, 1 seule place restante | (1) Cliquer « S'inscrire » dans les deux onglets presque en même temps | Au plus **une** personne obtient la place ; l'autre est en liste d'attente ou refusée. **Limite connue** : la capacité est calculée côté navigateur, un dépassement est possible (voir `CLAUDE.md`, « Sécurité ») ; noter ce qui se passe | ☐ |
+| 3.11 | Une table dont le contenu est sensible (avertissement renseigné) | (1) Regarder la carte | L'avertissement de contenu est visible avant l'inscription | ☐ |
+
+## 4. Accompagnants
+
+| # | Préconditions | Étapes | Résultat attendu | OK |
+|---|---|---|---|---|
+| 4.1 | Joueur A connecté | (1) `mes-inscriptions.html` → « Mes accompagnants » ; (2) « + Ajouter » ; (3) saisir un nom ; (4) valider | L'accompagnant apparaît dans la liste | ☐ |
+| 4.2 | 1 accompagnant déjà ajouté | (1) En ajouter deux autres ; (2) tenter d'en ajouter un **quatrième** | Les trois premiers sont acceptés ; le quatrième est refusé avec un message clair (3 maximum) | ☐ |
+| 4.3 | Joueur A avec accompagnants | (1) Cliquer sur « S'inscrire » sur une table | Une fenêtre « Pour qui ? » propose le joueur et chaque accompagnant | ☐ |
+| 4.4 | Idem | (1) Inscrire un accompagnant à la table T1 ; (2) inscrire le joueur lui-même à une **autre table** du même créneau | Les deux inscriptions sont acceptées (personnes différentes) | ☐ |
+| 4.5 | Accompagnant inscrit au créneau X | (1) Inscrire **le même accompagnant** à une autre table du créneau X | Refus (une table par créneau et par personne) | ☐ |
+| 4.6 | Accompagnant inscrit | (1) Vérifier l'e-mail reçu | L'e-mail va au **joueur principal** (jamais à l'accompagnant) et nomme l'accompagnant | ☐ |
+| 4.7 | Accompagnant avec plusieurs inscriptions | (1) Le supprimer de « Mes accompagnants » ; (2) confirmer | Toutes ses inscriptions (tables, repas, bénévolat) sont annulées ; **un e-mail « accompagnant supprimé »** arrive | ☐ |
+
+## 5. Liste d'attente et promotion
+
+*Utiliser la table à 1 place en ligne de 3.8 : B inscrit, A en liste d'attente.*
+
+| # | Préconditions | Étapes | Résultat attendu | OK |
+|---|---|---|---|---|
+| 5.1 | B inscrit, A en attente | (1) B annule son inscription (bouton « Annuler ») | **A est promu automatiquement** (statut inscrit) ; A reçoit l'e-mail de place libérée ; la table n'affiche pas de place vide | ☐ |
+| 5.2 | Trois personnes en attente (A, C, D, dans cet ordre) | (1) Une personne inscrite annule | **Le plus ancien en attente (A)** est promu, pas un autre | ☐ |
+| 5.3 | Admin connecté | (1) `admin.html` → « Inscriptions par table » ; (2) cliquer sur ↑ (« Promouvoir ») pour la 2e personne en attente | Elle devient inscrite hors ordre ; un e-mail lui est envoyé | ☐ |
+| 5.4 | Admin connecté | (1) Cliquer sur ✕ (« Retirer ») pour une personne inscrite | Son inscription est annulée ; la promotion automatique s'applique | ☐ |
+
+## 6. Annulation par le joueur
+
+| # | Préconditions | Étapes | Résultat attendu | OK |
+|---|---|---|---|---|
+| 6.1 | Inscrit à une table | (1) `mes-inscriptions.html` → « Annuler » à côté de la table ; (2) refuser la confirmation | Rien ne change | ☐ |
+| 6.2 | Idem | (1) « Annuler » ; (2) confirmer | L'inscription disparaît ; l'e-mail « Inscription annulée » arrive ; la place est de nouveau disponible | ☐ |
+| 6.3 | Idem | (1) Se réinscrire à la même table après annulation | L'inscription réussit (pas de blocage par l'ancienne ligne annulée) | ☐ |
+
+## 7. Présences à la convention
+
+| # | Préconditions | Étapes | Résultat attendu | OK |
+|---|---|---|---|---|
+| 7.1 | Compte tout neuf, sans aucune présence | (1) Se connecter | La fenêtre « Quels jours viens-tu ? » propose samedi et dimanche | ☐ |
+| 7.2 | Fenêtre 7.1 ouverte | (1) Choisir « Plus tard » ; (2) naviguer entre les pages | La fenêtre ne réapparaît pas pendant la session | ☐ |
+| 7.3 | Compte sans présence | (1) S'inscrire à une table du samedi | La présence du samedi est créée automatiquement (visible dans « Ma présence ») | ☐ |
+| 7.4 | Connecté | (1) `mes-inscriptions.html` → « Ma présence » ; (2) cocher le dimanche | La présence du dimanche est enregistrée | ☐ |
+| 7.5 | Inscrit à une table du samedi | (1) Décocher le samedi dans « Ma présence » ; (2) lire la fenêtre de confirmation ; (3) confirmer | L'inscription à la table du samedi, les repas et le bénévolat du samedi sont annulés ; la présence du samedi disparaît ; l'e-mail d'annulation arrive | ☐ |
+| 7.6 | Idem | (1) Décocher puis **refuser** la confirmation | Rien ne change | ☐ |
+| 7.7 | Accompagnant avec une présence | (1) Décocher la présence de l'accompagnant seul | Seules les inscriptions de l'accompagnant sont annulées ; celles du joueur restent | ☐ |
+
+## 8. Bénévolat
+
+| # | Préconditions | Étapes | Résultat attendu | OK |
+|---|---|---|---|---|
+| 8.1 | Non connecté | (1) Ouvrir `benevoles.html` ; (2) cliquer sur « Se connecter pour s'inscrire » | La connexion est demandée ; après connexion on revient aux créneaux | ☐ |
+| 8.2 | Connecté, un créneau disponible | (1) « S'inscrire comme bénévole » sur un créneau | L'inscription apparaît dans « Mon bénévolat » ; le nombre de places restantes diminue | ☐ |
+| 8.3 | Déjà bénévole sur un créneau | (1) Tenter de s'y inscrire de nouveau | Refus explicite ou bouton déjà inactif ; pas de doublon | ☐ |
+| 8.4 | Joueur avec accompagnant | (1) « S'inscrire comme bénévole » ; (2) choisir l'accompagnant dans « Pour qui ? » | L'inscription est enregistrée au nom de l'accompagnant | ☐ |
+| 8.5 | Bénévole inscrit | (1) « Annuler » ; (2) confirmer | L'inscription disparaît ; la place est de nouveau disponible | ☐ |
+| 8.6 | Créneau complet | (1) Regarder le créneau | Il est indiqué complet ; le bouton d'inscription n'est pas disponible | ☐ |
+| 8.7 | Bénévole inscrit un jour sans présence | (1) Consulter « Ma présence » | La présence du jour correspondant a été créée automatiquement | ☐ |
+
+## 9. Repas du samedi soir
+
+| # | Préconditions | Étapes | Résultat attendu | OK |
+|---|---|---|---|---|
+| 9.1 | Connecté | (1) `infos.html` → « S'inscrire au repas » | L'inscription apparaît dans « Repas du samedi soir » de `mes-inscriptions.html` | ☐ |
+| 9.2 | Inscrit au repas | (1) Cliquer sur le lien « HelloAsso » | Le lien s'ouvre sur la bonne page de paiement ; **vérifier qu'il correspond à l'édition en cours** | ☐ |
+| 9.3 | Inscrit au repas | (1) Annuler l'inscription au repas | L'inscription disparaît | ☐ |
+| 9.4 | Joueur avec accompagnant | (1) Inscrire l'accompagnant au repas | Enregistré au nom de l'accompagnant | ☐ |
+
+## 10. Espace MJ (compte MJ)
+
+| # | Préconditions | Étapes | Résultat attendu | OK |
+|---|---|---|---|---|
+| 10.1 | Compte au rôle joueur | (1) Ouvrir `espace-mj.html` | L'accès est refusé ; le lien « Espace MJ » n'est pas dans la navigation | ☐ |
+| 10.2 | Compte MJ connecté | (1) `espace-mj.html` → « Proposer une table » ; (2) remplir « Nom du jeu + titre du scénario », « Système de jeu », « Créneau souhaité », « Nombre total de places » (1 à 5), « Dont places en ligne », « Description », « Avertissement contenu » ; (3) « Proposer cette table » | La proposition est enregistrée avec le statut « en attente » ; elle apparaît dans « Mes propositions de tables » ; elle n'est **pas** visible dans le programme public | ☐ |
+| 10.3 | Formulaire ouvert | (1) Laisser un champ obligatoire vide ; (2) saisir 6 places ; (3) saisir plus de places en ligne que de places | Chaque cas est refusé avec un message clair | ☐ |
+| 10.4 | Formulaire ouvert | (1) Saisir dans le nom du jeu : `<b>test</b> "guillemets" & accents éèà` ; (2) enregistrer ; (3) consulter la table partout (espace MJ, admin, programme, e-mails) | Le texte s'affiche **tel quel**, sans mise en forme ni code interprété | ☐ |
+| 10.5 | Table en attente validée par l'admin (section 11) | (1) Consulter l'e-mail du MJ | « Table validée » arrive ; la table apparaît dans le programme | ☐ |
+| 10.6 | Table refusée par l'admin | (1) Consulter l'e-mail du MJ | « Table refusée » arrive ; la table reste absente du programme | ☐ |
+| 10.7 | Compte admin | (1) Ouvrir `espace-mj.html` | L'accès est autorisé (l'admin a aussi les droits MJ) | ☐ |
+
+## 11. Panneau admin (compte admin)
+
+| # | Préconditions | Étapes | Résultat attendu | OK |
+|---|---|---|---|---|
+| 11.1 | Compte joueur | (1) Ouvrir `admin.html` | « Accès restreint » ; aucune donnée | ☐ |
+| 11.2 | Compte admin | (1) Ouvrir `admin.html` | Le « Panneau admin » se charge : statistiques, propositions, inscriptions, rôles | ☐ |
+| 11.3 | Proposition de 10.2 en attente | (1) « Propositions de tables MJ » ; (2) valider la table | Le statut passe à validé ; la table apparaît dans le programme ; l'e-mail au MJ part | ☐ |
+| 11.4 | Autre proposition en attente | (1) « Refuser » | La proposition est refusée ; l'e-mail au MJ part | ☐ |
+| 11.5 | Tables avec des inscrits | (1) « Inscriptions par table » | Chaque table montre les inscrits et la liste d'attente numérotée, dans l'ordre d'inscription | ☐ |
+| 11.6 | Idem | (1) « Inscriptions (vue à plat) » | La liste complète est affichée ; les noms et e-mails sont lisibles sans troncature | ☐ |
+| 11.7 | Compte joueur de test | (1) « Gestion des rôles » ; (2) passer le compte à `mj` ; (3) se connecter avec ce compte | L'« Espace MJ » apparaît pour ce compte ; **remettre ensuite le rôle `joueur`** | ☐ |
+| 11.8 | Présences enregistrées | (1) Section « Présence à la convention » | Les totaux samedi, dimanche, les deux jours et personnes uniques sont cohérents avec les présences saisies | ☐ |
+| 11.9 | Des données existent | (1) « Exporter en CSV » | **5 fichiers** sont téléchargés (programme, tables, bénévoles, repas, présences), certains uniquement s'ils ont des données ; ouverts dans un tableur : accents corrects, une ligne par inscription, aucun caractère étrange | ☐ |
+| 11.10 | Admin | (1) « Tester le rappel sur mon email » | **Vous seul·e** recevez un e-mail de rappel avec votre propre contenu | ☐ |
+| 11.11 | Un autre compte avec inscriptions | (1) « Prévisualiser pour un inscrit » ; (2) saisir son adresse | **Vous seul·e** recevez le rappel tel que cette personne le recevrait ; **elle ne reçoit rien** | ☐ |
+| 11.12 | — | (1) Chercher le bouton « Envoyer les rappels J-3 » | Il est **masqué** hors période d'envoi. **Ne jamais l'utiliser en test** : il écrit à toutes les personnes présentes. Ne le tester que sur une base ne contenant que des comptes de test | ☐ |
+| 11.13 | Admin | (1) Cliquer sur « Outil convention J-J » | L'outil du jour J s'ouvre dans un nouvel onglet (section 13) | ☐ |
+
+## 12. E-mails transactionnels
+
+*À vérifier sur chacun des e-mails reçus pendant les sections précédentes.*
+
+| # | Préconditions | Étapes | Résultat attendu | OK |
+|---|---|---|---|---|
+| 12.1 | E-mails reçus | (1) Lire l'expéditeur et l'objet | Expéditeur du domaine du site ; objets lisibles (« Inscription confirmée — *jeu* », « Liste d'attente — *jeu* », « Inscription annulée — *jeu* ») | ☐ |
+| 12.2 | Idem | (1) Lire le corps | Dates, lieu et liens de **l'édition en cours** ; pas de date de l'année précédente ; accents et apostrophes corrects | ☐ |
+| 12.3 | Idem | (1) Cliquer sur les liens (site, Facebook, HelloAsso) | Les liens fonctionnent et pointent vers la bonne édition | ☐ |
+| 12.4 | Idem | (1) Ouvrir l'e-mail sur téléphone | Mise en page lisible | ☐ |
+| 12.5 | Idem | (1) Vérifier le dossier « indésirables » | Les e-mails arrivent en boîte de réception | ☐ |
+| 12.6 | Nom ou jeu contenant `<b>x</b>` (cas 10.4) | (1) Lire l'e-mail correspondant | Le texte est affiché tel quel, sans gras ni lien injecté | ☐ |
+| 12.7 | Compte avec inscriptions | (1) `mes-inscriptions.html` → « Recevoir par email le détail de mes inscriptions » | Un message de succès, puis un e-mail récapitulatif | ☐ |
+| 12.8 | Idem | (1) Cliquer de nouveau tout de suite | Refus (un récapitulatif toutes les 2 minutes) ; aucun second e-mail | ☐ |
+| 12.9 | Compte sans inscription | (1) Demander le récapitulatif | Message indiquant qu'il n'y a rien à envoyer | ☐ |
+| 12.10 | MailerSend | (1) Ouvrir **Activity** | Chaque e-mail de la recette y figure avec le statut « délivré » ; aucune erreur 401 ou 422 | ☐ |
+
+## 13. Outil du jour J (`melusine-convention-2026.html`)
+
+*Compte admin. Cet outil charge toutes les données personnelles dans le navigateur : l'utiliser sur un appareil de confiance.*
+
+| # | Préconditions | Étapes | Résultat attendu | OK |
+|---|---|---|---|---|
+| 13.1 | Non connecté ou compte joueur | (1) Ouvrir l'outil | Il refuse de charger les données et propose de passer par l'administration | ☐ |
+| 13.2 | Admin connecté sur le site | (1) Ouvrir l'outil depuis `admin.html` | Les données se chargent ; les onglets samedi, dimanche, repas, bénévoles, tables affichent des compteurs cohérents avec le panneau admin | ☐ |
+| 13.3 | Données chargées | (1) Cocher des personnes comme arrivées ; (2) recharger la page | Les coches sont conservées **dans ce navigateur** | ☐ |
+| 13.4 | Idem | (1) Ouvrir le site (ex. `mes-inscriptions.html`) avec un autre navigateur ; (2) rouvrir l'outil | Les coches du premier navigateur **n'y sont pas** : elles ne sont stockées que sur l'appareil | ☐ |
+| 13.5 | Idem | (1) Utiliser la recherche et les vues groupées ; (2) afficher le récapitulatif d'une personne | Les résultats correspondent aux données ; les noms avec caractères spéciaux s'affichent tels quels | ☐ |
+| 13.6 | Idem | (1) Utiliser l'export local ; (2) imprimer | Un fichier est produit ; l'impression affiche le titre de l'onglet courant | ☐ |
+| 13.7 | Coches enregistrées | (1) Utiliser la remise à zéro des coches ; (2) confirmer | Les coches sont effacées après confirmation ; rien ne se passe si on refuse | ☐ |
+| 13.8 | Fin de journée | (1) Se déconnecter du site ; (2) vérifier ce qui reste dans le navigateur | **Les données personnelles et les coches restent dans le navigateur** : vider le stockage du site avant de rendre l'appareil (réglages du navigateur → données du site) | ☐ |
+
+## 14. Droits d'accès et sécurité de base
+
+*Ces cas sont les plus importants avant l'ouverture au public.*
+
+| # | Préconditions | Étapes | Résultat attendu | OK |
+|---|---|---|---|---|
+| 14.1 | Joueur A et joueur B ont des inscriptions | (1) Se connecter en A ; (2) consulter `mes-inscriptions.html` | Seules **les inscriptions de A** apparaissent | ☐ |
+| 14.2 | Joueur A connecté | (1) Ouvrir les outils du navigateur (F12), onglet **Console** ; (2) lancer une requête qui lit les inscriptions de tout le monde (voir ci-dessous) | Seules les lignes de A sont renvoyées, ou une erreur ; **jamais** les lignes de B | ☐ |
+| 14.3 | Joueur A connecté | (1) Dans la console, tenter de changer **son propre rôle** en `admin` (voir ci-dessous) ; (2) recharger ; (3) vérifier dans « Gestion des rôles » avec le compte admin | Le rôle reste `joueur` (refus ou aucune ligne modifiée). **Si le rôle a changé : ❌ critique**, remettre le rôle et alerter immédiatement | ☐ |
+| 14.4 | Joueur A connecté | (1) Dans la console, tenter d'annuler la présence d'une autre adresse (voir `docs/RECETTE_MANUELLE.md`, étape M4, si ce fichier est présent) | Refus : on ne peut agir que sur son propre compte | ☐ |
+| 14.5 | Non connecté | (1) Dans la console, appeler une fonction réservée aux utilisateurs connectés (voir `docs/RECETTE_MANUELLE.md`, étape M5, si présent) | Refus « permission denied » | ☐ |
+| 14.6 | Joueur A | (1) Aller sur `admin.html` ; (2) sur `espace-mj.html` | Accès refusé sur les deux pages | ☐ |
+| 14.7 | Page publique | (1) Afficher le code source de la page (clic droit → code source) ; (2) chercher « secret », « password », « WEBHOOK », « MAILERSEND » | Aucun secret : seule la clé « publishable » de Supabase est présente (publique par conception) | ☐ |
+| 14.8 | Une erreur provoquée (ex. mauvaise saisie) | (1) Lire le message | Message compréhensible, sans trace technique, sans nom de table | ☐ |
+| 14.9 | Joueur A connecté | (1) Dans « Pseudo affiché », saisir `<img src=x onerror=alert(1)>` ; (2) enregistrer ; (3) consulter toutes les pages où le pseudo apparaît | Le texte est affiché tel quel, **aucune fenêtre d'alerte** | ☐ |
+| 14.10 | Joueur A connecté | (1) Se déconnecter ; (2) rouvrir la page `programme.html` | Les boutons demandent de nouveau la connexion ; aucune action possible en tant que A | ☐ |
+
+**Requêtes de la console pour 14.2 et 14.3** (à coller dans la console du navigateur, connecté en joueur A ; Chrome peut demander de taper `allow pasting` d'abord) :
+
+```js
+// 14.2 : lecture de toutes les inscriptions (doit ne rendre que celles de A, ou une erreur)
+APP.supabase.from('inscriptions').select('email').then(r => console.log(JSON.stringify(r).slice(0, 600)))
+
+// 14.3 : tentative de s'attribuer le rôle admin (le rôle doit rester joueur ; remplacer par l'adresse de A)
+APP.supabase.from('profiles').update({ role: 'admin' }).eq('email', 'adresse-de-A@exemple.fr').then(r => console.log(JSON.stringify(r)))
+```
+
+## 15. Mobile, accessibilité, thème
+
+| # | Préconditions | Étapes | Résultat attendu | OK |
+|---|---|---|---|---|
+| 15.1 | Téléphone ou 360 px | (1) Parcourir programme, mes-inscriptions, espace MJ, bénévoles, infos | Aucun défilement horizontal ; boutons faciles à toucher ; formulaires utilisables | ☐ |
+| 15.2 | Clavier uniquement | (1) Naviguer avec Tab et Entrée sur `programme.html` jusqu'à une inscription | Le focus est visible ; toutes les actions sont atteignables au clavier | ☐ |
+| 15.3 | Zoom du navigateur à 200 % | (1) Parcourir les pages principales | Rien de coupé ni de chevauché | ☐ |
+| 15.4 | Thème clair puis sombre du système | (1) Changer le thème du système ; (2) recharger | Le texte reste lisible sur tous les fonds ; pas de texte clair sur fond clair | ☐ |
+| 15.5 | Lecteur d'écran (si possible) | (1) Remplir un formulaire d'inscription | Les champs ont des libellés ; les erreurs et succès sont annoncés | ☐ |
+
+## 16. Nettoyage de fin de recette
+
+| # | Préconditions | Étapes | Résultat attendu | OK |
+|---|---|---|---|---|
+| 16.1 | Recette terminée | (1) Annuler toutes les inscriptions, repas et bénévolats des comptes de test | Plus aucune inscription active pour ces comptes | ☐ |
+| 16.2 | Idem | (1) Supprimer ou refuser les tables créées pour le test ; (2) remettre les rôles des comptes de test à `joueur` | Programme et rôles propres | ☐ |
+| 16.3 | Idem | (1) Supprimer les e-mails de test ; (2) vider les données du site dans le navigateur de l'outil du jour J | Aucune donnée personnelle ne reste sur les appareils utilisés | ☐ |
+| 16.4 | Idem | (1) Faire signer la fiche : date, version du site testée, nom de la personne, nombre de ❌ | Fiche archivée avec les écarts et les captures | ☐ |

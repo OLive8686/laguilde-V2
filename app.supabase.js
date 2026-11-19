@@ -945,6 +945,21 @@ async function maybeShowPresenceModal() {
 }
 
 /**
+ * Libellé d'un jour de la convention (« samedi 8 mai »), lu dans edition.js.
+ * Si edition.js n'est pas chargé, on retombe sur le seul nom du jour plutôt que de
+ * casser l'affichage : jamais de date écrite en dur ici.
+ * @param {string} jour - 'samedi' ou 'dimanche'
+ * @param {boolean} [majuscule] - true pour « Samedi 8 mai »
+ * @returns {string}
+ */
+function editionDayLabel(jour, majuscule) {
+    if (window.EDITION && typeof window.EDITION.dayLabel === 'function') {
+        return window.EDITION.dayLabel(jour, majuscule);
+    }
+    return majuscule ? jour.charAt(0).toUpperCase() + jour.slice(1) : jour;
+}
+
+/**
  * Construit et insère le modal dans le DOM.
  * Réutilise les classes CSS existantes (.modal-overlay, .modal) pour rester
  * cohérent avec le style du site.
@@ -966,11 +981,11 @@ function showPresenceModal() {
         +   '<div style="margin:20px 0;text-align:left">'
         +     '<label class="presence-toggle" style="display:flex;align-items:center;gap:10px;padding:8px 0;font-size:16px">'
         +       '<input type="checkbox" id="presenceModalSamedi" style="width:20px;height:20px;accent-color:var(--gold)">'
-        +       '<span>Samedi 16 mai</span>'
+        +       '<span>' + editionDayLabel('samedi', true) + '</span>'
         +     '</label>'
         +     '<label class="presence-toggle" style="display:flex;align-items:center;gap:10px;padding:8px 0;font-size:16px">'
         +       '<input type="checkbox" id="presenceModalDimanche" style="width:20px;height:20px;accent-color:var(--gold)">'
-        +       '<span>Dimanche 17 mai</span>'
+        +       '<span>' + editionDayLabel('dimanche', true) + '</span>'
         +     '</label>'
         +   '</div>'
         +   '<div style="display:flex;gap:12px;justify-content:space-between;margin-top:8px">'
@@ -1013,9 +1028,9 @@ window.confirmPresenceModal = async function() {
         if (samedi && dimanche) {
             toast('Présence enregistrée pour samedi et dimanche', 'success');
         } else if (samedi) {
-            toast('Présence enregistrée pour samedi 16 mai', 'success');
+            toast('Présence enregistrée pour ' + editionDayLabel('samedi'), 'success');
         } else if (dimanche) {
-            toast('Présence enregistrée pour dimanche 17 mai', 'success');
+            toast('Présence enregistrée pour ' + editionDayLabel('dimanche'), 'success');
         }
         // Si aucun jour coché : pas de toast (l'utilisateur a explicitement dit "rien")
 
@@ -1777,7 +1792,7 @@ async function initApp() {
 function prefetchAllPages() {
     // Attendre 1 seconde après le rendu pour ne pas concurrencer le contenu visible
     setTimeout(function() {
-        var pages = ['index.html', 'programme.html', 'infos.html', 'benevoles.html', 'mes-inscriptions.html', 'espace-mj.html', 'aide.html', 'styles.css', 'app.supabase.js?v=3'];
+        var pages = ['index.html', 'programme.html', 'infos.html', 'benevoles.html', 'mes-inscriptions.html', 'espace-mj.html', 'aide.html', 'styles.css', 'edition.js?v=1', 'app.supabase.js?v=4'];
         var current = location.pathname.split('/').pop() || 'index.html';
         pages.forEach(function(page) {
             if (page === current) return;

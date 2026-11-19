@@ -3,15 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="acces.js?v=1"></script><!-- rideau équipe : à retirer au lancement public (docs/ACCES_EQUIPE.md) -->
+    <meta name="robots" content="noindex"><!-- idem -->
     <title>Programme — Sous l'Œil de Mélusine</title>
-    <meta name="description" content="Programme des tables de jeu de rôle — Convention Sous l'Œil de Mélusine, 16 & 17 mai 2026, Poitiers.">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400&family=Lora:wght@400;600&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400&family=Lora:wght@400;600&display=swap"></noscript>
-    <link rel="icon" type="image/png" href="logo.png">
-    <link rel="apple-touch-icon" href="logo.png">
+    <meta name="description" content="Programme des tables de jeu de rôle — Convention Sous l'Œil de Mélusine, Poitiers.">
+    <link rel="preload" href="fonts/lora-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="fonts/cinzel-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="fonts.css?v=1">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
     <script>document.addEventListener('DOMContentLoaded',function(){var u=localStorage.getItem('melusine_user');var il=document.getElementById('navInscriptionsLink');if(il)il.style.display=u&&u!=='null'?'':'none';});</script>
-    <link rel="stylesheet" href="styles.css">
+    <meta name="color-scheme" content="dark light">
+    <link rel="stylesheet" href="theme.css?v=1">
+    <link rel="stylesheet" href="styles.css?v=2">
+    <link rel="stylesheet" href="v2.css?v=1">
 </head>
 <body>
 
@@ -36,8 +42,8 @@
             <label>Mot de passe</label>
             <input type="password" id="inputPassword" placeholder="Votre mot de passe" onkeydown="if(event.key==='Enter')loginEmail()">
             <button class="btn btn-primary" style="width:100%" onclick="loginEmail()">Se connecter</button>
-            <p style="margin-top:10px;font-size:13px;color:var(--accent);cursor:pointer;text-align:center" onclick="showForgotForm()">Mot de passe oublié ?</p>
-            <p style="margin-top:8px;font-size:14px;color:var(--text-muted);text-align:center">Pas encore de compte ? <span style="color:var(--accent);cursor:pointer" onclick="showRegisterForm()">Créer un compte</span></p>
+            <p style="margin-top:10px;font-size:13px;color:var(--accent-text);cursor:pointer;text-align:center" onclick="showForgotForm()">Mot de passe oublié ?</p>
+            <p style="margin-top:8px;font-size:14px;color:var(--text-muted);text-align:center">Pas encore de compte ? <span style="color:var(--accent-text);cursor:pointer" onclick="showRegisterForm()">Créer un compte</span></p>
             <p style="margin-top:8px;font-size:14px;color:var(--text-muted);cursor:pointer;text-align:center" onclick="showAuthOptions()">← Retour</p>
         </div>
         <div id="registerForm" class="auth-form">
@@ -50,7 +56,7 @@
             <label>Confirmer le mot de passe</label>
             <input type="password" id="inputRegConfirm" placeholder="Retapez le mot de passe" onkeydown="if(event.key==='Enter')registerEmail()">
             <button class="btn btn-primary" style="width:100%" onclick="registerEmail()">Créer mon compte</button>
-            <p style="margin-top:8px;font-size:14px;color:var(--text-muted);text-align:center">Déjà un compte ? <span style="color:var(--accent);cursor:pointer" onclick="showEmailForm()">Se connecter</span></p>
+            <p style="margin-top:8px;font-size:14px;color:var(--text-muted);text-align:center">Déjà un compte ? <span style="color:var(--accent-text);cursor:pointer" onclick="showEmailForm()">Se connecter</span></p>
             <p style="margin-top:8px;font-size:14px;color:var(--text-muted);cursor:pointer;text-align:center" onclick="showAuthOptions()">← Retour</p>
         </div>
         <div id="forgotForm" class="auth-form">
@@ -92,7 +98,7 @@
 <!-- NAV -->
 <nav class="nav" id="nav">
     <div class="nav-inner">
-        <a href="index.html" class="nav-brand"><img src="logo.png" alt="Logo" onerror="this.style.display='none'"><span>Mélusine</span></a>
+        <a href="index.html" class="nav-brand"><img src="img/logo-guilde-192.webp" width="46" height="44" alt=""><span>Mélusine</span></a>
         <button class="nav-toggle" id="navToggle" aria-label="Menu"><span></span><span></span><span></span></button>
         <ul class="nav-links" id="navLinks">
             <li><a href="index.html">Accueil</a></li>
@@ -135,18 +141,19 @@
 
 <!-- FOOTER -->
 <footer class="footer">
-    <div class="footer-inner">
+    <div class="footer-inner"><a class="footer-guilde" href="https://www.laguilde-poitiers.com/" target="_blank" rel="noopener"><img class="guilde-logo" src="img/logo-guilde-192.webp" width="72" height="68" alt="La Guilde — Poitiers" loading="lazy"></a>
         <div>
             <div class="footer-brand">Sous l'Œil de Mélusine</div>
-            <div class="footer-sub">Organisé par La Guilde · Foyer du Porteau · Poitiers</div>
+            <div class="footer-sub">Organisé par La Guilde · <span data-edition="venueDot"></span></div>
         </div>
-        <div class="footer-right">16 & 17 mai 2026</div>
+        <div class="footer-right" data-edition="range"></div>
     </div>
 </footer>
 <button class="scroll-top" id="scrollTop" aria-label="Retour en haut">↑</button>
 
 <!-- Scripts : app.js (partagé) puis code spécifique à la page programme -->
-<script src="app.supabase.js?v=3"></script>
+<script src="edition.js?v=1"></script>
+<script src="app.supabase.js?v=4"></script>
 <script>
 // =============================================================================
 // CODE SPÉCIFIQUE À LA PAGE PROGRAMME (programme.html)
@@ -543,18 +550,57 @@ function renderProgramme(items) {
         }
     });
 
-    // Générer les onglets : "Tous" + un onglet par créneau
-    tabsEl.innerHTML = '<button class="tab active" data-filter="all">Tous</button>' +
-        creneaux.map(function(c) {
-            return '<button class="tab" data-filter="' + escHtml(c) + '">' + escHtml(c) + '</button>';
-        }).join('');
+    // ── Filtres (v2) : un choix de jour, puis (si un jour est choisi) un choix de créneau ──
+    // Remplace les ~13 pastilles d'un seul rang. L'état du filtre est gardé ici.
+    var state = { jour: 'all', creneau: 'all' };
+
+    /** Jour d'un créneau : 'samedi' ou 'dimanche' (même règle que creneauSortKey). */
+    function jourDe(creneau) {
+        return (creneau || '').toLowerCase().indexOf('dimanche') !== -1 ? 'dimanche' : 'samedi';
+    }
+
+    /** Libellé d'un jour (« Samedi 8 mai », dates lues dans edition.js ; repli : « Samedi »). */
+    function jourLibelle(jour) {
+        if (window.EDITION && typeof window.EDITION.dayLabel === 'function') return window.EDITION.dayLabel(jour, true);
+        return jour.charAt(0).toUpperCase() + jour.slice(1);
+    }
+
+    var aSamedi = creneaux.some(function(c) { return jourDe(c) === 'samedi'; });
+    var aDimanche = creneaux.some(function(c) { return jourDe(c) === 'dimanche'; });
+
+    /** (Re)construit les contrôles de filtre selon l'état courant. */
+    function renderControls() {
+        function seg(valeur, libelle) {
+            var actif = state.jour === valeur;
+            return '<button type="button" class="seg' + (actif ? ' active' : '') + '" data-jour="' + valeur + '" aria-pressed="' + actif + '">' + escHtml(libelle) + '</button>';
+        }
+        var html = '<div class="day-switch" role="group" aria-label="Choisir le jour">' +
+            seg('all', 'Tous') +
+            (aSamedi ? seg('samedi', jourLibelle('samedi')) : '') +
+            (aDimanche ? seg('dimanche', jourLibelle('dimanche')) : '') +
+            '</div>';
+        if (state.jour !== 'all') {
+            var chips = creneaux.filter(function(c) { return jourDe(c) === state.jour; });
+            html += '<div class="creneau-chips" role="group" aria-label="Choisir un créneau">' +
+                '<button type="button" class="tab' + (state.creneau === 'all' ? ' active' : '') + '" data-creneau="all">Toute la journée</button>' +
+                chips.map(function(c) {
+                    return '<button type="button" class="tab' + (state.creneau === c ? ' active' : '') + '" data-creneau="' + escHtml(c) + '">' + escHtml(c) + '</button>';
+                }).join('') + '</div>';
+        }
+        tabsEl.innerHTML = html;
+    }
 
     /**
-     * Rendu des cartes de jeu pour un filtre donné.
-     * @param {string} filter - 'all' ou le nom d'un créneau
+     * Rendu des cartes de jeu selon l'état du filtre (jour, puis créneau).
+     * Les cartes sont groupées sous un titre de jour (si « Tous ») puis un titre de créneau.
      */
-    function render(filter) {
-        var list = filter === 'all' ? items : items.filter(function(i) { return i.creneau === filter; });
+    function render() {
+        var list = items.filter(function(i) {
+            if (state.jour !== 'all' && jourDe(i.creneau) !== state.jour) return false;
+            if (state.creneau !== 'all' && i.creneau !== state.creneau) return false;
+            return true;
+        });
+        var lastJour = null, lastCreneau = null; // pour n'écrire chaque titre de groupe qu'une fois
 
         grid.innerHTML = list.map(function(item) {
             // Calcul des places — utiliser le quota web si défini
@@ -598,7 +644,7 @@ function renderProgramme(items) {
             var btn;
             if (estMJ) {
                 // L'utilisateur est MJ de cette table → pas de bouton d'inscription
-                btn = '<span class="badge badge-inscrit" style="background:var(--accent-light);color:var(--accent)">🎲 Vous êtes MJ</span>';
+                btn = '<span class="badge badge-inscrit" style="background:var(--accent-light);color:var(--accent-text)">🎲 Vous êtes MJ</span>';
                 // Mais il peut inscrire un accompagnant
                 if (APP.accompagnants && APP.accompagnants.length > 0) {
                     btn += '<button class="btn btn-small btn-outline" style="margin-top:6px;font-size:12px" onclick="handleInscrire(\'' + esc(item.creneau) + '\',\'' + esc(item.jeu) + '\')">Inscrire un accompagnant</button>';
@@ -651,32 +697,63 @@ function renderProgramme(items) {
                 inscritsHtml = '<div style="margin-top:8px;font-size:13px;color:var(--text-muted)">👥 ' + noms.join(', ') + '</div>';
             }
 
+            // État de remplissage (couleur du liseré et de la jauge) et jauge en pourcentage
+            var etat = (fullWeb && !item.complet) ? 'attente' : (fullWeb ? 'complet' : (webRest <= 2 ? 'peu' : 'dispo'));
+            var pct = max > 0 ? Math.round(Math.min(ins, max) / max * 100) : 0;
+
+            // Description : repliée sur 3 lignes quand elle est longue, avec « Lire la suite »
+            var desc = item.description || '';
+            var longue = desc.length > 180;
+            var descHtml = '<div class="desc' + (longue ? ' desc--clamp' : '') + '">' + escHtml(desc) + '</div>' +
+                (longue ? '<button type="button" class="desc-toggle" onclick="var d=this.previousElementSibling;d.classList.toggle(\'desc--clamp\');this.textContent=d.classList.contains(\'desc--clamp\')?\'Lire la suite\':\'Réduire\'">Lire la suite</button>' : '');
+
+            // Titres de groupe : le jour (si « Tous »), puis le créneau, une seule fois chacun
+            var entete = '';
+            var jour = jourDe(item.creneau);
+            if (state.jour === 'all' && jour !== lastJour) {
+                entete += '<h2 class="day-title">' + escHtml(jourLibelle(jour)) + '</h2>';
+                lastJour = jour;
+                lastCreneau = null;
+            }
+            if (item.creneau !== lastCreneau) {
+                entete += '<h3 class="time-block">' + escHtml(item.creneau) + '</h3>';
+                lastCreneau = item.creneau;
+            }
+
             // Carte du jeu
-            return '<div class="creneau">' +
-                '<div class="creneau-time">' + (escHtml(item.creneau) || '') + '</div>' +
+            return entete + '<div class="creneau creneau--' + etat + '">' +
                 '<div class="creneau-info">' +
                     '<h4>' + (escHtml(item.jeu) || '') + '</h4>' +
                     '<div class="mj">MJ : ' + (escHtml(item.mj) || '—') + (item.systeme ? ' · ' + escHtml(item.systeme) : '') + '</div>' +
-                    '<div class="desc">' + (escHtml(item.description) || '') + '</div>' +
+                    descHtml +
                     (item.content_warning ? '<div class="content-warning">⚠️ ' + escHtml(item.content_warning) + '</div>' : '') +
-                    '<span class="badge ' + badgeCls + '">' + statusTxt + '</span>' +
+                    '<div class="places"><span class="badge ' + badgeCls + '">' + statusTxt + '</span>' +
+                        '<span class="places-bar" aria-hidden="true"><span style="width:' + pct + '%"></span></span></div>' +
                     inscritsHtml +
                 '</div>' +
                 '<div class="creneau-actions">' + btn + '</div>' +
             '</div>';
-        }).join('');
+        }).join('') || '<p class="vide">Aucune table sur ce créneau.</p>';
     }
 
-    // Rendu initial : afficher tous les créneaux
-    render('all');
+    // Rendu initial : tous les jours
+    renderControls();
+    render();
 
-    // Gestion des clics sur les onglets de filtre
+    // Gestion des clics : choix du jour (remet le créneau à « tout »), ou choix d'un créneau
     tabsEl.onclick = function(e) {
-        if (e.target.classList.contains('tab')) {
-            tabsEl.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
-            e.target.classList.add('active');
-            render(e.target.dataset.filter);
+        var seg = e.target.closest ? e.target.closest('.seg') : null;
+        var chip = e.target.closest ? e.target.closest('.tab') : null;
+        if (seg) {
+            state.jour = seg.dataset.jour;
+            state.creneau = 'all';
+        } else if (chip) {
+            state.creneau = chip.dataset.creneau;
+        } else {
+            return;
         }
+        renderControls();
+        render();
     };
 }
 

@@ -3,9 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mélusine 2026 — Outil Convention</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<title>Mélusine — Outil Convention</title>
+<link rel="stylesheet" href="fonts.css?v=1">
 <style>
 :root {
   --bg:#f4f0e8;--surface:#fdfaf5;--border:#d8d0c0;
@@ -18,7 +17,7 @@
   --del-bg:#fde8e8;--del-fg:#8b1a1a;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'EB Garamond',Georgia,serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.55}
+body{font-family:'Lora',Georgia,serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.55}
 
 /* HEADER */
 header{background:var(--green);color:#fff;padding:1.25rem 2rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;border-bottom:3px solid var(--gold2)}
@@ -31,7 +30,7 @@ header .datebadge{font-size:.8rem;white-space:nowrap;background:rgba(255,255,255
 .tab-btn{font-family:'Cinzel',serif;font-size:.72rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:rgba(255,255,255,.55);background:none;border:none;padding:.7rem 1.1rem;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:color .15s}
 .tab-btn:hover{color:rgba(255,255,255,.9)}
 .tab-btn.active{color:var(--gold2);border-bottom-color:var(--gold2);background:rgba(255,255,255,.04)}
-.tab-btn .cnt{display:inline-block;background:rgba(255,255,255,.13);border-radius:10px;padding:.08em .5em;font-size:.75em;font-family:'EB Garamond',serif;font-weight:400;letter-spacing:0;margin-left:.3em}
+.tab-btn .cnt{display:inline-block;background:rgba(255,255,255,.13);border-radius:10px;padding:.08em .5em;font-size:.75em;font-family:'Lora',serif;font-weight:400;letter-spacing:0;margin-left:.3em}
 .tab-btn.active .cnt{background:rgba(200,146,48,.3)}
 .tab-panel{display:none}
 .tab-panel.active{display:block}
@@ -44,7 +43,7 @@ header .datebadge{font-size:.8rem;white-space:nowrap;background:rgba(255,255,255
 .toolbar{padding:.85rem 2rem;display:flex;align-items:center;gap:.65rem;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap}
 .search-wrap{position:relative;flex:1;min-width:180px;max-width:360px}
 .search-wrap svg{position:absolute;left:.7rem;top:50%;transform:translateY(-50%);opacity:.4;pointer-events:none}
-.search-input{width:100%;padding:.45rem .75rem .45rem 2.1rem;border:1px solid var(--border);border-radius:5px;font-family:'EB Garamond',serif;font-size:.95rem;background:var(--bg);color:var(--text);outline:none;transition:border-color .15s}
+.search-input{width:100%;padding:.45rem .75rem .45rem 2.1rem;border:1px solid var(--border);border-radius:5px;font-family:'Lora',serif;font-size:.95rem;background:var(--bg);color:var(--text);outline:none;transition:border-color .15s}
 .search-input:focus{border-color:var(--green2)}
 .stats{font-size:.82rem;color:var(--muted);font-style:italic;margin-left:auto;white-space:nowrap}
 .btn{font-family:'Cinzel',serif;font-size:.67rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;cursor:pointer;border-radius:5px;padding:.4rem .85rem;border:2px solid;transition:all .15s;white-space:nowrap}
@@ -98,7 +97,7 @@ table.h-file   th.col-file,   table.h-file   td.col-file   {display:none}
 
 /* Menu déroulant "Colonnes" */
 .cols-wrap{position:relative;display:inline-block}
-.cols-menu{display:none;position:absolute;top:100%;right:0;z-index:50;background:var(--surface);border:1px solid var(--border);border-radius:5px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:.5rem .65rem;margin-top:.25rem;min-width:160px;font-family:'EB Garamond',serif;font-size:.88rem}
+.cols-menu{display:none;position:absolute;top:100%;right:0;z-index:50;background:var(--surface);border:1px solid var(--border);border-radius:5px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:.5rem .65rem;margin-top:.25rem;min-width:160px;font-family:'Lora',serif;font-size:.88rem}
 .cols-menu.on{display:block}
 .cols-menu label{display:flex;align-items:center;gap:.45rem;padding:.2rem 0;cursor:pointer;user-select:none}
 .cols-menu label:hover{color:var(--green)}
@@ -106,7 +105,7 @@ table.h-file   th.col-file,   table.h-file   td.col-file   {display:none}
 @media print{.cols-wrap{display:none!important}}
 
 /* Filtre pointage (samedi/dimanche) — select dans la toolbar */
-.ck-filter{padding:.4rem .6rem;border:1px solid var(--border);border-radius:5px;font-family:'EB Garamond',serif;font-size:.9rem;background:var(--surface);color:var(--text);outline:none;cursor:pointer;transition:border-color .15s}
+.ck-filter{padding:.4rem .6rem;border:1px solid var(--border);border-radius:5px;font-family:'Lora',serif;font-size:.9rem;background:var(--surface);color:var(--text);outline:none;cursor:pointer;transition:border-color .15s}
 .ck-filter:focus{border-color:var(--green2)}
 @media print{.ck-filter{display:none!important}}
 
@@ -124,9 +123,9 @@ table.h-file   th.col-file,   table.h-file   td.col-file   {display:none}
 .grp-head .grp-toggle{font-size:.7em;opacity:.5;transition:transform .12s}
 .grp.collapsed .grp-toggle{transform:rotate(-90deg)}
 .grp.collapsed .grp-body{display:none}
-.grp-cr{color:var(--muted);font-weight:400;font-family:'EB Garamond',serif;font-size:.95em;margin-left:.3em}
-.grp-mj{color:var(--acc-fg);font-weight:600;font-family:'EB Garamond',serif;font-size:.92em;margin-left:.4em}
-.grp-count{margin-left:auto;font-family:'EB Garamond',serif;font-weight:400;font-size:.92em;color:var(--muted);padding:.1em .55em;background:#fdfaf5;border-radius:3px;border:1px solid var(--border)}
+.grp-cr{color:var(--muted);font-weight:400;font-family:'Lora',serif;font-size:.95em;margin-left:.3em}
+.grp-mj{color:var(--acc-fg);font-weight:600;font-family:'Lora',serif;font-size:.92em;margin-left:.4em}
+.grp-count{margin-left:auto;font-family:'Lora',serif;font-weight:400;font-size:.92em;color:var(--muted);padding:.1em .55em;background:#fdfaf5;border-radius:3px;border:1px solid var(--border)}
 .grp-count.full{background:var(--del-bg);color:var(--del-fg);border-color:transparent}
 .grp-body{padding:.4rem 0}
 .grp-body table{margin:0}
@@ -157,7 +156,7 @@ table.h-file   th.col-file,   table.h-file   td.col-file   {display:none}
 .mrs li{padding:.3rem 0;font-size:.92rem;display:flex;align-items:baseline;gap:.5rem}
 .mrs li .mri{flex:1}
 .mrs .mr-empty{color:var(--muted);font-style:italic;font-size:.88em;padding:.2rem 0}
-.mr-cr{font-family:'EB Garamond',serif;color:var(--muted);font-size:.85em;margin-right:.3em;white-space:nowrap}
+.mr-cr{font-family:'Lora',serif;color:var(--muted);font-size:.85em;margin-right:.3em;white-space:nowrap}
 .mr-tag{display:inline-block;padding:.05em .45em;border-radius:3px;font-size:.7em;font-weight:600;font-family:sans-serif;text-transform:uppercase;letter-spacing:.04em;margin-left:.4em}
 #mbox{background:var(--surface);border-radius:8px;width:100%;max-width:530px;max-height:92vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.35);animation:su .18s ease}
 @keyframes su{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
@@ -172,7 +171,7 @@ table.h-file   th.col-file,   table.h-file   td.col-file   {display:none}
 .fg{margin-bottom:.85rem}
 .fg:last-child{margin-bottom:0}
 .fg label{display:block;font-family:'Cinzel',serif;font-size:.67rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--green);margin-bottom:.22rem}
-.fg input,.fg select{width:100%;padding:.45rem .65rem;border:1px solid var(--border);border-radius:4px;font-family:'EB Garamond',serif;font-size:1rem;background:var(--bg);color:var(--text);outline:none;transition:border-color .15s}
+.fg input,.fg select{width:100%;padding:.45rem .65rem;border:1px solid var(--border);border-radius:4px;font-family:'Lora',serif;font-size:1rem;background:var(--bg);color:var(--text);outline:none;transition:border-color .15s}
 .fg input:focus,.fg select:focus{border-color:var(--green2)}
 .hint{font-size:.77em;color:var(--muted);margin-top:.2rem;font-style:italic}
 .frow{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
@@ -199,7 +198,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
 /* ── AJOUT RAPIDE TABLES ── */
 #qa-bar{display:flex;align-items:center;gap:.5rem;padding:.7rem 2rem;background:#f0ede4;border-bottom:2px solid var(--gold);flex-wrap:wrap}
 #qa-label{font-family:'Cinzel',serif;font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--green);white-space:nowrap;margin-right:.3rem}
-#qa-bar input,#qa-bar select{padding:.42rem .6rem;border:1px solid var(--border);border-radius:5px;font-family:'EB Garamond',serif;font-size:.95rem;background:var(--surface);color:var(--text);outline:none;transition:border-color .15s}
+#qa-bar input,#qa-bar select{padding:.42rem .6rem;border:1px solid var(--border);border-radius:5px;font-family:'Lora',serif;font-size:.95rem;background:var(--surface);color:var(--text);outline:none;transition:border-color .15s}
 #qa-bar input:focus,#qa-bar select:focus{border-color:var(--green2)}
 #qa-cr{width:190px}
 #qa-jeu{flex:1;min-width:160px}
@@ -218,9 +217,9 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
      Affiché tant que l'auth + le chargement initial ne sont pas terminés.
      Bloque toute interaction avec l'outil. Une fois OK, on cache cet écran.
 -->
-<div id="boot-screen" style="position:fixed;inset:0;background:#f4f0e8;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem;text-align:center;font-family:'EB Garamond',Georgia,serif">
+<div id="boot-screen" style="position:fixed;inset:0;background:#f4f0e8;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem;text-align:center;font-family:'Lora',Georgia,serif">
   <div style="max-width:480px">
-    <h1 style="font-family:'Cinzel',serif;color:#1d4b3a;font-size:1.4rem;margin-bottom:.6rem">⚔ Outil Convention — Mélusine 2026</h1>
+    <h1 style="font-family:'Cinzel',serif;color:#1d4b3a;font-size:1.4rem;margin-bottom:.6rem">⚔ Outil Convention — Mélusine <span data-edition="year"></span></h1>
     <p id="boot-msg" style="color:#6e675e;font-style:italic">Vérification de l'accès…</p>
     <div id="boot-actions" style="margin-top:1.2rem;display:none">
       <a id="boot-link" href="https://sousloeildemelusine.fr/admin.html" style="display:inline-block;font-family:'Cinzel',serif;font-size:.75rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:#fff;background:#2a6b51;border:2px solid #2a6b51;border-radius:5px;padding:.5rem 1rem;text-decoration:none">Aller au site principal</a>
@@ -231,10 +230,10 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
 
 <header>
   <div>
-    <h1>⚔ Sous l'Œil de Mélusine — Convention 2026</h1>
+    <h1>⚔ Sous l'Œil de Mélusine — Convention <span data-edition="year"></span></h1>
     <div class="sub">Outil de gestion — Jour J</div>
   </div>
-  <div class="datebadge">📅 Samedi 16 &amp; Dimanche 17 mai 2026</div>
+  <div class="datebadge">📅 <span data-edition="range"></span></div>
 </header>
 
 <nav class="tabs-nav">
@@ -415,6 +414,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
   </div>
 </div>
 
+<script src="edition.js?v=1"></script>
 <script>
 // =============================================================================
 // CONFIGURATION SUPABASE — chargement live des données du site (lecture seule)
@@ -422,7 +422,11 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:.85rem 0}
 // On lit les données via la RPC `get_admin_export_data` (SECURITY DEFINER côté
 // Supabase, qui vérifie elle-même que l'appelant a le rôle admin).
 // Aucune écriture ne sera faite vers Supabase — toutes les modifs faites dans
-// cet outil restent en localStorage du navigateur (variables m26d_*).
+// cet outil restent en localStorage du navigateur (clés STORAGE_PREFIX + « d_ », voir edition.js).
+// Préfixe des clés localStorage : vient de edition.js (change à chaque édition, pour ne pas
+// relire les pointages de l'année précédente). Repli si edition.js est absent.
+const STORAGE_PREFIX = (window.EDITION && window.EDITION.storagePrefix) || 'm27';
+if (window.EDITION) document.title = 'Mélusine ' + window.EDITION.year + ' — Outil Convention';
 const SUPABASE_URL = 'https://hdbhvwaemrjoantcecuv.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_YGImet9fG8OKLDf_H0GNyQ_SmY5Mo56';
 
@@ -716,8 +720,8 @@ async function bootApp() {
 async function reloadFromSite() {
   if (!confirm('Recharger depuis le site ?\n\nCela va remplacer toutes vos modifications locales par la photo actuelle des inscriptions sur le site.\n\nContinuer ?')) return;
   ['samedi','dimanche','repas','benevoles','tables'].forEach(t => {
-    localStorage.removeItem('m26d_' + t);
-    localStorage.removeItem('m26c_' + t);  // coches aussi remises à zéro
+    localStorage.removeItem(STORAGE_PREFIX + 'd_' + t);
+    localStorage.removeItem(STORAGE_PREFIX + 'c_' + t);  // coches aussi remises à zéro
   });
   document.getElementById('unsaved-banner').classList.remove('on');
   document.getElementById('boot-screen').style.display = 'flex';
@@ -788,17 +792,17 @@ function openRecap(nom, email) {
 
   // ── Présence à la convention ──
   const jours = [];
-  if (samedi.length) jours.push('Samedi 16 mai');
-  if (dimanche.length) jours.push('Dimanche 17 mai');
+  if (samedi.length) jours.push(EDITION.dayLabel('samedi', true));
+  if (dimanche.length) jours.push(EDITION.dayLabel('dimanche', true));
   html += `<div class="mrs"><h3>📅 Présence</h3>`;
   if (jours.length) {
     html += '<ul>';
     if (samedi.length) {
       const s = samedi[0];
-      html += `<li><span class="mri"><strong>Samedi 16 mai</strong>${s.type==='accompagnant'?` <span class="mr-tag" style="background:var(--acc-bg);color:var(--acc-fg)">acc. de ${esc(s.avec||'')}</span>`:''}</span></li>`;
+      html += `<li><span class="mri"><strong>${EDITION.dayLabel('samedi', true)}</strong>${s.type==='accompagnant'?` <span class="mr-tag" style="background:var(--acc-bg);color:var(--acc-fg)">acc. de ${esc(s.avec||'')}</span>`:''}</span></li>`;
     }
     if (dimanche.length) {
-      html += `<li><span class="mri"><strong>Dimanche 17 mai</strong></span></li>`;
+      html += `<li><span class="mri"><strong>${EDITION.dayLabel('dimanche', true)}</strong></span></li>`;
     }
     html += '</ul>';
   } else {
@@ -886,10 +890,10 @@ const COLS = {
 };
 
 function getColPrefs(t) {
-  try { return JSON.parse(localStorage.getItem('m26col_'+t) || '{}'); } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem(STORAGE_PREFIX + 'col_' + t) || '{}'); } catch { return {}; }
 }
 function setColPrefs(t, p) {
-  localStorage.setItem('m26col_'+t, JSON.stringify(p));
+  localStorage.setItem(STORAGE_PREFIX + 'col_' + t, JSON.stringify(p));
 }
 
 /**
@@ -953,10 +957,10 @@ document.addEventListener('click', e => {
 // persisté en localStorage.
 
 function isGroupedView() {
-  return localStorage.getItem('m26_grouped') === '1';
+  return localStorage.getItem(STORAGE_PREFIX + '_grouped') === '1';
 }
 function setGroupedView(on) {
-  localStorage.setItem('m26_grouped', on ? '1' : '0');
+  localStorage.setItem(STORAGE_PREFIX + '_grouped', on ? '1' : '0');
 }
 
 function toggleGrouped() {
@@ -967,12 +971,12 @@ function toggleGrouped() {
 
 // État collapsed des groupes (clé = "creneau|jeu")
 function getCollapsed() {
-  try { return JSON.parse(localStorage.getItem('m26_grp_col') || '{}'); } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem(STORAGE_PREFIX + '_grp_col') || '{}'); } catch { return {}; }
 }
 function setCollapsed(key, on) {
   const c = getCollapsed();
   if (on) c[key] = 1; else delete c[key];
-  localStorage.setItem('m26_grp_col', JSON.stringify(c));
+  localStorage.setItem(STORAGE_PREFIX + '_grp_col', JSON.stringify(c));
 }
 function toggleGroupCollapse(key) {
   const c = getCollapsed();
@@ -1117,8 +1121,8 @@ function dlBlob(filename, content) {
 // Accueil Dimanche, Bénévoles, Tables) pour que la page imprimée soit claire.
 window.doPrint = function(btn) {
   const labels = {
-    samedi:    'Accueil — Samedi 16 mai 2026',
-    dimanche:  'Accueil — Dimanche 17 mai 2026',
+    samedi:    'Accueil — ' + EDITION.dayLabel('samedi', true) + ' ' + EDITION.year,
+    dimanche:  'Accueil — ' + EDITION.dayLabel('dimanche', true) + ' ' + EDITION.year,
     repas:     'Repas du samedi soir',
     benevoles: 'Bénévoles',
     tables:    'Tables de JDR'
@@ -1246,7 +1250,7 @@ function dc(o){return JSON.parse(JSON.stringify(o))}
 function initData(){
   let any=false;
   ['samedi','dimanche','repas','benevoles','tables'].forEach(t=>{
-    const raw=localStorage.getItem('m26d_'+t);
+    const raw=localStorage.getItem(STORAGE_PREFIX + 'd_' + t);
     if(raw){try{D[t]=JSON.parse(raw);any=true}catch{D[t]=dc(INIT[t])}}
     else D[t]=dc(INIT[t]);
     D[t].forEach(r=>{if(!r._id)r._id=nid();else idc=Math.max(idc,r._id)});
@@ -1255,22 +1259,22 @@ function initData(){
 }
 
 function save(t){
-  localStorage.setItem('m26d_'+t,JSON.stringify(D[t]));
+  localStorage.setItem(STORAGE_PREFIX + 'd_' + t,JSON.stringify(D[t]));
   document.getElementById('unsaved-banner').classList.add('on');
   updateDL();
 }
 
 function resetAllData(){
   if(!confirm('Restaurer toutes les données d\'origine ?\nToutes vos modifications seront perdues.'))return;
-  ['samedi','dimanche','repas','benevoles','tables'].forEach(t=>localStorage.removeItem('m26d_'+t));
+  ['samedi','dimanche','repas','benevoles','tables'].forEach(t=>localStorage.removeItem(STORAGE_PREFIX + 'd_' + t));
   idc=0; initData();
   ['samedi','dimanche','repas','benevoles','tables'].forEach(render);
 }
 
 // ── COCHES ────────────────────────────────────────────
-function getChk(t){try{return JSON.parse(localStorage.getItem('m26c_'+t)||'{}')}catch{return{}}}
-function setChk(t,o){localStorage.setItem('m26c_'+t,JSON.stringify(o))}
-function resetChecked(t){if(!confirm('Remettre toutes les coches à zéro ?'))return;localStorage.removeItem('m26c_'+t);render(t)}
+function getChk(t){try{return JSON.parse(localStorage.getItem(STORAGE_PREFIX + 'c_' + t)||'{}')}catch{return{}}}
+function setChk(t,o){localStorage.setItem(STORAGE_PREFIX + 'c_' + t,JSON.stringify(o))}
+function resetChecked(t){if(!confirm('Remettre toutes les coches à zéro ?'))return;localStorage.removeItem(STORAGE_PREFIX + 'c_' + t);render(t)}
 
 // ── UTILS ─────────────────────────────────────────────
 function esc(v){if(v==null)return'';return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}

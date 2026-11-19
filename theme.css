@@ -1,0 +1,178 @@
+/* =============================================================================
+   theme.css — Thème visuel 2027 : TOUTES les couleurs, polices, rayons, ombres
+   et espacements du site sont définis ici, et seulement ici.
+   =============================================================================
+   Règle : aucune couleur écrite en dur dans styles.css ni dans les pages. Pour
+   changer la palette, on ne modifie que ce fichier (voir « Changer la palette »
+   en bas).
+
+   Palette : ambiance crépusculaire (acier bleu-gris, orange-rouge, crème).
+     - Mode SOMBRE par défaut.
+     - Mode CLAIR automatique si le système de l'utilisateur est en mode clair
+       (prefers-color-scheme: light).
+   Les valeurs de base (fond, surfaces, texte, accent, information) viennent de la
+   palette validée le 18/11/2026. Les variantes « -text », « -strong » et les statuts
+   sont DÉRIVÉS pour tenir le contraste WCAG AA (calculé, voir le tableau plus bas).
+
+   Chargé AVANT styles.css :
+     <link rel="stylesheet" href="theme.css">
+     <link rel="stylesheet" href="styles.css">
+   ========================================================================== */
+
+:root {
+  /* ── Couleurs — mode SOMBRE (défaut) ───────────────────────────────────── */
+  color-scheme: dark;
+
+  --bg:        #0d1217;   /* fond de page */
+  --surface:   #1d2b32;   /* cartes, modales, champs */
+  --surface-2: #2b3d45;   /* second niveau : barre de navigation, pied de page, survol */
+  --border:        #41525a;   /* filet décoratif (séparateurs, cartes) */
+  --border-strong: #5f7883;   /* bordure des CHAMPS de formulaire (≥ 3:1 sur fond et surface) */
+
+  --text:   #f3e3d6;      /* texte principal */
+  --text-2: #daac88;      /* texte secondaire */
+
+  --accent:        #e47557;   /* boutons, remplissages, bordures d'accent */
+  --on-accent:     #0d1217;   /* texte sur un bouton d'accent */
+  --accent-strong: #a9564c;   /* accent appuyé (survol, états actifs) */
+  --accent-text:   #e98e75;   /* l'accent quand il sert de TEXTE ou de lien (≥ 4,5:1 sur les 3 fonds) */
+
+  --info:      #7fa3b3;   /* information : remplissages, icônes */
+  --info-text: #8babba;   /* information en TEXTE (≥ 4,5:1 sur les 3 fonds) */
+
+  --success: #79b297;     /* succès  (vert d'acier) — texte et remplissage */
+  --warning: #d9a441;     /* alerte  (ambre) */
+  --danger:  #e48f83;     /* erreur  (rouge brique clair) */
+
+  /* Mêmes couleurs en canaux « R G B », pour les transparences :
+     rgb(var(--accent-rgb) / 0.15). Les garder synchronisées avec les valeurs ci-dessus. */
+  --bg-rgb: 13 18 23;
+  --surface-rgb: 29 43 50;
+  --text-rgb: 243 227 214;
+  --accent-rgb: 228 117 87;
+  --on-accent-rgb: 13 18 23;
+  --info-rgb: 127 163 179;
+  --success-rgb: 121 178 151;
+  --warning-rgb: 217 164 65;
+  --danger-rgb: 228 143 131;
+  --shadow-rgb: 0 0 0;
+
+  /* ── Polices ───────────────────────────────────────────────────────────── */
+  --font-display: 'Cinzel Decorative', serif;
+  --font-heading: 'Cinzel', serif;
+  --font-body:    'Lora', serif;
+
+  /* ── Rayons, espacements, ombres, transition ───────────────────────────── */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 20px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --shadow-sm: 0 2px 12px rgb(var(--shadow-rgb) / 0.25);
+  --shadow-md: 0 8px 30px rgb(var(--shadow-rgb) / 0.35);
+  --shadow-lg: 0 12px 40px rgb(var(--shadow-rgb) / 0.45);
+
+  --transition: 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* ── Mode CLAIR (système en mode clair) ──────────────────────────────────── */
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+
+    --bg:        #fbf3ec;
+    --surface:   #f3e3d6;
+    --surface-2: #e7d3c3;
+    --border:        #c9b3a5;
+    --border-strong: #a07960;
+
+    --text:   #1d2b32;
+    --text-2: #36545f;
+
+    --accent:        #a9564c;
+    --on-accent:     #fbf3ec;
+    --accent-strong: #7e3f37;
+    --accent-text:   #7e3f37;
+
+    --info:      #476879;
+    --info-text: #395361;
+
+    --success: #2c5844;
+    --warning: #6c480b;
+    --danger:  #85352c;
+
+    --bg-rgb: 251 243 236;
+    --surface-rgb: 243 227 214;
+    --text-rgb: 29 43 50;
+    --accent-rgb: 169 86 76;
+    --on-accent-rgb: 251 243 236;
+    --info-rgb: 71 104 121;
+    --success-rgb: 51 102 78;
+    --warning-rgb: 125 83 12;
+    --danger-rgb: 156 62 51;
+    --shadow-rgb: 60 40 30;
+
+    --shadow-sm: 0 2px 12px rgb(var(--shadow-rgb) / 0.10);
+    --shadow-md: 0 8px 30px rgb(var(--shadow-rgb) / 0.14);
+    --shadow-lg: 0 12px 40px rgb(var(--shadow-rgb) / 0.18);
+  }
+}
+
+/* ── Alias de compatibilité ────────────────────────────────────────────────
+   Anciens noms de variables encore utilisés par styles.css et par les pages
+   (leur sens d'origine était parfois trompeur : --cream est une couleur de TEXTE,
+   --dark un FOND). Ils pointent sur les nouveaux jetons : ne pas y ajouter de couleur.
+   À terme, remplacer chaque usage par le jeton sémantique puis supprimer l'alias. */
+:root {
+  --cream: var(--text);
+  --text-on-light: var(--text);
+  --text-light: var(--text-2);
+  --text-muted: var(--text-2);
+
+  --dark: var(--bg);
+  --dark-card: var(--surface);
+  --dark-teal: var(--surface-2);
+  --parchment: var(--surface);
+
+  --gold: var(--accent-text);
+  --orange: var(--accent-text);
+  --orange-light: var(--accent);
+
+  --teal: var(--info-text);
+  --teal-dark: var(--surface-2);
+  --teal-deep: var(--surface);
+
+  --red: var(--danger);
+  --green: var(--success);
+}
+
+/* ── Contrastes mesurés (WCAG AA : 4,5:1 pour le texte normal, 3:1 pour les composants)
+   Texte sur fond / surface / surface-2 :
+     SOMBRE  texte 15,0 / 11,6 / 9,0   texte 2 9,2 / 7,1 / 5,5
+             accent-text 7,7 / 5,9 / 4,6   info-text 7,7 / 6,0 / 4,7
+             succès 7,7 / 6,0 / 4,6   alerte 8,4 / 6,5 / 5,0   erreur 7,7 / 5,9 / 4,6
+     CLAIR   texte 13,3 / 11,6 / 10,0  texte 2 7,4 / 6,5 / 5,6
+             accent-text 7,2 / 6,3 / 5,5   info-text 7,4 / 6,5 / 5,6
+             succès 7,4 / 6,5 / 5,6   alerte 7,4 / 6,5 / 5,6   erreur 7,5 / 6,6 / 5,7
+   Les statuts posés sur leur propre teinte à 15 % (badges, boutons « tintés ») restent à
+   4,6:1 ou plus, même sur surface-2 (c'est le cas le plus défavorable).
+   Texte de bouton sur --accent : sombre 6,3 ; clair 4,6.
+   Bordure de champ (--border-strong) : sombre 4,0 sur fond, 3,1 sur surface ;
+   clair 3,5 sur fond, 3,1 sur surface. Sur « surface-2 » elle reste à 2,4 (sombre) et
+   2,7 (clair) : ne pas poser de champ de formulaire directement sur surface-2.
+   Utiliser accent, info et leurs rgb UNIQUEMENT pour des remplissages et des bordures ;
+   en texte, utiliser accent-text et info-text.
+
+   ── Changer la palette ──
+   1. Modifier les valeurs hexadécimales des deux blocs (sombre et clair) ci-dessus.
+   2. Reporter les mêmes valeurs en canaux « R G B » (variables *-rgb).
+   3. Recalculer les contrastes (tableau ci-dessus) : tout couple texte/fond doit rester
+      ≥ 4,5:1 (3:1 pour les gros textes et les bordures de composants).
+   Ne rien ajouter ailleurs que dans ce fichier. */

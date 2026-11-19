@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="acces.js?v=1"></script><!-- rideau équipe : à retirer au lancement public (docs/ACCES_EQUIPE.md) -->
+    <title>Sous l'Œil de Mélusine — Convention de jeu de rôle, Poitiers</title>
+    <meta name="description" content="Sous l'Œil de Mélusine : convention de jeu de rôle organisée par La Guilde, à Poitiers.">
+    <meta name="robots" content="noindex"><!-- MAQUETTE : à retirer à la mise en production -->
+    <link rel="preload" href="fonts/lora-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="fonts/cinzel-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="fonts.css?v=1">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <script>document.addEventListener('DOMContentLoaded',function(){var u=localStorage.getItem('melusine_user');var il=document.getElementById('navInscriptionsLink');if(il)il.style.display=u&&u!=='null'?'':'none';});</script>
+    <meta name="color-scheme" content="dark light">
+    <link rel="stylesheet" href="theme.css?v=1">
+    <link rel="stylesheet" href="styles.css?v=2">
+    <link rel="stylesheet" href="v2.css?v=1">
+</head>
+<body>
+
+<div class="toast-container" id="toasts"></div>
+
+<!-- AUTH MODAL -->
+<div class="modal-overlay" id="authModal">
+    <div class="modal">
+        <button class="modal-close" onclick="closeAuthModal()">✕</button>
+        <h3>Se connecter</h3>
+        <p class="modal-game" id="modalGame"></p>
+        <p id="modalSubtext">Connectez-vous pour gérer vos inscriptions</p>
+        <div id="authOptions" class="auth-options">
+            <button class="auth-btn" onclick="loginGoogle()"><span class="auth-btn-icon">🔑</span><div><div class="auth-btn-text">Continuer avec Google</div><div class="auth-btn-sub">Connexion rapide</div></div></button>
+            <button class="auth-btn" onclick="loginDiscord()"><span class="auth-btn-icon">🎮</span><div><div class="auth-btn-text">Continuer avec Discord</div><div class="auth-btn-sub">Compte Discord</div></div></button>
+            <div class="auth-divider">ou</div>
+            <button class="auth-btn" onclick="showEmailForm()"><span class="auth-btn-icon">✉️</span><div><div class="auth-btn-text">Pseudo & email</div><div class="auth-btn-sub">Sans compte</div></div></button>
+        </div>
+        <div id="emailForm" class="auth-form">
+            <label>Email</label>
+            <input type="email" id="inputEmail" placeholder="votre@email.com">
+            <label>Mot de passe</label>
+            <input type="password" id="inputPassword" placeholder="Votre mot de passe" onkeydown="if(event.key==='Enter')loginEmail()">
+            <button class="btn btn-primary" style="width:100%" onclick="loginEmail()">Se connecter</button>
+            <p style="margin-top:10px;font-size:13px;color:var(--accent-text);cursor:pointer;text-align:center" onclick="showForgotForm()">Mot de passe oublié ?</p>
+            <p style="margin-top:8px;font-size:14px;color:var(--text-muted);text-align:center">Pas encore de compte ? <span style="color:var(--accent-text);cursor:pointer" onclick="showRegisterForm()">Créer un compte</span></p>
+            <p style="margin-top:8px;font-size:14px;color:var(--text-muted);cursor:pointer;text-align:center" onclick="showAuthOptions()">← Retour</p>
+        </div>
+        <div id="registerForm" class="auth-form">
+            <label>Pseudo / Nom</label>
+            <input type="text" id="inputRegNom" placeholder="Votre pseudo ou prénom">
+            <label>Email</label>
+            <input type="email" id="inputRegEmail" placeholder="votre@email.com">
+            <label>Mot de passe (6 caractères min.)</label>
+            <input type="password" id="inputRegPassword" placeholder="Choisissez un mot de passe">
+            <label>Confirmer le mot de passe</label>
+            <input type="password" id="inputRegConfirm" placeholder="Retapez le mot de passe" onkeydown="if(event.key==='Enter')registerEmail()">
+            <button class="btn btn-primary" style="width:100%" onclick="registerEmail()">Créer mon compte</button>
+            <p style="margin-top:8px;font-size:14px;color:var(--text-muted);text-align:center">Déjà un compte ? <span style="color:var(--accent-text);cursor:pointer" onclick="showEmailForm()">Se connecter</span></p>
+            <p style="margin-top:8px;font-size:14px;color:var(--text-muted);cursor:pointer;text-align:center" onclick="showAuthOptions()">← Retour</p>
+        </div>
+        <div id="forgotForm" class="auth-form">
+            <p style="font-size:15px;color:var(--text-light);text-align:center;margin-bottom:16px">Entrez votre email pour recevoir un lien de réinitialisation :</p>
+            <label>Email</label>
+            <input type="email" id="inputForgotEmail" placeholder="votre@email.com" onkeydown="if(event.key==='Enter')sendForgotPassword()">
+            <button class="btn btn-primary" style="width:100%" onclick="sendForgotPassword()">Envoyer le lien</button>
+            <p style="margin-top:12px;font-size:14px;color:var(--text-muted);cursor:pointer;text-align:center" onclick="showEmailForm()">← Retour à la connexion</p>
+        </div>
+        <div id="resetForm" class="auth-form">
+            <p style="font-size:15px;color:var(--text-light);text-align:center;margin-bottom:16px">Choisissez votre nouveau mot de passe :</p>
+            <label>Nouveau mot de passe (6 caractères min.)</label>
+            <input type="password" id="inputResetPassword" placeholder="Nouveau mot de passe">
+            <label>Confirmer</label>
+            <input type="password" id="inputResetConfirm" placeholder="Retapez le mot de passe" onkeydown="if(event.key==='Enter')submitResetPassword()">
+            <button class="btn btn-primary" style="width:100%" onclick="submitResetPassword()">Réinitialiser</button>
+        </div>
+        <div id="pseudoForm" class="auth-form">
+            <p id="pseudoHint" style="font-size:15px;color:var(--text-light);text-align:center;margin-bottom:16px">Choisissez votre pseudo :</p>
+            <label>Pseudo affiché</label>
+            <input type="text" id="inputPseudo" placeholder="Votre pseudo" onkeydown="if(event.key==='Enter')confirmPseudo()">
+            <button class="btn btn-primary" style="width:100%" onclick="confirmPseudo()">Confirmer</button>
+        </div>
+    </div>
+</div>
+
+<!-- NAV -->
+<nav class="nav" id="nav">
+    <div class="nav-inner">
+        <a href="index.html" class="nav-brand"><img src="img/logo-guilde-192.webp" width="46" height="44" alt=""><span>Mélusine</span></a>
+        <button class="nav-toggle" id="navToggle" aria-label="Menu"><span></span><span></span><span></span></button>
+        <ul class="nav-links" id="navLinks">
+            <li><a href="accueil-2027.html" class="active">Accueil</a></li>
+            <li><a href="programme.html">Programme</a></li>
+            <li><a href="infos.html">Infos</a></li>
+            <li><a href="benevoles.html">Bénévoles</a></li>
+            <li id="navInscriptionsLink" style="display:none"><a href="mes-inscriptions.html">Mes inscriptions</a></li>
+            <li id="navUserArea"><button class="nav-user-btn" onclick="openAuthModal()">Se connecter</button></li>
+        </ul>
+    </div>
+</nav>
+
+<!-- CONTENU (le menu est fixe : la zone héros gère elle-même son espacement) -->
+<div class="maquette-tag">MAQUETTE — textes provisoires</div>
+
+<!-- HÉROS : titre, date, lieu, appels à l'action + illustration de l'affiche -->
+<header class="hero2">
+    <div class="v2-wrap hero2-inner">
+        <div class="hero2-text">
+            <p class="v2-eyebrow">Convention de jeu de rôle · Poitiers</p>
+            <h1 class="hero2-title">Sous l'<em>Œil</em> de Mélusine</h1>
+            <p class="hero2-date" data-edition="range"></p>
+            <ul class="hero2-chips">
+                <li class="chip"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg><span data-edition="venue"></span></li>
+                <li class="chip"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6M17.5 14.2c2.2.7 3.5 2.7 3.5 5.8"/></svg><span>Organisée par La Guilde</span></li>
+            </ul>
+            <div class="hero2-cta">
+                <a class="btn btn-primary btn-lg" href="programme.html">Voir le programme <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                <a class="btn btn-ghost btn-lg" href="infos.html">Infos pratiques</a>
+            </div>
+        </div>
+        <figure class="poster">
+            <img src="img/affiche-2027.webp" width="960" height="1358" fetchpriority="high" alt="Illustration de l'affiche : une immense fusée rouge-orangé domine une petite tour posée sur une colline, au milieu de nuages roses">
+            <figcaption>Illustration : Louis Hyerlé</figcaption>
+        </figure>
+    </div>
+</header>
+
+<!-- TROIS ACTIONS : les trois usages réels du site -->
+<section class="band" aria-labelledby="participer">
+    <div class="v2-wrap">
+        <p class="v2-eyebrow">Participer</p>
+        <h2 class="v2-h2" id="participer">Il y a une place pour vous</h2>
+        <div class="actions3">
+            <a class="action" href="programme.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 20.5 7.5v9L12 21.5 3.5 16.5v-9z"/><path d="M12 2.5v19M3.5 7.5l17 9M20.5 7.5l-17 9"/></svg><h3>Jouer</h3><p>Parcourez les tables de jeu de rôle et réservez votre place.</p><span class="go">Voir le programme <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
+            <a class="action" href="espace-mj.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h11a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/><path d="M9.5 9h6M9.5 12.5h6M9.5 16h4"/></svg><h3>Animer une table</h3><p>Vous menez des parties ? Proposez votre table à l'équipe organisatrice.</p><span class="go">Proposer une table <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
+            <a class="action" href="benevoles.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg><h3>Donner un coup de main</h3><p>Rejoignez l'équipe de bénévoles et choisissez vos créneaux.</p><span class="go">Devenir bénévole <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
+        </div>
+    </div>
+</section>
+
+<!-- L'ÉVÉNEMENT : texte de présentation déjà publié sur la page Infos -->
+<section class="band band--surface" aria-labelledby="evenement">
+    <div class="v2-wrap split">
+        <div>
+            <p class="v2-eyebrow">L'événement</p>
+            <h2 class="v2-h2" id="evenement">Une convention de jeu de rôle, à Poitiers</h2>
+            <p class="v2-lead">Sous l'Œil de Mélusine est organisée par La Guilde, section jeu de rôle de l'association du Foyer du Porteau. Que vous soyez joueur·euse aguerri·e ou curieux·euse de découvrir le JDR, vous êtes les bienvenu·es !</p>
+            <a class="btn btn-ghost btn-lg" href="infos.html">Lieu, dates et restauration <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        </div>
+        <div class="guilde-card">
+            <img class="guilde-logo" src="img/logo-guilde-192.webp" width="96" height="91" alt="Logo de La Guilde — Poitiers" loading="lazy">
+            <p><strong>La Guilde</strong> organise l'événement. Retrouvez l'association sur <a href="https://www.laguilde-poitiers.com/" target="_blank" rel="noopener">laguilde-poitiers.com</a>.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ESPACE avant le pied de page -->
+<div style="height:48px"></div>
+
+<!-- FOOTER -->
+<footer class="footer"><div class="footer-inner"><a class="footer-guilde" href="https://www.laguilde-poitiers.com/" target="_blank" rel="noopener"><img class="guilde-logo" src="img/logo-guilde-192.webp" width="72" height="68" alt="La Guilde — Poitiers" loading="lazy"></a><div><div class="footer-brand">Sous l'Œil de Mélusine</div><div class="footer-sub">Organisé par <a href="https://www.laguilde-poitiers.com/" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none">La Guilde</a> · <span data-edition="venueDot"></span></div></div><div class="footer-right" data-edition="range"></div></div></footer>
+<button class="scroll-top" id="scrollTop" aria-label="Retour en haut">↑</button>
+
+<!-- Scripts : app.js (partagé) puis code spécifique à la page Infos -->
+<script src="edition.js?v=1"></script>
+<script src="app.supabase.js?v=4"></script>
+</body>
+</html>
