@@ -31,3 +31,28 @@ test('la migration ne redonne que la colonne nom, et seulement à authenticated'
 test('le retour arrière restaure l\'état d\'avant (c\'est lui qui rouvre la faille)', () => {
   assert.match(retour, /GRANT UPDATE ON TABLE public\.profiles TO anon, authenticated;/);
 });
+
+// ── Migration 005 : lecture restreinte ──
+const m5 = sansCommentaires(lire('migrations/005_profiles_lecture_restreinte.sql'));
+const r5 = sansCommentaires(lire('migrations/rollback/005_profiles_lecture_restreinte_rollback.sql'));
+
+test('005 : la nouvelle règle de lecture est créée AVANT la suppression de l\'ancienne', () => {
+  const creation = m5.indexOf('CREATE POLICY profiles_select_own_or_admin');
+  const suppression = m5.indexOf('DROP POLICY IF EXISTS profiles_select_public');
+  assert.ok(creation > -1 && suppression > -1 && creation < suppression);
+});
+
+test('005 : la règle est réservée à authenticated et ne contient aucune condition « true »', () => {
+  assert.match(m5, /FOR SELECT TO authenticated/);
+  assert.doesNotMatch(m5.slice(m5.indexOf('CREATE POLICY')), /USING\s*\(\s*true\s*\)/i);
+});
+
+test('005 : is_admin() est SECURITY DEFINER, a un search_path et est fermée à anon', () => {
+  assert.match(m5, /SECURITY DEFINER/);
+  assert.match(m5, /SET search_path = public, pg_temp/);
+  assert.match(m5, /REVOKE ALL ON FUNCTION public\.is_admin\(\) FROM PUBLIC, anon;/);
+});
+
+test('005 : le retour arrière rétablit la règle publique (c\'est lui qui rouvre la fuite)', () => {
+  assert.match(r5, /CREATE POLICY profiles_select_public/);
+});
