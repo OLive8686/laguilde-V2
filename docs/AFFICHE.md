@@ -14,7 +14,7 @@ L'illustration de l'affiche est affichée sur l'accueil (`accueil-2027.html`, zo
    - Rien à installer : le script utilise Chrome (ou Edge), déjà présent, et Node 22 ou plus.
    - Les deux derniers nombres sont la largeur (960 px) et la qualité (80). Le script **prévient si le fichier dépasse 150 Ko** : baisser alors la qualité (par exemple 70) ou la largeur.
 3. Vérifier le résultat à l'œil : la version web ne doit pas être floue ni avoir de bandes de couleur dans les dégradés.
-4. Mettre à jour le texte alternatif (`alt`) de l'image si le visuel change (ce que voit un lecteur d'écran), et le crédit de l'illustration (voir plus bas).
+4. Mettre à jour le texte alternatif (`alt`) de l'image si le visuel change (ce que voit un lecteur d'écran). Le crédit de l'illustration est décrit plus bas.
 5. Incrémenter le paramètre de version de l'image pour contourner le cache des navigateurs : `img/affiche-2027.webp?v=2` dans `accueil-2027.html`.
 
 Un autre outil convient aussi (par exemple le site squoosh.app) : viser du WebP, 960 px de large, moins de 150 Ko.
@@ -26,7 +26,7 @@ Le titre, la date et le lieu de l'accueil sont écrits en **texte** à côté de
 ## Crédit et droits
 
 - La signature de l'artiste est visible sur l'illustration (en bas à droite) : **ne pas recadrer l'image de façon à la couper**.
-- Le crédit « Illustration : à créditer » est un **marqueur provisoire** (`accueil-2027.html`, élément `figcaption`). Le remplacer par le nom de l'artiste, avec un lien vers son portfolio si vous en avez l'accord.
+- Le crédit affiché est « **Illustration : Louis Hyerlé** » (`accueil-2027.html`, élément `figcaption`). Y ajouter un lien vers son portfolio si l'artiste en est d'accord.
 - Confirmer par écrit avec l'artiste l'autorisation d'usage sur le site (et, si besoin, sur les autres supports).
 
 ## Fichiers

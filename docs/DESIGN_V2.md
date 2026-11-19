@@ -17,7 +17,7 @@ Contrôles faits : contraste AA mesuré dans Chrome sur les trois pages en sombr
 ## Ce qui est PROVISOIRE (à valider ou fournir)
 
 - **Tous les textes de l'accueil** sont des propositions, sauf la présentation de l'événement (reprise de la page Infos). Un bandeau « MAQUETTE — textes provisoires » est affiché.
-- **Crédit de l'illustration** : « à créditer » (nom de l'artiste à fournir, voir `docs/AFFICHE.md`).
+- **Crédit de l'illustration** : « Louis Hyerlé » affiché ; reste à confirmer **par écrit** son autorisation d'usage sur le site (voir `docs/AFFICHE.md`).
 - **Affiche sans lettrage** : à remplacer par la version finale.
 - Les valeurs de la table `config` (lieu, dates, tarif) restent celles de 2026 tant que la migration `010` n'est pas appliquée : la page Infos le montre.
 

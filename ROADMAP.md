@@ -228,6 +228,7 @@ Avant l'ouverture des inscriptions, vérifier :
 - [ ] Si refonte `programme_id` faite : tester un workflow complet (inscription → annulation → promotion auto → email)
 - [ ] Test de l'envoi du rappel J-3 sur un compte admin avant la vraie date
 - [ ] **Purger les données de 2026 avant de réactiver le bouton « Envoyer les rappels J-3 »** (inscriptions, présences, bénévoles, repas, accompagnants, copie dans `audit_log`). Le bouton est masqué (`display:none` dans `admin.html`) : `send_reminders` écrit à **toutes** les personnes présentes dans `presences`, donc tant que les données 2026 y figurent, le réactiver expose à un envoi massif aux participants de l'édition passée
+- [ ] **Retirer le rideau d'accès équipe au lancement public** (`acces.js`, balises `noindex`, formulaire de `index.html`) : procédure dans `docs/ACCES_EQUIPE.md`. Et appliquer les correctifs de la branche `security/lockdown-rpc` avant d'inviter de vrais utilisateurs
 - [ ] Test de l'export CSV (les 5 fichiers)
 - [ ] Vue admin par table opérationnelle
 - [ ] Modal post-login s'affiche pour un nouveau compte
