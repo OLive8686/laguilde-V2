@@ -33,6 +33,7 @@ Site d'inscription pour une convention de jeu de rôle à Poitiers, organisée p
 - `styles.css` : Mise en page et composants, partagés par toutes les pages. Ne contient aucune couleur en dur : tout passe par les jetons de `theme.css`
 - `fonts.css` et `fonts/` : Polices **auto-hébergées** (Cinzel, Cinzel Decorative, Lora ; woff2 latin, 116 Ko ; licence SIL OFL 1.1, voir `fonts/README.md`)
 - `Logo_guilde_final.webp` : Logo de La Guilde, affiché dans les pieds de page et sur la page Infos, sur une plaque claire (`--logo-plate`) car ses éléments bordeaux sont illisibles sur fond sombre. Le logo du menu reste `logo.png`
+- **Maquettes design v2 (branche `feature/design-v2`, non publiées)** : `v2.css` (couche visuelle chargée après `styles.css`), `accueil-2027.html` (nouvel accueil, textes provisoires, `noindex`), `img/affiche-2027.webp` (affiche allégée), `tools/optimiser-affiche.js` (fabrique la version web de l'affiche). Détail, points provisoires et marche à suivre : `docs/DESIGN_V2.md` et `docs/AFFICHE.md`
 - `worker-email.js` : Code du Cloudflare Worker d'e-mails `melusine-email` (à copier dans le dashboard Cloudflare après modification)
 - `worker.js` : Code du second Worker Cloudflare, de **maintien en éveil** : un cron ping la base Supabase toutes les 4 minutes pour éviter la mise en pause du plan gratuit. Sans lien avec les e-mails
 - `CNAME` : Domaine personnalisé GitHub Pages (`sousloeildemelusine.fr`)
